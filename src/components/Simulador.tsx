@@ -85,6 +85,7 @@ export default function Simulador({
   );
   const [observacoes, setObservacoes] = useState(proposta.observacoes ?? "");
   const [clienteId, setClienteId] = useState(proposta.cliente_id);
+  const [criandoCliente, setCriandoCliente] = useState(false);
   const [dadosCliente, setDadosCliente] = useState(() => ({
     nome: cliente?.nome ?? "",
     empresa: cliente?.empresa ?? null,
@@ -154,9 +155,13 @@ export default function Simulador({
     [lotesDisponiveis, lotes]
   );
 
-  function trocarCliente(id: string) {
-    const c = clientes.find((x) => x.id === id);
-    setClienteId(id || null);
+  const CLIENTE_NOVO = "__novo__";
+
+  function trocarCliente(valor: string) {
+    const novo = valor === CLIENTE_NOVO;
+    const c = novo ? undefined : clientes.find((x) => x.id === valor);
+    setCriandoCliente(novo);
+    setClienteId(novo ? null : valor || null);
     setDadosCliente({
       nome: c?.nome ?? "",
       empresa: c?.empresa ?? null,
@@ -332,11 +337,12 @@ export default function Simulador({
     setRecado(null);
     iniciarSalvar(async () => {
       try {
-        await salvarProposta({
+        const retorno = await salvarProposta({
           id: proposta.id,
           titulo: titulo || null,
           cliente_id: clienteId,
-          cliente: clienteId ? dadosCliente : null,
+          cliente: clienteId || criandoCliente ? dadosCliente : null,
+          criar_cliente: criandoCliente,
           status,
           data_base: dataBase,
           validade_dias: validade,
@@ -347,6 +353,10 @@ export default function Simulador({
           lotes,
           cenarios: cenarios as unknown as CenarioPayload[],
         });
+        if (criandoCliente && retorno.cliente_id) {
+          setClienteId(retorno.cliente_id);
+          setCriandoCliente(false);
+        }
         setSujo(false);
         setRecado("Proposta salva.");
       } catch (e) {
@@ -939,11 +949,12 @@ export default function Simulador({
             <h2 className="serif text-lg">Cliente</h2>
             <select
               className="campo w-auto text-xs"
-              value={clienteId ?? ""}
+              value={criandoCliente ? CLIENTE_NOVO : (clienteId ?? "")}
               onChange={(e) => trocarCliente(e.target.value)}
               title="Trocar o cliente desta proposta"
             >
               <option value="">— sem cliente —</option>
+              <option value={CLIENTE_NOVO}>+ cadastrar novo cliente</option>
               {clientes.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nome}
@@ -953,7 +964,7 @@ export default function Simulador({
             </select>
           </div>
 
-          {clienteId ? (
+          {clienteId || criandoCliente ? (
             <>
               <div>
                 <label className="rotulo">Nome</label>
@@ -1013,13 +1024,15 @@ export default function Simulador({
                 </div>
               </div>
               <p className="text-xs text-cinza">
-                Editar aqui altera o cadastro do cliente, não só esta proposta. O
-                nome e a empresa saem no cabeçalho do PDF.
+                {criandoCliente
+                  ? "O cadastro é criado ao salvar a proposta e passa a aparecer em Clientes."
+                  : "Editar aqui altera o cadastro do cliente, não só esta proposta. O nome e a empresa saem no cabeçalho do PDF."}
               </p>
             </>
           ) : (
             <p className="text-sm text-cinza">
-              Proposta sem cliente. Escolha um acima ou cadastre em{" "}
+              Proposta sem cliente. Escolha um na lista, use{" "}
+              <strong>+ cadastrar novo cliente</strong> ou abra{" "}
               <Link href="/clientes" className="text-vinho font-semibold">
                 Clientes
               </Link>

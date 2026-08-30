@@ -181,9 +181,15 @@ para o saldo devedor zerar exatamente.
 
 Os dados do cliente são editáveis em dois lugares, e os dois gravam na mesma
 linha de `clientes`: a tela `/clientes` (edição em linha) e o cartão Cliente
-dentro do simulador. O cartão do simulador também troca qual cliente a
-proposta aponta. Salvar a proposta grava o cliente antes do cabeçalho, para
-que a listagem já apareça com o nome novo.
+dentro do simulador. Salvar a proposta grava o cliente antes do cabeçalho,
+para que a listagem já apareça com o nome novo.
+
+O seletor do cartão faz três coisas: troca qual cliente a proposta aponta,
+desvincula (`— sem cliente —`) e cadastra um novo (`+ cadastrar novo
+cliente`). No modo "novo", `salvarProposta` recebe `criar_cliente: true`,
+insere o cadastro e devolve o `cliente_id` para a tela adotar — assim dá para
+corrigir um cliente errado sem sair da proposta, que é como o erro costuma
+aparecer.
 
 ## Ordem dos lotes
 
