@@ -141,7 +141,7 @@ export default function NovaPropostaForm({
           <h2 className="serif text-lg">
             Opções de parcelamento
             <span className="text-sm text-cinza font-sans ml-2">
-              marque quantas quiser — cada uma vira uma aba na proposta
+              marque quantas quiser; a ordem de clique é a ordem das abas
             </span>
           </h2>
           <span className="text-sm text-cinza">{efetivas.length} selecionada(s)</span>
@@ -149,7 +149,8 @@ export default function NovaPropostaForm({
 
         <div className="p-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {condicoesDaTabela.map((c) => {
-            const marcado = efetivas.includes(c.id);
+            const posicao = efetivas.indexOf(c.id);
+            const marcado = posicao >= 0;
             return (
               <button
                 type="button"
@@ -162,7 +163,14 @@ export default function NovaPropostaForm({
                 }`}
               >
                 <span className="flex items-start justify-between gap-2">
-                  <span className="font-semibold text-sm">{c.nome}</span>
+                  <span className="font-semibold text-sm">
+                    {marcado && (
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-vinho text-white text-[11px] mr-1.5 align-middle">
+                        {posicao + 1}
+                      </span>
+                    )}
+                    {c.nome}
+                  </span>
                   {marcado && <Check size={14} className="text-vinho shrink-0 mt-0.5" />}
                 </span>
                 {c.desconto_pct > 0 && (

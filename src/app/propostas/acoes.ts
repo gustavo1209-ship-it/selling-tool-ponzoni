@@ -12,6 +12,7 @@ import type {
   PropostaLote,
 } from "@/lib/db/tipos";
 import { compararLote } from "@/lib/ordenacao";
+import type { DadosCliente } from "@/app/clientes/acoes";
 
 /** Blocos default quando a condição escolhida não traz template. */
 const TEMPLATE_PADRAO: BlocoTemplate[] = [
@@ -134,12 +135,12 @@ export async function criarProposta(formData: FormData) {
   );
   if (erroLotes) throw new Error(erroLotes.message);
 
-  // Uma opção de parcelamento por condição escolhida. A ordem das condições
-  // na tabela manda, não a ordem em que foram clicadas.
+  // Uma opção de parcelamento por condição escolhida, na ordem em que foram
+  // marcadas na tela — é a ordem das abas e a ordem em que saem no PDF, e o
+  // vendedor pode rearrumar depois no simulador.
   const escolhidas = condicaoIds
     .map((id) => (condicoes ?? []).find((c) => c.id === id))
-    .filter((c): c is NonNullable<typeof c> => Boolean(c))
-    .sort((a, b) => a.ordem - b.ordem);
+    .filter((c): c is NonNullable<typeof c> => Boolean(c));
 
   const aCriar = escolhidas.length
     ? escolhidas.map((c, i) => ({
@@ -197,6 +198,9 @@ export interface CenarioPayload extends PropostaCenario {
 export interface PayloadSalvar {
   id: string;
   titulo: string | null;
+  cliente_id: string | null;
+  /** Dados do cliente, editáveis de dentro da proposta. */
+  cliente: DadosCliente | null;
   status: string;
   data_base: string;
   validade_dias: number;
@@ -251,10 +255,29 @@ export async function salvarProposta(payload: PayloadSalvar) {
   const recomendado =
     payload.cenarios.find((c) => c.recomendado) ?? payload.cenarios[0];
 
+  // o cliente é gravado antes: se o nome mudou, a listagem já reflete
+  if (payload.cliente_id && payload.cliente) {
+    const nome = payload.cliente.nome.trim();
+    if (!nome) throw new Error("O nome do cliente não pode ficar vazio.");
+    const { error } = await supabase
+      .from("clientes")
+      .update({
+        nome,
+        empresa: payload.cliente.empresa?.trim() || null,
+        documento: payload.cliente.documento?.trim() || null,
+        email: payload.cliente.email?.trim() || null,
+        telefone: payload.cliente.telefone?.trim() || null,
+        observacao: payload.cliente.observacao?.trim() || null,
+      })
+      .eq("id", payload.cliente_id);
+    if (error) throw new Error(error.message);
+  }
+
   const { error: erroCabecalho } = await supabase
     .from("propostas")
     .update({
       titulo: payload.titulo,
+      cliente_id: payload.cliente_id,
       status: payload.status,
       data_base: payload.data_base,
       validade_dias: payload.validade_dias,
@@ -331,6 +354,7 @@ export async function salvarProposta(payload: PayloadSalvar) {
 
   revalidatePath(`/propostas/${payload.id}`);
   revalidatePath("/propostas");
+  revalidatePath("/clientes");
   return { ok: true };
 }
 

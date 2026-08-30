@@ -4,6 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Download,
   Plus,
@@ -57,6 +59,7 @@ export default function Simulador({
   proposta,
   empreendimento,
   cliente,
+  clientes,
   lotesIniciais,
   cenariosIniciais,
   lotesDisponiveis,
@@ -65,6 +68,7 @@ export default function Simulador({
   proposta: Proposta;
   empreendimento: Empreendimento;
   cliente: Cliente | null;
+  clientes: Cliente[];
   lotesIniciais: PropostaLote[];
   cenariosIniciais: CenarioComBlocos[];
   lotesDisponiveis: Lote[];
@@ -80,6 +84,15 @@ export default function Simulador({
     proposta.correcao_primeira_parcela
   );
   const [observacoes, setObservacoes] = useState(proposta.observacoes ?? "");
+  const [clienteId, setClienteId] = useState(proposta.cliente_id);
+  const [dadosCliente, setDadosCliente] = useState(() => ({
+    nome: cliente?.nome ?? "",
+    empresa: cliente?.empresa ?? null,
+    documento: cliente?.documento ?? null,
+    email: cliente?.email ?? null,
+    telefone: cliente?.telefone ?? null,
+    observacao: cliente?.observacao ?? null,
+  }));
   const [lotes, setLotes] = useState<PropostaLote[]>(lotesIniciais);
   const [cenarios, setCenarios] = useState<CenarioComBlocos[]>(cenariosIniciais);
   const [ativoId, setAtivoId] = useState(cenariosIniciais[0]?.id ?? "");
@@ -140,6 +153,20 @@ export default function Simulador({
         .sort(compararLote),
     [lotesDisponiveis, lotes]
   );
+
+  function trocarCliente(id: string) {
+    const c = clientes.find((x) => x.id === id);
+    setClienteId(id || null);
+    setDadosCliente({
+      nome: c?.nome ?? "",
+      empresa: c?.empresa ?? null,
+      documento: c?.documento ?? null,
+      email: c?.email ?? null,
+      telefone: c?.telefone ?? null,
+      observacao: c?.observacao ?? null,
+    });
+    marcar();
+  }
 
   // ------------------------------------------------------------- cenários
   function mudarCenario(id: string, patch: Partial<CenarioComBlocos>) {
@@ -206,6 +233,18 @@ export default function Simulador({
       }
       if (id === ativoId) setAtivoId(restantes[0]?.id ?? "");
       return restantes;
+    });
+    marcar();
+  }
+
+  function moverCenario(id: string, direcao: -1 | 1) {
+    setCenarios((cs) => {
+      const i = cs.findIndex((c) => c.id === id);
+      const j = i + direcao;
+      if (i < 0 || j < 0 || j >= cs.length) return cs;
+      const out = [...cs];
+      [out[i], out[j]] = [out[j], out[i]];
+      return out.map((c, k) => ({ ...c, ordem: k }));
     });
     marcar();
   }
@@ -296,6 +335,8 @@ export default function Simulador({
         await salvarProposta({
           id: proposta.id,
           titulo: titulo || null,
+          cliente_id: clienteId,
+          cliente: clienteId ? dadosCliente : null,
           status,
           data_base: dataBase,
           validade_dias: validade,
@@ -331,7 +372,7 @@ export default function Simulador({
             {empreendimento.nome} · {proposta.codigo}
           </p>
           <h1 className="serif text-3xl mt-1">
-            {cliente?.nome ?? (titulo || "Proposta sem cliente")}
+            {dadosCliente.nome || titulo || "Proposta sem cliente"}
           </h1>
           <p className="text-sm text-cinza mt-1">
             {cenarios.length === 1
@@ -573,19 +614,46 @@ export default function Simulador({
       {/* ----------------------------------------------------- abas + editor */}
       <section className="cartao">
         <div className="flex items-center gap-1 px-3 pt-3 flex-wrap border-b border-linha">
-          {cenarios.map((c) => (
-            <button
+          {cenarios.map((c, i) => (
+            <div
               key={c.id}
-              onClick={() => setAtivoId(c.id)}
-              className={`px-3 py-2 text-sm font-semibold rounded-t-md border border-b-0 -mb-px flex items-center gap-1.5 ${
+              className={`px-2 py-1.5 rounded-t-md border border-b-0 -mb-px flex items-center gap-0.5 ${
                 c.id === ativoId
-                  ? "bg-superficie border-linha text-vinho"
-                  : "bg-papel-alt border-transparent text-cinza hover:text-tinta"
+                  ? "bg-superficie border-linha"
+                  : "bg-papel-alt border-transparent"
               }`}
             >
-              {c.recomendado && <Star size={12} className="text-dourado-escuro" />}
-              {c.nome}
-            </button>
+              {/* a ordem das abas é a ordem em que as opções saem no PDF */}
+              {c.id === ativoId && cenarios.length > 1 && (
+                <button
+                  className="btn btn-fantasma px-1"
+                  onClick={() => moverCenario(c.id, -1)}
+                  disabled={i === 0}
+                  title="Mover para a esquerda"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+              )}
+              <button
+                onClick={() => setAtivoId(c.id)}
+                className={`px-1.5 text-sm font-semibold flex items-center gap-1.5 ${
+                  c.id === ativoId ? "text-vinho" : "text-cinza hover:text-tinta"
+                }`}
+              >
+                {c.recomendado && <Star size={12} className="text-dourado-escuro" />}
+                {c.nome}
+              </button>
+              {c.id === ativoId && cenarios.length > 1 && (
+                <button
+                  className="btn btn-fantasma px-1"
+                  onClick={() => moverCenario(c.id, 1)}
+                  disabled={i === cenarios.length - 1}
+                  title="Mover para a direita"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              )}
+            </div>
           ))}
 
           <div className="ml-auto flex items-center gap-2 pb-2">
@@ -864,8 +932,102 @@ export default function Simulador({
         )}
       </section>
 
-      {/* ------------------------------------------------------- premissas */}
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* ------------------------------------------------- cliente e premissas */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <section className="cartao p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="serif text-lg">Cliente</h2>
+            <select
+              className="campo w-auto text-xs"
+              value={clienteId ?? ""}
+              onChange={(e) => trocarCliente(e.target.value)}
+              title="Trocar o cliente desta proposta"
+            >
+              <option value="">— sem cliente —</option>
+              {clientes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                  {c.empresa ? ` · ${c.empresa}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {clienteId ? (
+            <>
+              <div>
+                <label className="rotulo">Nome</label>
+                <input
+                  className="campo"
+                  value={dadosCliente.nome}
+                  onChange={(e) => {
+                    setDadosCliente((d) => ({ ...d, nome: e.target.value }));
+                    marcar();
+                  }}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="rotulo">Empresa</label>
+                  <input
+                    className="campo"
+                    value={dadosCliente.empresa ?? ""}
+                    onChange={(e) => {
+                      setDadosCliente((d) => ({ ...d, empresa: e.target.value || null }));
+                      marcar();
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="rotulo">CPF / CNPJ</label>
+                  <input
+                    className="campo"
+                    value={dadosCliente.documento ?? ""}
+                    onChange={(e) => {
+                      setDadosCliente((d) => ({ ...d, documento: e.target.value || null }));
+                      marcar();
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="rotulo">Telefone</label>
+                  <input
+                    className="campo"
+                    value={dadosCliente.telefone ?? ""}
+                    onChange={(e) => {
+                      setDadosCliente((d) => ({ ...d, telefone: e.target.value || null }));
+                      marcar();
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="rotulo">E-mail</label>
+                  <input
+                    className="campo"
+                    value={dadosCliente.email ?? ""}
+                    onChange={(e) => {
+                      setDadosCliente((d) => ({ ...d, email: e.target.value || null }));
+                      marcar();
+                    }}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-cinza">
+                Editar aqui altera o cadastro do cliente, não só esta proposta. O
+                nome e a empresa saem no cabeçalho do PDF.
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-cinza">
+              Proposta sem cliente. Escolha um acima ou cadastre em{" "}
+              <Link href="/clientes" className="text-vinho font-semibold">
+                Clientes
+              </Link>
+              .
+            </p>
+          )}
+        </section>
+
         <section className="cartao p-4 flex flex-col gap-3">
           <h2 className="serif text-lg">Premissas</h2>
           <p className="text-xs text-cinza -mt-2">

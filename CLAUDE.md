@@ -63,8 +63,13 @@ update perfis set papel = 'admin' where email = 'gustavo1209@gmail.com';
 ```
 
 Só `admin` edita empreendimentos, tabelas de preço e condições. Qualquer
-vendedor lê tudo, edita status de lote e cria/edita as próprias propostas
-(RLS em `supabase/migrations/*_02_rls.sql`).
+vendedor lê tudo, edita status de lote e **clientes**, e cria/edita as
+próprias propostas (RLS em `supabase/migrations/*_02_rls.sql`).
+
+Cliente é dado compartilhado de propósito: prender a edição a quem cadastrou
+só gerava cliente duplicado quando outra pessoa atendia. Apagar continua
+restrito ao autor ou a um admin, e um cliente com proposta não pode ser
+apagado.
 
 ## Como a tabela de preços funciona de verdade
 
@@ -117,6 +122,10 @@ só podem ser comparadas se estiverem descontadas à mesma taxa.
 Um cenário é marcado `recomendado`. Ele define o `propostas.resultado`, que é
 o snapshot que as listagens leem sem carregar tudo.
 
+`ordem` é a ordem das abas no simulador **e** a ordem em que as opções saem
+no PDF e no XLSX. Na criação ela vem da ordem de clique nas condições; depois
+o vendedor rearruma pelas setas na aba ativa.
+
 ### Cada bloco é um trecho do fluxo
 
 *Entrada*, *2x de R$ 30.000*, *36x corrigidas pelo INCC*, *120x SAC no
@@ -167,6 +176,14 @@ sobra na última parcela afastava o resultado da planilha em alguns centavos
 justamente na última linha — que é a que todo mundo confere. `sac()` e
 `price()` fazem o contrário de propósito: a última parcela absorve o resíduo
 para o saldo devedor zerar exatamente.
+
+## Cliente
+
+Os dados do cliente são editáveis em dois lugares, e os dois gravam na mesma
+linha de `clientes`: a tela `/clientes` (edição em linha) e o cartão Cliente
+dentro do simulador. O cartão do simulador também troca qual cliente a
+proposta aponta. Salvar a proposta grava o cliente antes do cabeçalho, para
+que a listagem já apareça com o nome novo.
 
 ## Ordem dos lotes
 

@@ -48,20 +48,22 @@ export default async function PropostaPage({
     proposta_cenarios: (PropostaCenario & { proposta_blocos: PropostaBloco[] })[];
   };
 
-  const [{ data: disponiveis }, { data: condicoes }] = await Promise.all([
-    supabase
-      .from("lotes")
-      .select("*")
-      .eq("empreendimento_id", proposta.empreendimento_id),
-    proposta.tabela_preco_id
-      ? supabase
-          .from("condicoes_pagamento")
-          .select("*")
-          .eq("tabela_preco_id", proposta.tabela_preco_id)
-          .eq("ativa", true)
-          .order("ordem")
+  const [{ data: disponiveis }, { data: condicoes }, { data: clientes }] =
+    await Promise.all([
+      supabase
+        .from("lotes")
+        .select("*")
+        .eq("empreendimento_id", proposta.empreendimento_id),
+      proposta.tabela_preco_id
+        ? supabase
+            .from("condicoes_pagamento")
+            .select("*")
+            .eq("tabela_preco_id", proposta.tabela_preco_id)
+            .eq("ativa", true)
+            .order("ordem")
       : Promise.resolve({ data: [] }),
-  ]);
+      supabase.from("clientes").select("*").order("nome"),
+    ]);
 
   const cenariosOrdenados: CenarioComBlocos[] = [...(cenarios ?? [])]
     .sort((a, b) => a.ordem - b.ordem)
@@ -78,6 +80,7 @@ export default async function PropostaPage({
           proposta={proposta}
           empreendimento={empreendimento}
           cliente={cliente}
+          clientes={(clientes ?? []) as Cliente[]}
           lotesIniciais={[...(lotes ?? [])].sort(compararLote)}
           cenariosIniciais={cenariosOrdenados}
           lotesDisponiveis={(disponiveis ?? []) as Lote[]}
