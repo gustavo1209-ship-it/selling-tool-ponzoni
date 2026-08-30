@@ -7,8 +7,8 @@
  *  - o memorando de negociação da Quadra C (escada de desconto da tabela)
  *  - a premissa SAC do deck de lançamento (slide 32)
  */
-import { calcular, sac, price } from "./index.ts";
-import type { Bloco, Premissas } from "./tipos.ts";
+import { calcular, sac, price } from "./index";
+import type { Bloco, Premissas } from "./tipos";
 
 let falhas = 0;
 

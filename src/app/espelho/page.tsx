@@ -1,6 +1,7 @@
 import Cabecalho from "@/components/Cabecalho";
 import EspelhoTabela from "@/components/EspelhoTabela";
 import { createClient } from "@/lib/supabase/server";
+import { ordenarLotes } from "@/lib/ordenacao";
 import type { Empreendimento, Lote, TabelaPreco } from "@/lib/db/tipos";
 import type { CondicaoPagamento } from "@/lib/db/tipos";
 
@@ -38,9 +39,7 @@ export default async function EspelhoPage({
     supabase
       .from("lotes")
       .select("*")
-      .eq("empreendimento_id", atual.id)
-      .order("quadra")
-      .order("numero"),
+      .eq("empreendimento_id", atual.id),
     supabase
       .from("tabelas_preco")
       .select("*")
@@ -67,7 +66,7 @@ export default async function EspelhoPage({
         <EspelhoTabela
           empreendimentos={lista}
           empreendimento={atual}
-          lotes={(lotes ?? []) as Lote[]}
+          lotes={ordenarLotes((lotes ?? []) as Lote[])}
           tabela={(tabela ?? null) as TabelaPreco | null}
           condicoes={(condicoes ?? []) as unknown as CondicaoPagamento[]}
         />

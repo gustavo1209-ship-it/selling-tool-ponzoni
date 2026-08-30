@@ -4,6 +4,7 @@ import SairBotao from "./SairBotao";
 
 const LINKS = [
   { href: "/", rotulo: "Início" },
+  { href: "/mapa", rotulo: "Mapa de lotes" },
   { href: "/espelho", rotulo: "Espelho de vendas" },
   { href: "/propostas", rotulo: "Propostas" },
   { href: "/clientes", rotulo: "Clientes" },

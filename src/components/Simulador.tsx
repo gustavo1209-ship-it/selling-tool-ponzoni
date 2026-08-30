@@ -9,7 +9,9 @@ import {
   Plus,
   Printer,
   Save,
+  Star,
   Trash2,
+  X,
 } from "lucide-react";
 import BlocoEditor from "./BlocoEditor";
 import CampoNumero from "./CampoNumero";
@@ -18,10 +20,12 @@ import {
   apagarProposta,
   duplicarProposta,
   salvarProposta,
+  type CenarioPayload,
 } from "@/app/propostas/acoes";
 import { calcular } from "@/lib/calc";
-import type { Bloco, PropostaStatus } from "@/lib/calc/tipos";
+import type { Bloco, PropostaStatus, Resultado } from "@/lib/calc/tipos";
 import type {
+  CenarioComBlocos,
   Cliente,
   CondicaoPagamento,
   Empreendimento,
@@ -30,6 +34,7 @@ import type {
   PropostaBloco,
   PropostaLote,
 } from "@/lib/db/tipos";
+import { compararLote } from "@/lib/ordenacao";
 import { area, moeda, num, pct, precoM2, rotuloMes } from "@/lib/formato";
 
 const STATUS: PropostaStatus[] = [
@@ -41,6 +46,8 @@ const STATUS: PropostaStatus[] = [
   "expirada",
 ];
 
+const LETRAS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
 const idLocal = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -51,7 +58,7 @@ export default function Simulador({
   empreendimento,
   cliente,
   lotesIniciais,
-  blocosIniciais,
+  cenariosIniciais,
   lotesDisponiveis,
   condicoes,
 }: {
@@ -59,7 +66,7 @@ export default function Simulador({
   empreendimento: Empreendimento;
   cliente: Cliente | null;
   lotesIniciais: PropostaLote[];
-  blocosIniciais: PropostaBloco[];
+  cenariosIniciais: CenarioComBlocos[];
   lotesDisponiveis: Lote[];
   condicoes: CondicaoPagamento[];
 }) {
@@ -69,15 +76,13 @@ export default function Simulador({
   const [validade, setValidade] = useState(proposta.validade_dias);
   const [incc, setIncc] = useState(Number(proposta.incc_mensal));
   const [jurosVP, setJurosVP] = useState(Number(proposta.juros_vp_mensal));
-  const [corrigeprimeira, setCorrigePrimeira] = useState(
+  const [corrigePrimeira, setCorrigePrimeira] = useState(
     proposta.correcao_primeira_parcela
   );
-  const [descontoPct, setDescontoPct] = useState(Number(proposta.desconto_pct));
-  const [descontoValor, setDescontoValor] = useState(Number(proposta.desconto_valor));
-  const [descontoMotivo, setDescontoMotivo] = useState(proposta.desconto_motivo ?? "");
   const [observacoes, setObservacoes] = useState(proposta.observacoes ?? "");
   const [lotes, setLotes] = useState<PropostaLote[]>(lotesIniciais);
-  const [blocos, setBlocos] = useState<PropostaBloco[]>(blocosIniciais);
+  const [cenarios, setCenarios] = useState<CenarioComBlocos[]>(cenariosIniciais);
+  const [ativoId, setAtivoId] = useState(cenariosIniciais[0]?.id ?? "");
   const [mostrarFluxo, setMostrarFluxo] = useState(false);
 
   const [salvando, iniciarSalvar] = useTransition();
@@ -86,73 +91,77 @@ export default function Simulador({
 
   const marcar = () => setSujo(true);
 
-  const resultado = useMemo(
+  const lotesCalc = useMemo(
     () =>
-      calcular({
-        lotes: lotes.map((l) => ({
-          quadra: l.quadra,
-          numero: l.numero,
-          area_m2: Number(l.area_m2),
-          preco_tabela: Number(l.preco_tabela),
-          valor_negociado: Number(l.valor_negociado),
-        })),
-        blocos: blocos as unknown as Bloco[],
-        premissas: {
-          incc_mensal: incc,
-          juros_vp_mensal: jurosVP,
-          correcao_primeira_parcela: corrigeprimeira,
-        },
-        desconto_pct: descontoPct,
-        desconto_valor: descontoValor,
-      }),
-    [lotes, blocos, incc, jurosVP, corrigeprimeira, descontoPct, descontoValor]
+      lotes.map((l) => ({
+        quadra: l.quadra,
+        numero: l.numero,
+        area_m2: Number(l.area_m2),
+        preco_tabela: Number(l.preco_tabela),
+        valor_negociado: Number(l.valor_negociado),
+      })),
+    [lotes]
   );
 
+  /** Todos os cenários calculados de uma vez — o comparativo depende disso. */
+  const resultados = useMemo(() => {
+    const mapa = new Map<string, Resultado>();
+    for (const c of cenarios) {
+      mapa.set(
+        c.id,
+        calcular({
+          lotes: lotesCalc,
+          blocos: c.blocos as unknown as Bloco[],
+          premissas: {
+            incc_mensal: incc,
+            juros_vp_mensal: jurosVP,
+            correcao_primeira_parcela: corrigePrimeira,
+          },
+          desconto_pct: Number(c.desconto_pct),
+          desconto_valor: Number(c.desconto_valor),
+        })
+      );
+    }
+    return mapa;
+  }, [cenarios, lotesCalc, incc, jurosVP, corrigePrimeira]);
+
+  const ativo = cenarios.find((c) => c.id === ativoId) ?? cenarios[0];
+  const resultado = ativo ? resultados.get(ativo.id) : undefined;
+
   const porBloco = useMemo(
-    () => new Map(resultado.blocos.map((b) => [b.bloco.id, b])),
+    () => new Map((resultado?.blocos ?? []).map((b) => [b.bloco.id, b])),
     [resultado]
   );
 
-  const naoUsados = lotesDisponiveis.filter(
-    (l) => !lotes.some((pl) => pl.lote_id === l.id)
+  const naoUsados = useMemo(
+    () =>
+      [...lotesDisponiveis]
+        .filter((l) => !lotes.some((pl) => pl.lote_id === l.id))
+        .sort(compararLote),
+    [lotesDisponiveis, lotes]
   );
 
-  function salvar() {
-    setRecado(null);
-    iniciarSalvar(async () => {
-      try {
-        await salvarProposta({
-          id: proposta.id,
-          titulo: titulo || null,
-          status,
-          data_base: dataBase,
-          validade_dias: validade,
-          incc_mensal: incc,
-          juros_vp_mensal: jurosVP,
-          correcao_primeira_parcela: corrigeprimeira,
-          desconto_pct: descontoPct,
-          desconto_valor: descontoValor,
-          desconto_motivo: descontoMotivo || null,
-          observacoes: observacoes || null,
-          lotes,
-          blocos,
-        });
-        setSujo(false);
-        setRecado("Proposta salva.");
-      } catch (e) {
-        setRecado((e as Error).message);
-      }
-    });
+  // ------------------------------------------------------------- cenários
+  function mudarCenario(id: string, patch: Partial<CenarioComBlocos>) {
+    setCenarios((cs) => cs.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    marcar();
   }
 
-  function aplicarCondicao(id: string) {
-    const c = condicoes.find((x) => x.id === id);
-    if (!c) return;
-    setDescontoPct(Number(c.desconto_pct));
-    setBlocos(
-      c.template.map((b, i) => ({
+  function adicionarCenario(condicao?: CondicaoPagamento) {
+    const novo: CenarioComBlocos = {
+      id: idLocal(),
+      proposta_id: proposta.id,
+      ordem: cenarios.length,
+      nome: condicao?.nome ?? `Opção ${LETRAS[cenarios.length] ?? cenarios.length + 1}`,
+      condicao_origem: condicao?.nome ?? null,
+      desconto_pct: condicao ? Number(condicao.desconto_pct) : 0,
+      desconto_valor: 0,
+      desconto_motivo: null,
+      recomendado: cenarios.length === 0,
+      resultado: null,
+      blocos: (condicao?.template ?? []).map((b, i) => ({
         id: idLocal(),
-        proposta_id: proposta.id,
+        cenario_id: "",
         ordem: i,
         rotulo: b.rotulo,
         tipo: b.tipo,
@@ -167,25 +176,86 @@ export default function Simulador({
         amortizacao: b.amortizacao,
         parcela_fixa: b.parcela_fixa ?? null,
         observacao: b.observacao ?? null,
-      }))
+      })),
+    };
+    setCenarios((cs) => [...cs, novo]);
+    setAtivoId(novo.id);
+    marcar();
+  }
+
+  function duplicarCenario(id: string) {
+    const origem = cenarios.find((c) => c.id === id);
+    if (!origem) return;
+    const copia: CenarioComBlocos = {
+      ...origem,
+      id: idLocal(),
+      nome: `${origem.nome} (cópia)`,
+      recomendado: false,
+      blocos: origem.blocos.map((b) => ({ ...b, id: idLocal() })),
+    };
+    setCenarios((cs) => [...cs, copia]);
+    setAtivoId(copia.id);
+    marcar();
+  }
+
+  function removerCenario(id: string) {
+    setCenarios((cs) => {
+      const restantes = cs.filter((c) => c.id !== id);
+      if (restantes.length && !restantes.some((c) => c.recomendado)) {
+        restantes[0] = { ...restantes[0], recomendado: true };
+      }
+      if (id === ativoId) setAtivoId(restantes[0]?.id ?? "");
+      return restantes;
+    });
+    marcar();
+  }
+
+  function recomendar(id: string) {
+    setCenarios((cs) => cs.map((c) => ({ ...c, recomendado: c.id === id })));
+    marcar();
+  }
+
+  // --------------------------------------------------------------- blocos
+  function mudarBloco(cenarioId: string, blocoId: string, patch: Partial<PropostaBloco>) {
+    setCenarios((cs) =>
+      cs.map((c) =>
+        c.id !== cenarioId
+          ? c
+          : { ...c, blocos: c.blocos.map((b) => (b.id === blocoId ? { ...b, ...patch } : b)) }
+      )
     );
     marcar();
   }
 
-  function adicionarBloco() {
-    setBlocos((b) => [
-      ...b,
+  function alterarBlocos(
+    cenarioId: string,
+    fn: (blocos: PropostaBloco[]) => PropostaBloco[]
+  ) {
+    setCenarios((cs) =>
+      cs.map((c) =>
+        c.id !== cenarioId
+          ? c
+          : { ...c, blocos: fn(c.blocos).map((b, i) => ({ ...b, ordem: i })) }
+      )
+    );
+    marcar();
+  }
+
+  function adicionarBloco(cenarioId: string) {
+    alterarBlocos(cenarioId, (bs) => [
+      ...bs,
       {
         id: idLocal(),
-        proposta_id: proposta.id,
-        ordem: b.length,
-        rotulo: `Bloco ${b.length + 1}`,
+        cenario_id: cenarioId,
+        ordem: bs.length,
+        rotulo: `Bloco ${bs.length + 1}`,
         tipo: "parcelas",
         base_percentual: null,
         base_valor: null,
         absorve_residuo: true,
         qtd_parcelas: 12,
-        mes_inicio: (b[b.length - 1]?.mes_inicio ?? 0) + (b[b.length - 1]?.qtd_parcelas ?? 1),
+        mes_inicio:
+          (bs[bs.length - 1]?.mes_inicio ?? 0) + (bs[bs.length - 1]?.qtd_parcelas ?? 1),
         indexador: "incc",
         taxa_indexador_mensal: null,
         juros_mensal: 0,
@@ -194,44 +264,54 @@ export default function Simulador({
         observacao: null,
       },
     ]);
-    marcar();
   }
 
-  function mudarBloco(id: string, patch: Partial<PropostaBloco>) {
-    setBlocos((bs) => bs.map((b) => (b.id === id ? { ...b, ...patch } : b)));
-    marcar();
-  }
-
-  function moverBloco(id: string, direcao: -1 | 1) {
-    setBlocos((bs) => {
-      const i = bs.findIndex((b) => b.id === id);
-      const j = i + direcao;
-      if (i < 0 || j < 0 || j >= bs.length) return bs;
-      const copia = [...bs];
-      [copia[i], copia[j]] = [copia[j], copia[i]];
-      return copia.map((b, k) => ({ ...b, ordem: k }));
-    });
-    marcar();
-  }
-
+  // ---------------------------------------------------------------- lotes
   function adicionarLote(loteId: string) {
     const l = lotesDisponiveis.find((x) => x.id === loteId);
     if (!l) return;
-    setLotes((ls) => [
-      ...ls,
-      {
-        id: idLocal(),
-        proposta_id: proposta.id,
-        lote_id: l.id,
-        quadra: l.quadra,
-        numero: l.numero,
-        area_m2: Number(l.area_m2),
-        preco_tabela: Number(l.preco_tabela ?? 0),
-        valor_negociado: Number(l.preco_tabela ?? 0),
-        ordem: ls.length,
-      },
-    ]);
+    setLotes((ls) =>
+      [
+        ...ls,
+        {
+          id: idLocal(),
+          proposta_id: proposta.id,
+          lote_id: l.id,
+          quadra: l.quadra,
+          numero: l.numero,
+          area_m2: Number(l.area_m2),
+          preco_tabela: Number(l.preco_tabela ?? 0),
+          valor_negociado: Number(l.preco_tabela ?? 0),
+          ordem: ls.length,
+        },
+      ].sort(compararLote)
+    );
     marcar();
+  }
+
+  function salvar() {
+    setRecado(null);
+    iniciarSalvar(async () => {
+      try {
+        await salvarProposta({
+          id: proposta.id,
+          titulo: titulo || null,
+          status,
+          data_base: dataBase,
+          validade_dias: validade,
+          incc_mensal: incc,
+          juros_vp_mensal: jurosVP,
+          correcao_primeira_parcela: corrigePrimeira,
+          observacoes: observacoes || null,
+          lotes,
+          cenarios: cenarios as unknown as CenarioPayload[],
+        });
+        setSujo(false);
+        setRecado("Proposta salva.");
+      } catch (e) {
+        setRecado((e as Error).message);
+      }
+    });
   }
 
   const validadeAte = useMemo(() => {
@@ -239,6 +319,8 @@ export default function Simulador({
     d.setDate(d.getDate() + validade);
     return d.toLocaleDateString("pt-BR");
   }, [dataBase, validade]);
+
+  const somaLotes = lotes.reduce((s, l) => s + Number(l.valor_negociado), 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -252,11 +334,10 @@ export default function Simulador({
             {cliente?.nome ?? (titulo || "Proposta sem cliente")}
           </h1>
           <p className="text-sm text-cinza mt-1">
-            {proposta.condicao_origem
-              ? `Partiu de: ${proposta.condicao_origem}`
-              : "Estrutura montada do zero"}
-            {" · "}
-            válida até {validadeAte}
+            {cenarios.length === 1
+              ? "1 opção de parcelamento"
+              : `${cenarios.length} opções de parcelamento`}
+            {" · "}válida até {validadeAte}
           </p>
         </div>
 
@@ -272,14 +353,14 @@ export default function Simulador({
           <a
             href={`/api/propostas/${proposta.id}/xlsx`}
             className="btn btn-secundario"
-            title="Planilha com o fluxo completo, para uso interno"
+            title="Planilha com o fluxo completo de cada opção"
           >
             <Download size={15} /> XLSX
           </a>
           <button
             className="btn btn-fantasma"
             onClick={() => duplicarProposta(proposta.id)}
-            title="Duplicar"
+            title="Duplicar proposta"
           >
             <Copy size={15} />
           </button>
@@ -290,7 +371,7 @@ export default function Simulador({
                 apagarProposta(proposta.id);
               }
             }}
-            title="Apagar"
+            title="Apagar proposta"
           >
             <Trash2 size={15} />
           </button>
@@ -307,178 +388,373 @@ export default function Simulador({
         </p>
       )}
 
-      {resultado.avisos.length > 0 && (
-        <div className="rounded-md px-3 py-2.5 bg-ambar-fraco text-ambar flex gap-2">
-          <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-          <ul className="text-sm flex flex-col gap-0.5">
-            {resultado.avisos.map((a) => (
-              <li key={a}>{a}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* --------------------------------------------------------- resumo */}
-      <section className="grid gap-3 grid-cols-2 lg:grid-cols-6">
-        {[
-          ["Preço de tabela", moeda(resultado.valorTabela), precoM2(resultado.precoM2Tabela)],
-          [
-            "Valor negociado",
-            moeda(resultado.valorNegociado),
-            `−${pct(resultado.descontoEfetivoPct, 2)} · ${precoM2(resultado.precoM2Negociado)}`,
-          ],
-          [
-            "Entrada",
-            moeda(resultado.entrada),
-            `${pct(resultado.entradaPct, 1)} do negociado`,
-          ],
-          [
-            "Total nominal",
-            moeda(resultado.totalNominal),
-            `${resultado.prazoMeses} meses`,
-          ],
-          [
-            "Valor presente",
-            moeda(resultado.totalVP),
-            `a ${pct(jurosVP, 2)} a.m. · ${precoM2(resultado.precoM2VP)}`,
-          ],
-          [
-            "Maior parcela",
-            moeda(resultado.maiorParcela),
-            `juros + correção ${moeda(resultado.totalJuros + resultado.totalCorrecao)}`,
-          ],
-        ].map(([rotulo, valor, nota], i) => (
-          <div key={rotulo} className={`cartao p-4 ${i === 1 ? "border-vinho" : ""}`}>
-            <p className="eyebrow">{rotulo}</p>
-            <p
-              className={`serif text-xl tabular mt-1 ${i === 1 ? "text-vinho" : ""}`}
+      {/* --------------------------------------------------------- terrenos */}
+      <section className="cartao">
+        <div className="cartao-titulo flex-wrap">
+          <h2 className="serif text-lg">
+            Terrenos
+            <span className="text-sm text-cinza font-sans ml-2">
+              valem para todas as opções
+            </span>
+          </h2>
+          {naoUsados.length > 0 && (
+            <select
+              className="campo w-auto text-xs"
+              value=""
+              onChange={(e) => e.target.value && adicionarLote(e.target.value)}
             >
-              {valor}
-            </p>
-            <p className="text-[11px] text-cinza mt-1">{nota}</p>
-          </div>
-        ))}
+              <option value="">+ adicionar terreno</option>
+              {naoUsados.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.quadra}-{l.numero} · {num(Number(l.area_m2))} m² ·{" "}
+                  {moeda(Number(l.preco_tabela ?? 0))}
+                  {l.status !== "livre" ? ` (${l.status})` : ""}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="tabela">
+            <thead>
+              <tr>
+                <th>Lote</th>
+                <th className="num">Área</th>
+                <th className="num">Tabela</th>
+                <th className="num">Valor negociado</th>
+                <th className="num">R$/m²</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {lotes.map((l) => (
+                <tr key={l.id}>
+                  <td className="font-semibold whitespace-nowrap">
+                    {l.quadra}-{l.numero}
+                  </td>
+                  <td className="num">{area(Number(l.area_m2))}</td>
+                  <td className="num text-cinza">{moeda(Number(l.preco_tabela))}</td>
+                  <td className="num w-40">
+                    <CampoNumero
+                      valor={Number(l.valor_negociado)}
+                      aoMudar={(v) => {
+                        setLotes((ls) =>
+                          ls.map((x) =>
+                            x.id === l.id ? { ...x, valor_negociado: v ?? 0 } : x
+                          )
+                        );
+                        marcar();
+                      }}
+                      prefixo="R$"
+                    />
+                  </td>
+                  <td className="num text-cinza">
+                    {precoM2(Number(l.valor_negociado) / Number(l.area_m2))}
+                  </td>
+                  <td>
+                    <button
+                      className="btn btn-fantasma px-2 text-vermelho"
+                      onClick={() => {
+                        setLotes((ls) => ls.filter((x) => x.id !== l.id));
+                        marcar();
+                      }}
+                      title="Remover"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {lotes.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center text-cinza py-5">
+                    Nenhum terreno na proposta.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+            {lotes.length > 1 && (
+              <tfoot>
+                <tr className="bg-papel-alt font-semibold">
+                  <td>{lotes.length} terrenos</td>
+                  <td className="num">
+                    {area(lotes.reduce((s, l) => s + Number(l.area_m2), 0))}
+                  </td>
+                  <td className="num">
+                    {moeda(lotes.reduce((s, l) => s + Number(l.preco_tabela), 0))}
+                  </td>
+                  <td className="num">{moeda(somaLotes)}</td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px] items-start">
-        {/* ------------------------------------------------------- blocos */}
-        <div className="flex flex-col gap-4">
-          <section className="cartao">
-            <div className="cartao-titulo flex-wrap">
-              <h2 className="serif text-lg">Terrenos</h2>
-              {naoUsados.length > 0 && (
-                <select
-                  className="campo w-auto text-xs"
-                  value=""
-                  onChange={(e) => e.target.value && adicionarLote(e.target.value)}
-                >
-                  <option value="">+ adicionar terreno</option>
-                  {naoUsados.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.quadra}-{l.numero} · {num(Number(l.area_m2))} m² ·{" "}
-                      {moeda(Number(l.preco_tabela ?? 0))}
-                      {l.status !== "livre" ? ` (${l.status})` : ""}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-            <div className="overflow-x-auto">
-              <table className="tabela">
-                <thead>
-                  <tr>
-                    <th>Lote</th>
-                    <th className="num">Área</th>
-                    <th className="num">Tabela</th>
-                    <th className="num">Valor negociado</th>
-                    <th className="num">R$/m²</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {lotes.map((l) => (
-                    <tr key={l.id}>
-                      <td className="font-semibold whitespace-nowrap">
-                        {l.quadra}-{l.numero}
-                      </td>
-                      <td className="num">{area(Number(l.area_m2))}</td>
-                      <td className="num text-cinza">{moeda(Number(l.preco_tabela))}</td>
-                      <td className="num w-40">
-                        <CampoNumero
-                          valor={Number(l.valor_negociado)}
-                          aoMudar={(v) => {
-                            setLotes((ls) =>
-                              ls.map((x) =>
-                                x.id === l.id ? { ...x, valor_negociado: v ?? 0 } : x
-                              )
-                            );
-                            marcar();
-                          }}
-                          prefixo="R$"
-                        />
-                      </td>
-                      <td className="num text-cinza">
-                        {precoM2(Number(l.valor_negociado) / Number(l.area_m2))}
-                      </td>
-                      <td>
-                        <button
-                          className="btn btn-fantasma px-2 text-vermelho"
-                          onClick={() => {
-                            setLotes((ls) => ls.filter((x) => x.id !== l.id));
-                            marcar();
-                          }}
-                          title="Remover"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {lotes.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="text-center text-cinza py-5">
-                        Nenhum terreno na proposta.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section className="cartao">
-            <div className="cartao-titulo flex-wrap">
-              <h2 className="serif text-lg">Estrutura de pagamento</h2>
-              <div className="flex gap-2 items-center flex-wrap">
-                {condicoes.length > 0 && (
-                  <select
-                    className="campo w-auto text-xs"
-                    value=""
-                    onChange={(e) => {
-                      if (
-                        e.target.value &&
-                        confirm("Substituir os blocos atuais pelo modelo da condição?")
-                      ) {
-                        aplicarCondicao(e.target.value);
-                      }
-                    }}
+      {/* ------------------------------------------------------ comparativo */}
+      {cenarios.length > 1 && (
+        <section className="cartao overflow-x-auto">
+          <div className="cartao-titulo">
+            <h2 className="serif text-lg">Comparativo das opções</h2>
+            <span className="text-xs text-cinza">
+              valor presente a {pct(jurosVP, 2)} a.m.
+            </span>
+          </div>
+          <table className="tabela">
+            <thead>
+              <tr>
+                <th>Opção</th>
+                <th className="num">Desconto</th>
+                <th className="num">Valor negociado</th>
+                <th className="num">Entrada</th>
+                <th className="num">Maior parcela</th>
+                <th className="num">Prazo</th>
+                <th className="num">Total nominal</th>
+                <th className="num">Valor presente</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {cenarios.map((c) => {
+                const r = resultados.get(c.id);
+                if (!r) return null;
+                return (
+                  <tr
+                    key={c.id}
+                    className={`cursor-pointer hover:bg-papel-alt ${
+                      c.id === ativoId ? "bg-vinho-fraco" : ""
+                    }`}
+                    onClick={() => setAtivoId(c.id)}
                   >
-                    <option value="">aplicar condição da tabela…</option>
-                    {condicoes.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nome}
-                      </option>
-                    ))}
-                  </select>
+                    <td className="font-semibold whitespace-nowrap">
+                      {c.recomendado && (
+                        <Star size={12} className="inline text-dourado-escuro mr-1" />
+                      )}
+                      {c.nome}
+                    </td>
+                    <td className="num">
+                      {r.descontoEfetivoPct > 0.0001
+                        ? `−${pct(r.descontoEfetivoPct, 2)}`
+                        : "—"}
+                    </td>
+                    <td className="num">{moeda(r.valorNegociado)}</td>
+                    <td className="num">{moeda(r.entrada)}</td>
+                    <td className="num">{moeda(r.maiorParcela)}</td>
+                    <td className="num text-cinza">{r.prazoMeses}m</td>
+                    <td className="num">{moeda(r.totalNominal)}</td>
+                    <td className="num font-semibold">{moeda(r.totalVP)}</td>
+                    <td>
+                      {!c.recomendado && (
+                        <button
+                          className="btn btn-fantasma px-2"
+                          title="Marcar como recomendada"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            recomendar(c.id);
+                          }}
+                        >
+                          <Star size={13} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="text-xs text-cinza px-4 py-2.5 border-t border-linha">
+            O valor presente é o que permite comparar estruturas de prazos
+            diferentes: traz cada parcela para hoje à taxa das premissas.
+          </p>
+        </section>
+      )}
+
+      {/* ----------------------------------------------------- abas + editor */}
+      <section className="cartao">
+        <div className="flex items-center gap-1 px-3 pt-3 flex-wrap border-b border-linha">
+          {cenarios.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setAtivoId(c.id)}
+              className={`px-3 py-2 text-sm font-semibold rounded-t-md border border-b-0 -mb-px flex items-center gap-1.5 ${
+                c.id === ativoId
+                  ? "bg-superficie border-linha text-vinho"
+                  : "bg-papel-alt border-transparent text-cinza hover:text-tinta"
+              }`}
+            >
+              {c.recomendado && <Star size={12} className="text-dourado-escuro" />}
+              {c.nome}
+            </button>
+          ))}
+
+          <div className="ml-auto flex items-center gap-2 pb-2">
+            <select
+              className="campo w-auto text-xs"
+              value=""
+              onChange={(e) => {
+                const c = condicoes.find((x) => x.id === e.target.value);
+                if (c) adicionarCenario(c);
+              }}
+            >
+              <option value="">+ opção a partir da tabela…</option>
+              {condicoes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+            <button className="btn btn-secundario" onClick={() => adicionarCenario()}>
+              <Plus size={15} /> Opção em branco
+            </button>
+          </div>
+        </div>
+
+        {ativo && resultado && (
+          <div className="p-4 flex flex-col gap-5">
+            {/* cabeçalho do cenário */}
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex-1 min-w-56">
+                <label className="rotulo">Nome desta opção</label>
+                <input
+                  className="campo"
+                  value={ativo.nome}
+                  onChange={(e) => mudarCenario(ativo.id, { nome: e.target.value })}
+                />
+              </div>
+              <div className="w-36">
+                <label className="rotulo">Desconto %</label>
+                <CampoNumero
+                  valor={Number(ativo.desconto_pct) * 100}
+                  aoMudar={(v) =>
+                    mudarCenario(ativo.id, { desconto_pct: (v ?? 0) / 100 })
+                  }
+                  sufixo="%"
+                />
+              </div>
+              <div className="w-44">
+                <label className="rotulo">Desconto em valor</label>
+                <CampoNumero
+                  valor={Number(ativo.desconto_valor)}
+                  aoMudar={(v) => mudarCenario(ativo.id, { desconto_valor: v ?? 0 })}
+                  prefixo="R$"
+                />
+              </div>
+              <div className="flex-1 min-w-48">
+                <label className="rotulo">Motivo do desconto</label>
+                <input
+                  className="campo"
+                  value={ativo.desconto_motivo ?? ""}
+                  onChange={(e) =>
+                    mudarCenario(ativo.id, { desconto_motivo: e.target.value || null })
+                  }
+                  placeholder="Ex.: compra dos dois lotes"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                {!ativo.recomendado && (
+                  <button
+                    className="btn btn-fantasma"
+                    onClick={() => recomendar(ativo.id)}
+                    title="Marcar como recomendada"
+                  >
+                    <Star size={15} />
+                  </button>
                 )}
-                <button className="btn btn-secundario" onClick={adicionarBloco}>
-                  <Plus size={15} /> Bloco
+                <button
+                  className="btn btn-fantasma"
+                  onClick={() => duplicarCenario(ativo.id)}
+                  title="Duplicar opção"
+                >
+                  <Copy size={15} />
                 </button>
+                {cenarios.length > 1 && (
+                  <button
+                    className="btn btn-fantasma text-vermelho"
+                    onClick={() => removerCenario(ativo.id)}
+                    title="Remover opção"
+                  >
+                    <X size={15} />
+                  </button>
+                )}
               </div>
             </div>
 
-            <div className="p-3 flex flex-col gap-3">
-              {blocos.map((b, i) => (
+            {resultado.avisos.length > 0 && (
+              <div className="rounded-md px-3 py-2.5 bg-ambar-fraco text-ambar flex gap-2">
+                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                <ul className="text-sm flex flex-col gap-0.5">
+                  {resultado.avisos.map((a) => (
+                    <li key={a}>{a}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* resumo do cenário */}
+            <div className="grid gap-3 grid-cols-2 lg:grid-cols-6">
+              {(
+                [
+                  [
+                    "Preço de tabela",
+                    moeda(resultado.valorTabela),
+                    precoM2(resultado.precoM2Tabela),
+                  ],
+                  [
+                    "Valor negociado",
+                    moeda(resultado.valorNegociado),
+                    `−${pct(resultado.descontoEfetivoPct, 2)} · ${precoM2(resultado.precoM2Negociado)}`,
+                  ],
+                  [
+                    "Entrada",
+                    moeda(resultado.entrada),
+                    `${pct(resultado.entradaPct, 1)} do negociado`,
+                  ],
+                  [
+                    "Total nominal",
+                    moeda(resultado.totalNominal),
+                    `${resultado.prazoMeses} meses`,
+                  ],
+                  [
+                    "Valor presente",
+                    moeda(resultado.totalVP),
+                    `a ${pct(jurosVP, 2)} a.m. · ${precoM2(resultado.precoM2VP)}`,
+                  ],
+                  [
+                    "Maior parcela",
+                    moeda(resultado.maiorParcela),
+                    `juros + correção ${moeda(resultado.totalJuros + resultado.totalCorrecao)}`,
+                  ],
+                ] as const
+              ).map(([rotulo, valor, nota], i) => (
+                <div
+                  key={rotulo}
+                  className={`rounded-lg border p-3 ${
+                    i === 1 ? "border-vinho bg-vinho-fraco" : "border-linha bg-papel"
+                  }`}
+                >
+                  <p className="eyebrow">{rotulo}</p>
+                  <p className={`serif text-lg tabular mt-1 ${i === 1 ? "text-vinho" : ""}`}>
+                    {valor}
+                  </p>
+                  <p className="text-[11px] text-cinza mt-0.5">{nota}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* blocos */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h3 className="serif text-lg">Estrutura de pagamento</h3>
+                <button
+                  className="btn btn-secundario"
+                  onClick={() => adicionarBloco(ativo.id)}
+                >
+                  <Plus size={15} /> Bloco
+                </button>
+              </div>
+
+              {ativo.blocos.map((b, i) => (
                 <BlocoEditor
                   key={b.id}
                   bloco={b}
@@ -486,240 +762,194 @@ export default function Simulador({
                   dataBase={dataBase}
                   inccProposta={incc}
                   primeiro={i === 0}
-                  ultimo={i === blocos.length - 1}
-                  aoMudar={(patch) => mudarBloco(b.id, patch)}
-                  aoRemover={() => {
-                    setBlocos((bs) => bs.filter((x) => x.id !== b.id));
-                    marcar();
-                  }}
-                  aoDuplicar={() => {
-                    setBlocos((bs) => {
-                      const copia = { ...b, id: idLocal(), rotulo: `${b.rotulo} (cópia)` };
+                  ultimo={i === ativo.blocos.length - 1}
+                  aoMudar={(patch) => mudarBloco(ativo.id, b.id, patch)}
+                  aoRemover={() =>
+                    alterarBlocos(ativo.id, (bs) => bs.filter((x) => x.id !== b.id))
+                  }
+                  aoDuplicar={() =>
+                    alterarBlocos(ativo.id, (bs) => {
                       const out = [...bs];
-                      out.splice(i + 1, 0, copia);
-                      return out.map((x, k) => ({ ...x, ordem: k }));
-                    });
-                    marcar();
-                  }}
-                  aoMover={(d) => moverBloco(b.id, d)}
+                      out.splice(i + 1, 0, {
+                        ...b,
+                        id: idLocal(),
+                        rotulo: `${b.rotulo} (cópia)`,
+                      });
+                      return out;
+                    })
+                  }
+                  aoMover={(d) =>
+                    alterarBlocos(ativo.id, (bs) => {
+                      const j = i + d;
+                      if (j < 0 || j >= bs.length) return bs;
+                      const out = [...bs];
+                      [out[i], out[j]] = [out[j], out[i]];
+                      return out;
+                    })
+                  }
                 />
               ))}
-              {blocos.length === 0 && (
+              {ativo.blocos.length === 0 && (
                 <p className="text-sm text-cinza text-center py-5">
-                  Sem blocos. Adicione um ou aplique uma condição da tabela.
+                  Sem blocos nesta opção. Adicione um para começar.
                 </p>
               )}
             </div>
-          </section>
 
-          <section className="cartao">
-            <div className="cartao-titulo">
-              <h2 className="serif text-lg">Fluxo consolidado</h2>
-              <button
-                className="btn btn-fantasma"
-                onClick={() => setMostrarFluxo((v) => !v)}
-              >
-                {mostrarFluxo ? "ocultar" : `mostrar ${resultado.fluxo.length} vencimentos`}
-              </button>
-            </div>
-            {mostrarFluxo && (
-              <div className="overflow-x-auto max-h-[520px]">
-                <table className="tabela">
-                  <thead className="sticky top-0">
-                    <tr>
-                      <th>Mês</th>
-                      <th>Vencimento</th>
-                      <th>Composição</th>
-                      <th className="num">Valor</th>
-                      <th className="num">Valor presente</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {resultado.fluxo.map((f) => (
-                      <tr key={f.mes}>
-                        <td className="tabular">{f.mes}</td>
-                        <td className="text-cinza">{rotuloMes(f.mes, dataBase)}</td>
-                        <td className="text-cinza text-xs">
-                          {f.itens
-                            .map((it) =>
-                              f.itens.length > 1
-                                ? `${it.rotulo} ${moeda(it.valor)}`
-                                : `${it.rotulo} (${it.indice}/${
-                                    blocos.find((b) => b.id === it.blocoId)?.qtd_parcelas ?? 1
-                                  })`
-                            )
-                            .join(" + ")}
-                        </td>
-                        <td className="num font-semibold">{moeda(f.valor)}</td>
-                        <td className="num text-cinza">{moeda(f.vp)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-papel-alt font-semibold">
-                      <td colSpan={3}>Total</td>
-                      <td className="num">{moeda(resultado.totalNominal)}</td>
-                      <td className="num">{moeda(resultado.totalVP)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
+            {/* fluxo */}
+            <div className="border border-linha rounded-lg">
+              <div className="cartao-titulo">
+                <h3 className="serif text-base">Fluxo consolidado</h3>
+                <button
+                  className="btn btn-fantasma"
+                  onClick={() => setMostrarFluxo((v) => !v)}
+                >
+                  {mostrarFluxo
+                    ? "ocultar"
+                    : `mostrar ${resultado.fluxo.length} vencimentos`}
+                </button>
               </div>
-            )}
-          </section>
-        </div>
+              {mostrarFluxo && (
+                <div className="overflow-x-auto max-h-[520px]">
+                  <table className="tabela">
+                    <thead className="sticky top-0">
+                      <tr>
+                        <th>Mês</th>
+                        <th>Vencimento</th>
+                        <th>Composição</th>
+                        <th className="num">Valor</th>
+                        <th className="num">Valor presente</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resultado.fluxo.map((f) => (
+                        <tr key={f.mes}>
+                          <td className="tabular">{f.mes}</td>
+                          <td className="text-cinza">{rotuloMes(f.mes, dataBase)}</td>
+                          <td className="text-cinza text-xs">
+                            {f.itens
+                              .map((it) =>
+                                f.itens.length > 1
+                                  ? `${it.rotulo} ${moeda(it.valor)}`
+                                  : `${it.rotulo} (${it.indice}/${
+                                      ativo.blocos.find((b) => b.id === it.blocoId)
+                                        ?.qtd_parcelas ?? 1
+                                    })`
+                              )
+                              .join(" + ")}
+                          </td>
+                          <td className="num font-semibold">{moeda(f.valor)}</td>
+                          <td className="num text-cinza">{moeda(f.vp)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-papel-alt font-semibold">
+                        <td colSpan={3}>Total</td>
+                        <td className="num">{moeda(resultado.totalNominal)}</td>
+                        <td className="num">{moeda(resultado.totalVP)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
-        {/* -------------------------------------------------- lateral */}
-        <aside className="flex flex-col gap-4 lg:sticky lg:top-20">
-          <section className="cartao p-4 flex flex-col gap-3">
-            <h2 className="serif text-lg">Negociação</h2>
+        {cenarios.length === 0 && (
+          <p className="p-6 text-sm text-cinza text-center">
+            Nenhuma opção de parcelamento. Adicione uma acima.
+          </p>
+        )}
+      </section>
 
+      {/* ------------------------------------------------------- premissas */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <section className="cartao p-4 flex flex-col gap-3">
+          <h2 className="serif text-lg">Premissas</h2>
+          <p className="text-xs text-cinza -mt-2">
+            Valem para todas as opções — é o que mantém o comparativo honesto.
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="rotulo">Desconto sobre os terrenos</label>
+              <label className="rotulo">INCC a.m.</label>
               <CampoNumero
-                valor={descontoPct * 100}
+                valor={incc * 100}
                 aoMudar={(v) => {
-                  setDescontoPct((v ?? 0) / 100);
+                  setIncc((v ?? 0) / 100);
                   marcar();
                 }}
+                casas={3}
                 sufixo="%"
               />
             </div>
-
             <div>
-              <label className="rotulo">Desconto em valor</label>
+              <label className="rotulo">Taxa p/ valor presente</label>
               <CampoNumero
-                valor={descontoValor}
+                valor={jurosVP * 100}
                 aoMudar={(v) => {
-                  setDescontoValor(v ?? 0);
+                  setJurosVP((v ?? 0) / 100);
                   marcar();
                 }}
-                prefixo="R$"
+                casas={3}
+                sufixo="%"
               />
             </div>
+          </div>
 
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={corrigePrimeira}
+              onChange={(e) => {
+                setCorrigePrimeira(e.target.checked);
+                marcar();
+              }}
+            />
+            <span>
+              Corrigir já a 1ª parcela
+              <span className="block text-xs text-cinza">
+                Desligado: fator 1 no 1º mês (convenção das propostas de
+                parcelamento). Ligado: (1+i) já no 1º mês.
+              </span>
+            </span>
+          </label>
+
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="rotulo">Motivo do desconto</label>
+              <label className="rotulo">Data-base</label>
               <input
+                type="date"
                 className="campo"
-                value={descontoMotivo}
+                value={dataBase}
                 onChange={(e) => {
-                  setDescontoMotivo(e.target.value);
+                  setDataBase(e.target.value);
                   marcar();
                 }}
-                placeholder="Ex.: compra dos dois lotes"
               />
             </div>
-
-            <div className="bg-papel rounded-md p-3 text-sm flex flex-col gap-1">
-              <span className="flex justify-between">
-                <span className="text-cinza">Soma dos terrenos</span>
-                <span className="tabular">
-                  {moeda(lotes.reduce((s, l) => s + Number(l.valor_negociado), 0))}
-                </span>
-              </span>
-              <span className="flex justify-between">
-                <span className="text-cinza">Desconto</span>
-                <span className="tabular text-vermelho">
-                  −{moeda(resultado.descontoValor)}
-                </span>
-              </span>
-              <span className="flex justify-between font-semibold border-t border-linha pt-1 mt-1">
-                <span>Valor negociado</span>
-                <span className="tabular">{moeda(resultado.valorNegociado)}</span>
-              </span>
-              <span className="flex justify-between">
-                <span className="text-cinza">Alocado nos blocos</span>
-                <span
-                  className={`tabular ${
-                    Math.abs(resultado.residuo) >= 0.5 ? "text-ambar font-semibold" : ""
-                  }`}
-                >
-                  {moeda(resultado.alocado)}
-                </span>
-              </span>
-            </div>
-          </section>
-
-          <section className="cartao p-4 flex flex-col gap-3">
-            <h2 className="serif text-lg">Premissas</h2>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="rotulo">INCC a.m.</label>
-                <CampoNumero
-                  valor={incc * 100}
-                  aoMudar={(v) => {
-                    setIncc((v ?? 0) / 100);
-                    marcar();
-                  }}
-                  casas={3}
-                  sufixo="%"
-                />
-              </div>
-              <div>
-                <label className="rotulo">Taxa p/ valor presente</label>
-                <CampoNumero
-                  valor={jurosVP * 100}
-                  aoMudar={(v) => {
-                    setJurosVP((v ?? 0) / 100);
-                    marcar();
-                  }}
-                  casas={3}
-                  sufixo="%"
-                />
-              </div>
-            </div>
-
-            <label className="flex items-start gap-2 text-sm">
+            <div>
+              <label className="rotulo">Validade (dias)</label>
               <input
-                type="checkbox"
-                className="mt-1"
-                checked={corrigeprimeira}
+                type="number"
+                className="campo text-right"
+                value={validade}
+                min={1}
                 onChange={(e) => {
-                  setCorrigePrimeira(e.target.checked);
+                  setValidade(Number(e.target.value) || 1);
                   marcar();
                 }}
               />
-              <span>
-                Corrigir já a 1ª parcela
-                <span className="block text-xs text-cinza">
-                  Desligado: fator 1 no 1º mês (convenção das propostas de
-                  parcelamento). Ligado: (1+i) já no 1º mês.
-                </span>
-              </span>
-            </label>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="rotulo">Data-base</label>
-                <input
-                  type="date"
-                  className="campo"
-                  value={dataBase}
-                  onChange={(e) => {
-                    setDataBase(e.target.value);
-                    marcar();
-                  }}
-                />
-              </div>
-              <div>
-                <label className="rotulo">Validade (dias)</label>
-                <input
-                  type="number"
-                  className="campo text-right"
-                  value={validade}
-                  min={1}
-                  onChange={(e) => {
-                    setValidade(Number(e.target.value) || 1);
-                    marcar();
-                  }}
-                />
-              </div>
             </div>
-          </section>
+          </div>
+        </section>
 
-          <section className="cartao p-4 flex flex-col gap-3">
-            <h2 className="serif text-lg">Proposta</h2>
+        <section className="cartao p-4 flex flex-col gap-3">
+          <h2 className="serif text-lg">Proposta</h2>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="rotulo">Título interno</label>
               <input
@@ -749,20 +979,20 @@ export default function Simulador({
                 ))}
               </select>
             </div>
-            <div>
-              <label className="rotulo">Observações (saem na proposta)</label>
-              <textarea
-                className="campo min-h-24"
-                value={observacoes}
-                onChange={(e) => {
-                  setObservacoes(e.target.value);
-                  marcar();
-                }}
-                placeholder="Condições especiais, prazos, o que ficou combinado…"
-              />
-            </div>
-          </section>
-        </aside>
+          </div>
+          <div>
+            <label className="rotulo">Observações (saem na proposta)</label>
+            <textarea
+              className="campo min-h-24"
+              value={observacoes}
+              onChange={(e) => {
+                setObservacoes(e.target.value);
+                marcar();
+              }}
+              placeholder="Condições especiais, prazos, o que ficou combinado…"
+            />
+          </div>
+        </section>
       </div>
     </div>
   );

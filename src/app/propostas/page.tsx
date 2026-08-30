@@ -4,6 +4,7 @@ import Cabecalho from "@/components/Cabecalho";
 import { SeloProposta } from "@/components/SeloStatus";
 import { createClient } from "@/lib/supabase/server";
 import { dataBR, moeda, pct } from "@/lib/formato";
+import { compararLote } from "@/lib/ordenacao";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,6 @@ interface Linha {
   titulo: string | null;
   status: string;
   criado_em: string;
-  desconto_pct: number;
   resultado: {
     valorTabela?: number;
     valorNegociado?: number;
@@ -25,6 +25,7 @@ interface Linha {
   clientes: { nome: string } | null;
   empreendimentos: { nome: string } | null;
   proposta_lotes: { quadra: string; numero: string }[];
+  proposta_cenarios: { id: string }[];
 }
 
 export default async function PropostasPage() {
@@ -32,7 +33,7 @@ export default async function PropostasPage() {
   const { data } = await supabase
     .from("propostas")
     .select(
-      "id, codigo, titulo, status, criado_em, desconto_pct, resultado, clientes(nome), empreendimentos(nome), proposta_lotes(quadra, numero)"
+      "id, codigo, titulo, status, criado_em, resultado, clientes(nome), empreendimentos(nome), proposta_lotes(quadra, numero), proposta_cenarios(id)"
     )
     .order("criado_em", { ascending: false });
 
@@ -64,6 +65,7 @@ export default async function PropostasPage() {
                 <th className="num">Desc.</th>
                 <th className="num">Valor presente</th>
                 <th className="num">Prazo</th>
+                <th className="num">Opções</th>
                 <th>Status</th>
                 <th>Criada</th>
               </tr>
@@ -79,7 +81,10 @@ export default async function PropostasPage() {
                   <td>{p.clientes?.nome ?? p.titulo ?? "—"}</td>
                   <td className="text-cinza whitespace-nowrap">
                     {p.proposta_lotes.length
-                      ? p.proposta_lotes.map((l) => `${l.quadra}-${l.numero}`).join(", ")
+                      ? [...p.proposta_lotes]
+                          .sort(compararLote)
+                          .map((l) => `${l.quadra}-${l.numero}`)
+                          .join(", ")
                       : "—"}
                   </td>
                   <td className="num text-cinza">{moeda(p.resultado?.valorTabela ?? 0)}</td>
@@ -95,6 +100,7 @@ export default async function PropostasPage() {
                   <td className="num text-cinza">
                     {p.resultado?.prazoMeses ? `${p.resultado.prazoMeses}m` : "—"}
                   </td>
+                  <td className="num text-cinza">{p.proposta_cenarios.length}</td>
                   <td>
                     <SeloProposta status={p.status} />
                   </td>
@@ -103,7 +109,7 @@ export default async function PropostasPage() {
               ))}
               {propostas.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="text-center text-cinza py-8">
+                  <td colSpan={11} className="text-center text-cinza py-8">
                     Nenhuma proposta ainda.
                   </td>
                 </tr>

@@ -1,4 +1,4 @@
-import { arredonda, baseParaParcela, tabela } from "./amortizacao.ts";
+import { arredonda, baseParaParcela, tabela } from "./amortizacao";
 import type {
   Bloco,
   BlocoCalculado,
@@ -6,10 +6,10 @@ import type {
   Parcela,
   Premissas,
   Resultado,
-} from "./tipos.ts";
+} from "./tipos";
 
-export * from "./tipos.ts";
-export * from "./amortizacao.ts";
+export * from "./tipos";
+export * from "./amortizacao";
 
 /** Taxa mensal do indexador do bloco, caindo para o INCC da proposta. */
 export function taxaIndexador(bloco: Bloco, premissas: Premissas): number {

@@ -2,8 +2,19 @@
 
 import { Printer } from "lucide-react";
 import type { Resultado } from "@/lib/calc/tipos";
-import type { Cliente, Empreendimento, Proposta, PropostaLote } from "@/lib/db/tipos";
+import type {
+  Cliente,
+  Empreendimento,
+  Proposta,
+  PropostaCenario,
+  PropostaLote,
+} from "@/lib/db/tipos";
 import { area, dataBR, moeda, num, pct, precoM2, rotuloMes } from "@/lib/formato";
+
+export interface Opcao {
+  cenario: PropostaCenario;
+  resultado: Resultado;
+}
 
 /** Frase de venda de um bloco, do jeito que se lê em voz alta. */
 function descreverBloco(
@@ -66,26 +77,70 @@ function descreverBloco(
   };
 }
 
+function Cronograma({
+  resultado,
+  dataBase,
+}: {
+  resultado: Resultado;
+  dataBase: string;
+}) {
+  const vencimentos = resultado.fluxo.filter((f) => f.mes > 0);
+  if (vencimentos.length === 0) return null;
+  const colunas = 3;
+  const porColuna = Math.ceil(vencimentos.length / colunas);
+
+  return (
+    <div className="cronograma">
+      {Array.from({ length: colunas }, (_, c) => {
+        const fatia = vencimentos.slice(c * porColuna, (c + 1) * porColuna);
+        if (fatia.length === 0) return <div key={c} style={{ flex: 1 }} />;
+        return (
+          <table className="t t-mini" key={c}>
+            <thead>
+              <tr>
+                <th>Mês</th>
+                <th>Venc.</th>
+                <th className="d">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fatia.map((f) => (
+                <tr key={f.mes}>
+                  <td>{f.mes}</td>
+                  <td>{rotuloMes(f.mes, dataBase)}</td>
+                  <td className="d">{num(f.valor)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function FolhaProposta({
   proposta,
   empreendimento,
   cliente,
   lotes,
-  resultado,
+  opcoes,
 }: {
   proposta: Proposta;
   empreendimento: Empreendimento;
   cliente: Cliente | null;
   lotes: PropostaLote[];
-  resultado: Resultado;
+  opcoes: Opcao[];
 }) {
   const validade = new Date(`${proposta.data_base}T12:00:00`);
   validade.setDate(validade.getDate() + proposta.validade_dias);
 
-  const temDesconto = resultado.descontoValor > 0.5;
-  const vencimentos = resultado.fluxo.filter((f) => f.mes > 0);
-  const colunas = 3;
-  const porColuna = Math.ceil(vencimentos.length / colunas);
+  const varias = opcoes.length > 1;
+  const referencia = opcoes.find((o) => o.cenario.recomendado) ?? opcoes[0];
+  const somaLotes = lotes.reduce((s, l) => s + Number(l.valor_negociado), 0);
+
+  let secao = 0;
+  const n = () => ++secao;
 
   return (
     <>
@@ -127,7 +182,7 @@ export default function FolhaProposta({
         {/* ------------------------------------------------------- terrenos */}
         <section>
           <h2>
-            <span className="num-secao">1</span> Objeto da proposta
+            <span className="num-secao">{n()}</span> Objeto da proposta
           </h2>
 
           <table className="t">
@@ -160,132 +215,175 @@ export default function FolhaProposta({
                 <td>
                   {lotes.length} {lotes.length === 1 ? "terreno" : "terrenos"}
                 </td>
-                <td className="d">{area(resultado.areaTotal)}</td>
-                <td className="d">{precoM2(resultado.precoM2Negociado)}</td>
+                <td className="d">{area(referencia?.resultado.areaTotal ?? 0)}</td>
                 <td className="d">
-                  {moeda(lotes.reduce((s, l) => s + Number(l.valor_negociado), 0))}
+                  {precoM2(somaLotes / (referencia?.resultado.areaTotal || 1))}
                 </td>
+                <td className="d">{moeda(somaLotes)}</td>
               </tr>
             </tfoot>
           </table>
+        </section>
 
-          {temDesconto && (
-            <table className="t t-resumo">
+        {/* --------------------------------------------------- comparativo */}
+        {varias && (
+          <section>
+            <h2>
+              <span className="num-secao">{n()}</span> Opções de pagamento
+            </h2>
+            <p className="texto nota">
+              As {opcoes.length} opções abaixo se referem aos mesmos terrenos. Mudam a
+              entrada, o prazo e o preço final.
+            </p>
+            <table className="t">
+              <thead>
+                <tr>
+                  <th>Opção</th>
+                  <th className="d">Entrada</th>
+                  <th className="d">Parcelas</th>
+                  <th className="d">Maior parcela</th>
+                  <th className="d">Valor da proposta</th>
+                </tr>
+              </thead>
               <tbody>
-                <tr>
-                  <td>Valor de tabela</td>
-                  <td className="d">{moeda(resultado.valorTabela)}</td>
-                </tr>
-                <tr>
-                  <td>
-                    Condição especial desta proposta
-                    {proposta.desconto_motivo ? ` — ${proposta.desconto_motivo}` : ""}
-                  </td>
-                  <td className="d desconto">
-                    − {moeda(resultado.descontoValor)} ({pct(resultado.descontoEfetivoPct, 2)})
-                  </td>
-                </tr>
+                {opcoes.map(({ cenario, resultado }) => (
+                  <tr key={cenario.id} className={cenario.recomendado ? "recomendada" : ""}>
+                    <td>
+                      <strong>{cenario.nome}</strong>
+                      {cenario.recomendado && <span className="tag">recomendada</span>}
+                    </td>
+                    <td className="d">{moeda(resultado.entrada)}</td>
+                    <td className="d">
+                      {resultado.prazoMeses > 0 ? `${resultado.prazoMeses} meses` : "—"}
+                    </td>
+                    <td className="d">
+                      {resultado.maiorParcela > 0 ? moeda(resultado.maiorParcela) : "—"}
+                    </td>
+                    <td className="d">{moeda(resultado.valorNegociado)}</td>
+                  </tr>
+                ))}
               </tbody>
-              <tfoot>
-                <tr className="destaque">
-                  <td>Valor da proposta</td>
-                  <td className="d">{moeda(resultado.valorNegociado)}</td>
-                </tr>
-              </tfoot>
             </table>
-          )}
-        </section>
+          </section>
+        )}
 
-        {/* ---------------------------------------------------- pagamento */}
-        <section>
-          <h2>
-            <span className="num-secao">2</span> Condições de pagamento
-          </h2>
+        {/* ------------------------------------------------ cada opção */}
+        {opcoes.map(({ cenario, resultado }, idx) => {
+          const temDesconto = resultado.descontoValor > 0.5;
+          const vencimentos = resultado.fluxo.filter((f) => f.mes > 0);
+          return (
+            <section key={cenario.id} className={varias && idx > 0 ? "quebra-leve" : ""}>
+              <h2>
+                <span className="num-secao">{varias ? "" : n()}</span>
+                {varias ? cenario.nome : "Condições de pagamento"}
+                {varias && cenario.recomendado && (
+                  <span className="tag-h2">recomendada</span>
+                )}
+              </h2>
 
-          <ol className="blocos">
-            {resultado.blocos.map((b) => {
-              const d = descreverBloco(b, proposta.data_base);
-              return (
-                <li key={b.bloco.id}>
-                  <div className="bloco-topo">
-                    <strong>{d.titulo}</strong>
-                    <span className="bloco-valor">{d.valor}</span>
-                  </div>
-                  <p>{d.detalhe}</p>
-                </li>
-              );
-            })}
-          </ol>
+              <ol className="blocos">
+                {resultado.blocos.map((b) => {
+                  const d = descreverBloco(b, proposta.data_base);
+                  return (
+                    <li key={b.bloco.id}>
+                      <div className="bloco-topo">
+                        <strong>{d.titulo}</strong>
+                        <span className="bloco-valor">{d.valor}</span>
+                      </div>
+                      <p>{d.detalhe}</p>
+                    </li>
+                  );
+                })}
+              </ol>
 
-          <div className="totais">
-            <div>
-              <span>Entrada</span>
-              <strong>{moeda(resultado.entrada)}</strong>
-              <em>{pct(resultado.entradaPct, 1)} do valor</em>
-            </div>
-            <div>
-              <span>Prazo total</span>
-              <strong>{resultado.prazoMeses} meses</strong>
-              <em>{vencimentos.length} vencimentos</em>
-            </div>
-            <div>
-              <span>Maior parcela</span>
-              <strong>{moeda(resultado.maiorParcela)}</strong>
-              <em>no mês de maior soma</em>
-            </div>
-            <div className="destaque-caixa">
-              <span>Total do investimento</span>
-              <strong>{moeda(resultado.totalNominal)}</strong>
-              <em>valor nominal, já com correção projetada</em>
-            </div>
-          </div>
-        </section>
+              {temDesconto && (
+                <table className="t t-resumo">
+                  <tbody>
+                    <tr>
+                      <td>Valor de tabela</td>
+                      <td className="d">{moeda(resultado.valorTabela)}</td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Condição especial desta opção
+                        {cenario.desconto_motivo ? ` — ${cenario.desconto_motivo}` : ""}
+                      </td>
+                      <td className="d desconto">
+                        − {moeda(resultado.descontoValor)} (
+                        {pct(resultado.descontoEfetivoPct, 2)})
+                      </td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr className="destaque">
+                      <td>Valor da proposta</td>
+                      <td className="d">{moeda(resultado.valorNegociado)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+
+              <div className="totais">
+                <div>
+                  <span>Entrada</span>
+                  <strong>{moeda(resultado.entrada)}</strong>
+                  <em>{pct(resultado.entradaPct, 1)} do valor</em>
+                </div>
+                <div>
+                  <span>Prazo total</span>
+                  <strong>
+                    {resultado.prazoMeses > 0 ? `${resultado.prazoMeses} meses` : "à vista"}
+                  </strong>
+                  <em>{vencimentos.length} vencimentos</em>
+                </div>
+                <div>
+                  <span>Maior parcela</span>
+                  <strong>
+                    {resultado.maiorParcela > 0 ? moeda(resultado.maiorParcela) : "—"}
+                  </strong>
+                  <em>no mês de maior soma</em>
+                </div>
+                <div className="destaque-caixa">
+                  <span>Total do investimento</span>
+                  <strong>{moeda(resultado.totalNominal)}</strong>
+                  <em>valor nominal, já com correção projetada</em>
+                </div>
+              </div>
+            </section>
+          );
+        })}
 
         {/* ---------------------------------------------------- observações */}
         {proposta.observacoes && (
           <section>
             <h2>
-              <span className="num-secao">3</span> Observações
+              <span className="num-secao">{n()}</span> Observações
             </h2>
             <p className="texto">{proposta.observacoes}</p>
           </section>
         )}
 
-        {/* ---------------------------------------------------- cronograma */}
-        {vencimentos.length > 0 && (
+        {/* ---------------------------------------------------- cronogramas */}
+        {opcoes.some((o) => o.resultado.fluxo.some((f) => f.mes > 0)) && (
           <section className="quebra">
             <h2>
-              <span className="num-secao">{proposta.observacoes ? 4 : 3}</span> Cronograma de
-              vencimentos
+              <span className="num-secao">{n()}</span> Cronograma de vencimentos
             </h2>
             <p className="texto nota">
-              Valores projetados com correção de {pct(Number(proposta.incc_mensal), 3)} ao mês
-              (INCC estimado). As parcelas indexadas são reajustadas pelo índice efetivamente
-              apurado.
+              Valores projetados com correção de {pct(Number(proposta.incc_mensal), 3)} ao
+              mês (INCC estimado). As parcelas indexadas são reajustadas pelo índice
+              efetivamente apurado.
             </p>
 
-            <div className="cronograma">
-              {Array.from({ length: colunas }, (_, c) => (
-                <table className="t t-mini" key={c}>
-                  <thead>
-                    <tr>
-                      <th>Mês</th>
-                      <th>Venc.</th>
-                      <th className="d">Valor</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {vencimentos.slice(c * porColuna, (c + 1) * porColuna).map((f) => (
-                      <tr key={f.mes}>
-                        <td>{f.mes}</td>
-                        <td>{rotuloMes(f.mes, proposta.data_base)}</td>
-                        <td className="d">{num(f.valor)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ))}
-            </div>
+            {opcoes.map(({ cenario, resultado }) => {
+              if (!resultado.fluxo.some((f) => f.mes > 0)) return null;
+              return (
+                <div key={cenario.id} className="crono-bloco">
+                  {varias && <h3>{cenario.nome}</h3>}
+                  <Cronograma resultado={resultado} dataBase={proposta.data_base} />
+                </div>
+              );
+            })}
           </section>
         )}
 
@@ -362,8 +460,15 @@ section{ margin-bottom:7mm; }
 h2{
   font-size:8.5pt; font-weight:bold; letter-spacing:.13em; text-transform:uppercase;
   color:#fff; background:var(--vinho); padding:1.6mm 3mm; margin:0 0 3.5mm;
+  display:flex; align-items:center; gap:2mm;
 }
-h2 .num-secao{ color:var(--ouro); margin-right:2mm; }
+h2 .num-secao{ color:var(--ouro); }
+h2 .tag-h2{
+  margin-left:auto; background:var(--ouro); color:#3a2a06;
+  border-radius:1mm; padding:.4mm 1.8mm; font-size:7pt; letter-spacing:.1em;
+}
+
+h3{ font-size:9.5pt; margin:0 0 2mm; color:var(--vinho); }
 
 .t{ width:100%; border-collapse:collapse; font-size:9.5pt; }
 .t th{
@@ -374,6 +479,12 @@ h2 .num-secao{ color:var(--ouro); margin-right:2mm; }
 .t td{ padding:1.8mm 2mm; border-bottom:.25mm solid var(--linha); }
 .t tfoot td{ border-top:.4mm solid var(--linha-forte); border-bottom:none; font-weight:bold; }
 .t .d{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.t .recomendada td{ background:var(--vinho-fraco); }
+.t .tag{
+  display:inline-block; margin-left:2mm; background:var(--ouro); color:#3a2a06;
+  border-radius:1mm; padding:.2mm 1.4mm; font-size:6.5pt; font-weight:bold;
+  letter-spacing:.08em; text-transform:uppercase; vertical-align:1px;
+}
 
 .t-resumo{ margin-top:4mm; }
 .t-resumo td{ border-bottom:none; padding:1.2mm 2mm; }
@@ -383,7 +494,7 @@ h2 .num-secao{ color:var(--ouro); margin-right:2mm; }
   padding:2.4mm 2mm; border-top:.5mm solid var(--vinho);
 }
 
-.blocos{ list-style:none; margin:0; padding:0; counter-reset:b; }
+.blocos{ list-style:none; margin:0; padding:0; }
 .blocos li{
   border-left:.9mm solid var(--ouro); padding:0 0 0 3.5mm; margin-bottom:3.5mm;
 }
@@ -410,6 +521,7 @@ h2 .num-secao{ color:var(--ouro); margin-right:2mm; }
 .nota{ color:var(--cinza); font-size:8.5pt; margin-bottom:3mm; }
 
 .quebra{ break-before:page; }
+.crono-bloco{ margin-bottom:5mm; break-inside:avoid; }
 .cronograma{ display:flex; gap:4mm; align-items:flex-start; }
 .t-mini{ font-size:8pt; }
 .t-mini th, .t-mini td{ padding:.9mm 1.6mm; }
@@ -427,5 +539,6 @@ h2 .num-secao{ color:var(--ouro); margin-right:2mm; }
   .folha{ width:auto; min-height:0; margin:0; padding:0 16mm; box-shadow:none; }
   .topo{ margin-top:-12mm; }
   section{ break-inside:avoid; }
+  .quebra-leve{ break-inside:avoid; }
 }
 `;

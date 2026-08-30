@@ -39,6 +39,12 @@
   --font-mono: "Cascadia Mono", Consolas, "SF Mono", Menlo, ui-monospace, monospace;
 }
 
+/*
+  As classes da casa vivem em @layer base/components: fora de camada elas
+  venceriam os utilitários do Tailwind na cascata, e um `campo w-auto`
+  ficaria preso no width:100% de .campo.
+*/
+@layer base {
 html {
   color-scheme: light;
 }
@@ -49,7 +55,9 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+}
 
+@layer components {
 /* números em tabela alinham na vírgula */
 .tabular {
   font-variant-numeric: tabular-nums;
@@ -227,6 +235,7 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 input[type="number"] {
   -moz-appearance: textfield;
+}
 }
 
 @media print {

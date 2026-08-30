@@ -6,13 +6,17 @@ Florescer sem mexer em código.
 
 ## O que ela faz
 
+- **Mapa de lotes** — o mesmo mapa interativo do site, dentro da ferramenta.
 - **Espelho de vendas** — os 44 lotes com área, preço, status e comprador,
   sincronizáveis com o Google Sheets que já alimenta o mapa público.
 - **Simulador** — monta a condição de pagamento em blocos: entrada, parcelas
   corrigidas pelo INCC, balão, financiamento Sicredi em SAC até 120 meses.
   Tudo editável: valor da entrada, percentual de cada bloco, número e valor
   das parcelas, sistema de amortização, índice de correção e taxa.
-- **Vários terrenos numa proposta**, com desconto em percentual ou em reais.
+- **Várias opções na mesma proposta** — à vista, 24x INCC e Sicredi lado a
+  lado, com comparativo e uma marcada como recomendada.
+- **Vários terrenos numa proposta**, com desconto em percentual ou em reais
+  por opção.
 - **Valor presente** de cada estrutura, para comparar propostas que têm o
   mesmo nominal mas prazos diferentes.
 - **Proposta em PDF** para entregar ao cliente e **planilha XLSX** com o
@@ -44,6 +48,7 @@ Primeiro acesso: `/login` → "Criar uma conta" → confirmar pelo e-mail.
 src/
   app/
     login/                       entrada
+    mapa/                        mapa de lotes (iframe do mapa do site)
     espelho/                     espelho de vendas
     propostas/                   lista, nova, simulador e folha de impressão
     api/espelho/sync/            importa o espelho do Google Sheets
@@ -52,6 +57,7 @@ src/
   lib/
     calc/                        motor de cálculo (puro, testável)
     espelho.ts                   leitura do CSV do Sheets
+    ordenacao.ts                 ordem natural dos lotes (A-2 antes de A-10)
     supabase/                    clients de browser, servidor e sessão
 supabase/migrations/             schema versionado
 ```

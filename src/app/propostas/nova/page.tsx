@@ -20,9 +20,7 @@ export default async function NovaPropostaPage() {
       supabase
         .from("lotes")
         .select("*")
-        .in("status", ["livre", "reservado"])
-        .order("quadra")
-        .order("numero"),
+        .in("status", ["livre", "reservado"]),
       supabase.from("tabelas_preco").select("*").eq("ativa", true),
       supabase.from("clientes").select("*").order("nome"),
     ]);

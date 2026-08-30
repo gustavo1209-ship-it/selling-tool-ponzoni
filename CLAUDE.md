@@ -24,6 +24,14 @@ escada de desconto do espelho, as identidades fechadas do SAC e do Price) e
 falha com exit 1 se o motor divergir. **Rodar depois de qualquer mexida em
 `src/lib/calc/`.**
 
+Ele roda via `tsx`, e não via `node --experimental-strip-types`. A diferença
+importa: o `--experimental-strip-types` exige extensão nos imports
+(`from "./tipos.ts"`), e essas extensões **quebram o resolvedor do Turbopack
+em modo dev** — a página que importa `@/lib/calc` fica em branco com
+"Jest worker encountered 2 child process exceptions" e nenhum erro real no
+log, enquanto `next build` compila normalmente. Não voltar a pôr `.ts` nos
+imports nem religar `allowImportingTsExtensions` no tsconfig.
+
 ## Stack
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind v4 ·
@@ -93,11 +101,27 @@ Funções puras, sem React e sem Supabase — o mesmo código roda no cliente
   desconta a valor presente e consolida os totais.
 - `verificar.ts` — as conferências contra planilha.
 
-### Uma proposta é uma lista de blocos
+### Uma proposta tem várias opções, cada opção é uma lista de blocos
 
-Cada bloco é um trecho do fluxo: *entrada*, *2x de R$ 30.000*, *36x
-corrigidas pelo INCC*, *120x SAC no Sicredi*. A base (o principal que ele
-quita) vem, nesta ordem de precedência:
+`propostas` → `proposta_cenarios` → `proposta_blocos`.
+
+Um **cenário** é uma opção de parcelamento: "à vista", "40% + 24x INCC",
+"Sicredi 120x SAC". Os lotes são da proposta (todas as opções vendem os
+mesmos terrenos); o desconto e os blocos são do cenário, porque mudam de
+opção para opção — à vista tem 9% de desconto e o 36x não.
+
+As **premissas** (INCC, taxa de valor presente, convenção da 1ª parcela) são
+da proposta, não do cenário. É o que mantém o comparativo honesto: as opções
+só podem ser comparadas se estiverem descontadas à mesma taxa.
+
+Um cenário é marcado `recomendado`. Ele define o `propostas.resultado`, que é
+o snapshot que as listagens leem sem carregar tudo.
+
+### Cada bloco é um trecho do fluxo
+
+*Entrada*, *2x de R$ 30.000*, *36x corrigidas pelo INCC*, *120x SAC no
+Sicredi*. A base (o principal que ele quita) vem, nesta ordem de
+precedência:
 
 1. `absorve_residuo` — o que sobrar do valor negociado (só um bloco
    costuma ter isso ligado; se houver vários, a sobra é dividida);
@@ -144,6 +168,27 @@ justamente na última linha — que é a que todo mundo confere. `sac()` e
 `price()` fazem o contrário de propósito: a última parcela absorve o resíduo
 para o saldo devedor zerar exatamente.
 
+## Ordem dos lotes
+
+`numero` é `text` no banco (existe loteamento com "12A"), então a ordenação
+do Postgres sai alfabética: A-1, A-10, A-11, A-2. Toda listagem passa por
+`compararLote`/`ordenarLotes` de `src/lib/ordenacao.ts`, que usa
+`localeCompare(..., { numeric: true })`. **Não ordenar por `numero` no
+`.order()` do Supabase** — o resultado fica errado e ninguém percebe até a
+quadra passar de nove lotes.
+
+## Mapa de lotes
+
+`/mapa` embute em iframe o mesmo HTML que o site publica. São duas colunas em
+`empreendimentos`: `mapa_url` (o HTML puro, do GitHub Pages, que é o que a
+aba embute) e `mapa_publico_url` (a página do site, para mandar ao cliente).
+A página do Webflow não manda `X-Frame-Options` nem CSP, então embutir
+qualquer uma das duas funciona — a do GitHub Pages foi escolhida por não
+trazer o cabeçalho do site junto.
+
+O mapa lê o status do mesmo Google Sheets, então os contadores dele batem com
+o espelho sem nenhuma integração entre os dois.
+
 ## Espelho de vendas
 
 A fonte de verdade de **status e comprador** continua sendo o
@@ -160,10 +205,20 @@ nome do comprador mora numa coluna sem título fixo ("Coluna 1").
 Preço só é sobrescrito quando a planilha traz um: lotes vendidos vêm com a
 célula de valor vazia e não podem zerar o preço no banco.
 
+## CSS: camadas importam
+
+As classes da casa (`.campo`, `.btn`, `.cartao`, `.tabela`…) vivem dentro de
+`@layer components` em `globals.css`, e `html`/`body` dentro de `@layer base`.
+Fora de camada elas venceriam os utilitários do Tailwind na cascata — foi
+assim que um `campo w-auto` ficou preso no `width: 100%` de `.campo` e
+colapsou o campo vizinho num flex. Ao acrescentar classe nova, pôr dentro da
+camada.
+
 ## Proposta para o cliente (PDF)
 
-`/propostas/[id]/imprimir` renderiza uma folha A4 autocontida
-(`src/components/FolhaProposta.tsx`) e o navegador gera o PDF — é o mesmo
+`/propostas/[id]/imprimir` renderiza uma folha A4 autocontida com **todas as
+opções da proposta** (`src/components/FolhaProposta.tsx`) e o navegador gera
+o PDF — é o mesmo
 padrão de `site-industrial-ponzoni/avaliacao-propostas/` e da manifestação de
 interesse do evento. Nada de biblioteca de PDF.
 
@@ -183,10 +238,11 @@ Português com todos os acentos. Percentuais e decimais com **vírgula**
 
 ## Planilha para uso interno (XLSX)
 
-`GET /api/propostas/[id]/xlsx` monta com `exceljs` quatro abas: **Resumo**
-(cabeçalho, terrenos, resumo financeiro), **Blocos** (parâmetros e totais de
-cada bloco), **Fluxo** (uma coluna por bloco + total + valor presente) e
-**Amortização** (parcela a parcela, com juros, correção e saldo devedor).
+`GET /api/propostas/[id]/xlsx` monta com `exceljs` uma aba **Resumo**
+(cabeçalho, terrenos e o comparativo das opções) e, para cada opção, duas
+abas: `▸ nome` (resumo, blocos e fluxo consolidado) e `≡ nome` (amortização
+parcela a parcela). Nome de aba do Excel não aceita `/ \ ? * [ ] :` e corta
+em 31 caracteres — `nomeDeAba` cuida disso e desambigua repetidos.
 `exceljs` está em `serverExternalPackages` no `next.config.ts`.
 
 ## Adicionar um empreendimento

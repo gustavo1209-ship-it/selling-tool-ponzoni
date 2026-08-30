@@ -2,13 +2,16 @@ import { notFound } from "next/navigation";
 import Cabecalho from "@/components/Cabecalho";
 import Simulador from "@/components/Simulador";
 import { createClient } from "@/lib/supabase/server";
+import { compararLote } from "@/lib/ordenacao";
 import type {
+  CenarioComBlocos,
   Cliente,
   CondicaoPagamento,
   Empreendimento,
   Lote,
   Proposta,
   PropostaBloco,
+  PropostaCenario,
   PropostaLote,
 } from "@/lib/db/tipos";
 
@@ -25,7 +28,7 @@ export default async function PropostaPage({
   const { data } = await supabase
     .from("propostas")
     .select(
-      "*, empreendimentos(*), clientes(*), proposta_lotes(*), proposta_blocos(*)"
+      "*, empreendimentos(*), clientes(*), proposta_lotes(*), proposta_cenarios(*, proposta_blocos(*))"
     )
     .eq("id", id)
     .maybeSingle();
@@ -36,22 +39,20 @@ export default async function PropostaPage({
     empreendimentos: empreendimento,
     clientes: cliente,
     proposta_lotes: lotes,
-    proposta_blocos: blocos,
+    proposta_cenarios: cenarios,
     ...proposta
   } = data as unknown as Proposta & {
     empreendimentos: Empreendimento;
     clientes: Cliente | null;
     proposta_lotes: PropostaLote[];
-    proposta_blocos: PropostaBloco[];
+    proposta_cenarios: (PropostaCenario & { proposta_blocos: PropostaBloco[] })[];
   };
 
   const [{ data: disponiveis }, { data: condicoes }] = await Promise.all([
     supabase
       .from("lotes")
       .select("*")
-      .eq("empreendimento_id", proposta.empreendimento_id)
-      .order("quadra")
-      .order("numero"),
+      .eq("empreendimento_id", proposta.empreendimento_id),
     proposta.tabela_preco_id
       ? supabase
           .from("condicoes_pagamento")
@@ -62,6 +63,13 @@ export default async function PropostaPage({
       : Promise.resolve({ data: [] }),
   ]);
 
+  const cenariosOrdenados: CenarioComBlocos[] = [...(cenarios ?? [])]
+    .sort((a, b) => a.ordem - b.ordem)
+    .map(({ proposta_blocos, ...c }) => ({
+      ...c,
+      blocos: [...(proposta_blocos ?? [])].sort((x, y) => x.ordem - y.ordem),
+    }));
+
   return (
     <>
       <Cabecalho />
@@ -70,8 +78,8 @@ export default async function PropostaPage({
           proposta={proposta}
           empreendimento={empreendimento}
           cliente={cliente}
-          lotesIniciais={(lotes ?? []).sort((a, b) => a.ordem - b.ordem)}
-          blocosIniciais={(blocos ?? []).sort((a, b) => a.ordem - b.ordem)}
+          lotesIniciais={[...(lotes ?? [])].sort(compararLote)}
+          cenariosIniciais={cenariosOrdenados}
           lotesDisponiveis={(disponiveis ?? []) as Lote[]}
           condicoes={(condicoes ?? []) as unknown as CondicaoPagamento[]}
         />

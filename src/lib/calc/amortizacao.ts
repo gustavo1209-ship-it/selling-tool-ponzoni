@@ -1,4 +1,4 @@
-import type { Amortizacao } from "./tipos.ts";
+import type { Amortizacao } from "./tipos";
 
 export interface LinhaAmortizacao {
   indice: number;

@@ -4,8 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { calcular } from "@/lib/calc";
-import type { Bloco } from "@/lib/calc/tipos";
-import type { BlocoTemplate, PropostaBloco, PropostaLote } from "@/lib/db/tipos";
+import type { Bloco, Resultado } from "@/lib/calc/tipos";
+import type {
+  BlocoTemplate,
+  PropostaBloco,
+  PropostaCenario,
+  PropostaLote,
+} from "@/lib/db/tipos";
+import { compararLote } from "@/lib/ordenacao";
 
 /** Blocos default quando a condição escolhida não traz template. */
 const TEMPLATE_PADRAO: BlocoTemplate[] = [
@@ -31,6 +37,26 @@ const TEMPLATE_PADRAO: BlocoTemplate[] = [
   },
 ];
 
+function linhasDeBloco(cenarioId: string, template: BlocoTemplate[]) {
+  return (template.length ? template : TEMPLATE_PADRAO).map((b, i) => ({
+    cenario_id: cenarioId,
+    ordem: i,
+    rotulo: b.rotulo,
+    tipo: b.tipo,
+    base_percentual: b.base_percentual ?? null,
+    base_valor: b.base_valor ?? null,
+    absorve_residuo: b.absorve_residuo ?? false,
+    qtd_parcelas: b.qtd_parcelas,
+    mes_inicio: b.mes_inicio,
+    indexador: b.indexador,
+    taxa_indexador_mensal: b.taxa_indexador_mensal ?? null,
+    juros_mensal: b.juros_mensal,
+    amortizacao: b.amortizacao,
+    parcela_fixa: b.parcela_fixa ?? null,
+    observacao: b.observacao ?? null,
+  }));
+}
+
 export async function criarProposta(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -39,7 +65,7 @@ export async function criarProposta(formData: FormData) {
   if (!user) redirect("/login");
 
   const empreendimentoId = String(formData.get("empreendimento_id") ?? "");
-  const condicaoId = String(formData.get("condicao_id") ?? "");
+  const condicaoIds = formData.getAll("condicao_id").map(String).filter(Boolean);
   const loteIds = formData.getAll("lote_id").map(String).filter(Boolean);
   const nomeCliente = String(formData.get("cliente_nome") ?? "").trim();
   const clienteExistente = String(formData.get("cliente_id") ?? "").trim();
@@ -49,11 +75,11 @@ export async function criarProposta(formData: FormData) {
     throw new Error("Escolha o empreendimento e ao menos um lote.");
   }
 
-  const [{ data: lotes }, { data: condicao }, { data: tabela }] = await Promise.all([
+  const [{ data: lotes }, { data: condicoes }, { data: tabela }] = await Promise.all([
     supabase.from("lotes").select("*").in("id", loteIds),
-    condicaoId
-      ? supabase.from("condicoes_pagamento").select("*").eq("id", condicaoId).single()
-      : Promise.resolve({ data: null }),
+    condicaoIds.length
+      ? supabase.from("condicoes_pagamento").select("*").in("id", condicaoIds)
+      : Promise.resolve({ data: [] }),
     supabase
       .from("tabelas_preco")
       .select("*")
@@ -78,29 +104,22 @@ export async function criarProposta(formData: FormData) {
     clienteId = novo.id;
   }
 
-  const descontoPct = condicao ? Number(condicao.desconto_pct) : 0;
-
   const { data: proposta, error: erroProposta } = await supabase
     .from("propostas")
     .insert({
       empreendimento_id: empreendimentoId,
       cliente_id: clienteId,
       tabela_preco_id: tabela?.id ?? null,
-      condicao_origem: condicao?.nome ?? null,
       titulo,
       incc_mensal: tabela?.incc_mensal ?? 0.005,
       juros_vp_mensal: tabela?.juros_vp_mensal ?? 0.01,
-      desconto_pct: descontoPct,
       criado_por: user.id,
     })
     .select("id")
     .single();
   if (erroProposta) throw new Error(erroProposta.message);
 
-  const ordenados = loteIds
-    .map((id) => lotes.find((l) => l.id === id))
-    .filter((l): l is NonNullable<typeof l> => Boolean(l));
-
+  const ordenados = [...lotes].sort(compararLote);
   const { error: erroLotes } = await supabase.from("proposta_lotes").insert(
     ordenados.map((l, i) => ({
       proposta_id: proposta.id,
@@ -115,30 +134,64 @@ export async function criarProposta(formData: FormData) {
   );
   if (erroLotes) throw new Error(erroLotes.message);
 
-  const template = (condicao?.template as BlocoTemplate[] | null) ?? TEMPLATE_PADRAO;
-  const { error: erroBlocos } = await supabase.from("proposta_blocos").insert(
-    (template.length ? template : TEMPLATE_PADRAO).map((b, i) => ({
-      proposta_id: proposta.id,
-      ordem: i,
-      rotulo: b.rotulo,
-      tipo: b.tipo,
-      base_percentual: b.base_percentual ?? null,
-      base_valor: b.base_valor ?? null,
-      absorve_residuo: b.absorve_residuo ?? false,
-      qtd_parcelas: b.qtd_parcelas,
-      mes_inicio: b.mes_inicio,
-      indexador: b.indexador,
-      taxa_indexador_mensal: b.taxa_indexador_mensal ?? null,
-      juros_mensal: b.juros_mensal,
-      amortizacao: b.amortizacao,
-      parcela_fixa: b.parcela_fixa ?? null,
-      observacao: b.observacao ?? null,
-    }))
-  );
+  // Uma opção de parcelamento por condição escolhida. A ordem das condições
+  // na tabela manda, não a ordem em que foram clicadas.
+  const escolhidas = condicaoIds
+    .map((id) => (condicoes ?? []).find((c) => c.id === id))
+    .filter((c): c is NonNullable<typeof c> => Boolean(c))
+    .sort((a, b) => a.ordem - b.ordem);
+
+  const aCriar = escolhidas.length
+    ? escolhidas.map((c, i) => ({
+        proposta_id: proposta.id,
+        ordem: i,
+        nome: c.nome,
+        condicao_origem: c.nome,
+        desconto_pct: Number(c.desconto_pct),
+        recomendado: i === 0,
+        template: (c.template as BlocoTemplate[] | null) ?? TEMPLATE_PADRAO,
+      }))
+    : [
+        {
+          proposta_id: proposta.id,
+          ordem: 0,
+          nome: "Opção A",
+          condicao_origem: null,
+          desconto_pct: 0,
+          recomendado: true,
+          template: TEMPLATE_PADRAO,
+        },
+      ];
+
+  const { data: cenarios, error: erroCenarios } = await supabase
+    .from("proposta_cenarios")
+    .insert(
+      aCriar.map((c) => ({
+        proposta_id: c.proposta_id,
+        ordem: c.ordem,
+        nome: c.nome,
+        condicao_origem: c.condicao_origem,
+        desconto_pct: c.desconto_pct,
+        recomendado: c.recomendado,
+      }))
+    )
+    .select("id, ordem");
+  if (erroCenarios) throw new Error(erroCenarios.message);
+
+  const blocos = (cenarios ?? []).flatMap((c) => {
+    const origem = aCriar.find((x) => x.ordem === c.ordem);
+    return linhasDeBloco(c.id, origem?.template ?? TEMPLATE_PADRAO);
+  });
+
+  const { error: erroBlocos } = await supabase.from("proposta_blocos").insert(blocos);
   if (erroBlocos) throw new Error(erroBlocos.message);
 
   revalidatePath("/propostas");
   redirect(`/propostas/${proposta.id}`);
+}
+
+export interface CenarioPayload extends PropostaCenario {
+  blocos: PropostaBloco[];
 }
 
 export interface PayloadSalvar {
@@ -150,18 +203,15 @@ export interface PayloadSalvar {
   incc_mensal: number;
   juros_vp_mensal: number;
   correcao_primeira_parcela: boolean;
-  desconto_pct: number;
-  desconto_valor: number;
-  desconto_motivo: string | null;
   observacoes: string | null;
   lotes: PropostaLote[];
-  blocos: PropostaBloco[];
+  cenarios: CenarioPayload[];
 }
 
 /**
- * Grava a proposta inteira: cabeçalho, lotes, blocos e o snapshot do
- * cálculo. Blocos e lotes são reescritos do zero — a lista é pequena e
- * assim não sobra órfão de linha removida na tela.
+ * Grava a proposta inteira: cabeçalho, lotes, cenários e blocos, com o
+ * snapshot do cálculo de cada cenário. Cenários e blocos são reescritos do
+ * zero — a lista é pequena e assim não sobra órfão de linha removida na tela.
  */
 export async function salvarProposta(payload: PayloadSalvar) {
   const supabase = await createClient();
@@ -170,23 +220,36 @@ export async function salvarProposta(payload: PayloadSalvar) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Não autenticado.");
 
-  const resultado = calcular({
-    lotes: payload.lotes.map((l) => ({
-      quadra: l.quadra,
-      numero: l.numero,
-      area_m2: Number(l.area_m2),
-      preco_tabela: Number(l.preco_tabela),
-      valor_negociado: Number(l.valor_negociado),
-    })),
-    blocos: payload.blocos as unknown as Bloco[],
-    premissas: {
-      incc_mensal: payload.incc_mensal,
-      juros_vp_mensal: payload.juros_vp_mensal,
-      correcao_primeira_parcela: payload.correcao_primeira_parcela,
-    },
-    desconto_pct: payload.desconto_pct,
-    desconto_valor: payload.desconto_valor,
-  });
+  const premissas = {
+    incc_mensal: payload.incc_mensal,
+    juros_vp_mensal: payload.juros_vp_mensal,
+    correcao_primeira_parcela: payload.correcao_primeira_parcela,
+  };
+
+  const lotes = payload.lotes.map((l) => ({
+    quadra: l.quadra,
+    numero: l.numero,
+    area_m2: Number(l.area_m2),
+    preco_tabela: Number(l.preco_tabela),
+    valor_negociado: Number(l.valor_negociado),
+  }));
+
+  const resultados = new Map<string, Resultado>();
+  for (const c of payload.cenarios) {
+    resultados.set(
+      c.id,
+      calcular({
+        lotes,
+        blocos: c.blocos as unknown as Bloco[],
+        premissas,
+        desconto_pct: Number(c.desconto_pct),
+        desconto_valor: Number(c.desconto_valor),
+      })
+    );
+  }
+
+  const recomendado =
+    payload.cenarios.find((c) => c.recomendado) ?? payload.cenarios[0];
 
   const { error: erroCabecalho } = await supabase
     .from("propostas")
@@ -198,11 +261,8 @@ export async function salvarProposta(payload: PayloadSalvar) {
       incc_mensal: payload.incc_mensal,
       juros_vp_mensal: payload.juros_vp_mensal,
       correcao_primeira_parcela: payload.correcao_primeira_parcela,
-      desconto_pct: payload.desconto_pct,
-      desconto_valor: payload.desconto_valor,
-      desconto_motivo: payload.desconto_motivo,
       observacoes: payload.observacoes,
-      resultado,
+      resultado: recomendado ? resultados.get(recomendado.id) : null,
     })
     .eq("id", payload.id);
   if (erroCabecalho) throw new Error(erroCabecalho.message);
@@ -224,33 +284,54 @@ export async function salvarProposta(payload: PayloadSalvar) {
     if (error) throw new Error(error.message);
   }
 
-  await supabase.from("proposta_blocos").delete().eq("proposta_id", payload.id);
-  if (payload.blocos.length) {
-    const { error } = await supabase.from("proposta_blocos").insert(
-      payload.blocos.map((b, i) => ({
+  // apagar o cenário leva os blocos junto (cascade)
+  await supabase.from("proposta_cenarios").delete().eq("proposta_id", payload.id);
+
+  for (const [i, c] of payload.cenarios.entries()) {
+    const { data: novo, error } = await supabase
+      .from("proposta_cenarios")
+      .insert({
         proposta_id: payload.id,
         ordem: i,
-        rotulo: b.rotulo,
-        tipo: b.tipo,
-        base_percentual: b.base_percentual,
-        base_valor: b.base_valor,
-        absorve_residuo: b.absorve_residuo,
-        qtd_parcelas: b.qtd_parcelas,
-        mes_inicio: b.mes_inicio,
-        indexador: b.indexador,
-        taxa_indexador_mensal: b.taxa_indexador_mensal,
-        juros_mensal: b.juros_mensal,
-        amortizacao: b.amortizacao,
-        parcela_fixa: b.parcela_fixa,
-        observacao: b.observacao,
-      }))
-    );
+        nome: c.nome,
+        condicao_origem: c.condicao_origem,
+        desconto_pct: c.desconto_pct,
+        desconto_valor: c.desconto_valor,
+        desconto_motivo: c.desconto_motivo,
+        recomendado: c.recomendado,
+        resultado: resultados.get(c.id) ?? null,
+      })
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
+
+    if (c.blocos.length) {
+      const { error: erroBlocos } = await supabase.from("proposta_blocos").insert(
+        c.blocos.map((b, k) => ({
+          cenario_id: novo.id,
+          ordem: k,
+          rotulo: b.rotulo,
+          tipo: b.tipo,
+          base_percentual: b.base_percentual,
+          base_valor: b.base_valor,
+          absorve_residuo: b.absorve_residuo,
+          qtd_parcelas: b.qtd_parcelas,
+          mes_inicio: b.mes_inicio,
+          indexador: b.indexador,
+          taxa_indexador_mensal: b.taxa_indexador_mensal,
+          juros_mensal: b.juros_mensal,
+          amortizacao: b.amortizacao,
+          parcela_fixa: b.parcela_fixa,
+          observacao: b.observacao,
+        }))
+      );
+      if (erroBlocos) throw new Error(erroBlocos.message);
+    }
   }
 
   revalidatePath(`/propostas/${payload.id}`);
   revalidatePath("/propostas");
-  return { ok: true, resultado };
+  return { ok: true };
 }
 
 export async function apagarProposta(id: string) {
@@ -270,16 +351,19 @@ export async function duplicarProposta(id: string) {
 
   const { data: origem } = await supabase
     .from("propostas")
-    .select("*, proposta_lotes(*), proposta_blocos(*)")
+    .select("*, proposta_lotes(*), proposta_cenarios(*, proposta_blocos(*))")
     .eq("id", id)
     .single();
   if (!origem) throw new Error("Proposta não encontrada.");
 
-  const { proposta_lotes: lotes, proposta_blocos: blocos, ...cabecalho } = origem;
-  delete (cabecalho as Record<string, unknown>).id;
-  delete (cabecalho as Record<string, unknown>).codigo;
-  delete (cabecalho as Record<string, unknown>).criado_em;
-  delete (cabecalho as Record<string, unknown>).atualizado_em;
+  const {
+    proposta_lotes: lotes,
+    proposta_cenarios: cenarios,
+    ...cabecalho
+  } = origem;
+  for (const campo of ["id", "codigo", "criado_em", "atualizado_em"]) {
+    delete (cabecalho as Record<string, unknown>)[campo];
+  }
 
   const { data: nova, error } = await supabase
     .from("propostas")
@@ -303,15 +387,28 @@ export async function duplicarProposta(id: string) {
       })
     );
   }
-  if (blocos?.length) {
-    await supabase.from("proposta_blocos").insert(
-      blocos.map((b: PropostaBloco) => {
-        const { id: _id, proposta_id: _p, ...resto } = b;
-        void _id;
-        void _p;
-        return { ...resto, proposta_id: nova.id };
-      })
-    );
+
+  for (const c of (cenarios ?? []) as (PropostaCenario & {
+    proposta_blocos: PropostaBloco[];
+  })[]) {
+    const { id: _id, proposta_id: _p, proposta_blocos: blocos, ...resto } = c;
+    void _id;
+    void _p;
+    const { data: novoCenario } = await supabase
+      .from("proposta_cenarios")
+      .insert({ ...resto, proposta_id: nova.id })
+      .select("id")
+      .single();
+    if (novoCenario && blocos?.length) {
+      await supabase.from("proposta_blocos").insert(
+        blocos.map((b) => {
+          const { id: _bid, cenario_id: _c, ...restoBloco } = b;
+          void _bid;
+          void _c;
+          return { ...restoBloco, cenario_id: novoCenario.id };
+        })
+      );
+    }
   }
 
   revalidatePath("/propostas");
