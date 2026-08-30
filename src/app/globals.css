@@ -1,0 +1,236 @@
+@import "tailwindcss";
+
+/*
+  Identidade da casa — a mesma do deck de lançamento e do memorando de
+  negociação: vinho como marca, dourado como destaque, fundo de papel.
+  Serifa nos títulos, sans no corpo. Claro por decisão: a ferramenta é
+  usada em reunião e o material impresso sai desta mesma paleta.
+*/
+@theme {
+  --color-vinho: #7c2a28;
+  --color-vinho-escuro: #5e1f1e;
+  --color-vinho-claro: #a24a45;
+  --color-vinho-fraco: #f4e7e5;
+
+  --color-dourado: #e0a221;
+  --color-dourado-escuro: #a3730f;
+  --color-dourado-fraco: #fbf1dc;
+
+  --color-tinta: #22201f;
+  --color-tinta-suave: #4a4744;
+  --color-cinza: #6b6662;
+  --color-linha: #ddd7d1;
+  --color-linha-forte: #c9c2bb;
+  --color-papel: #f6f4f1;
+  --color-papel-alt: #efeae4;
+  --color-superficie: #ffffff;
+
+  --color-verde: #276b4c;
+  --color-verde-fraco: #e0ede5;
+  --color-ambar: #8a5b0b;
+  --color-ambar-fraco: #f7ecd8;
+  --color-vermelho: #96262c;
+  --color-vermelho-fraco: #f5e0e0;
+
+  --font-display: "Iowan Old Style", "Palatino Linotype", Palatino,
+    "Book Antiqua", Georgia, serif;
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, "SF Mono", Menlo, ui-monospace, monospace;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-papel);
+  color: var(--color-tinta);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* números em tabela alinham na vírgula */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.serif {
+  font-family: var(--font-display);
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-cinza);
+}
+
+/* ---------------------------------------------------------- formulário */
+.campo {
+  width: 100%;
+  border: 1px solid var(--color-linha-forte);
+  border-radius: 6px;
+  background: var(--color-superficie);
+  padding: 7px 10px;
+  font-size: 14px;
+  color: var(--color-tinta);
+  font-variant-numeric: tabular-nums;
+}
+.campo:focus {
+  outline: 2px solid var(--color-vinho);
+  outline-offset: -1px;
+  border-color: var(--color-vinho);
+}
+.campo:disabled {
+  background: var(--color-papel-alt);
+  color: var(--color-cinza);
+}
+
+.rotulo {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-cinza);
+  margin-bottom: 4px;
+}
+
+/* -------------------------------------------------------------- botões */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  white-space: nowrap;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primario {
+  background: var(--color-vinho);
+  color: #fff;
+}
+.btn-primario:hover:not(:disabled) {
+  background: var(--color-vinho-escuro);
+}
+.btn-secundario {
+  background: var(--color-superficie);
+  color: var(--color-tinta);
+  border-color: var(--color-linha-forte);
+}
+.btn-secundario:hover:not(:disabled) {
+  background: var(--color-papel-alt);
+}
+.btn-fantasma {
+  background: transparent;
+  color: var(--color-cinza);
+}
+.btn-fantasma:hover:not(:disabled) {
+  background: var(--color-papel-alt);
+  color: var(--color-tinta);
+}
+
+/* -------------------------------------------------------------- cartão */
+.cartao {
+  background: var(--color-superficie);
+  border: 1px solid var(--color-linha);
+  border-radius: 10px;
+}
+
+.cartao-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-linha);
+}
+
+/* ------------------------------------------------------------- tabelas */
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.tabela th {
+  text-align: left;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-cinza);
+  font-weight: 600;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-linha-forte);
+  background: var(--color-papel-alt);
+  white-space: nowrap;
+}
+.tabela td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--color-linha);
+}
+.tabela tbody tr:last-child td {
+  border-bottom: none;
+}
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- selos */
+.selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.selo-livre { background: var(--color-verde-fraco); color: var(--color-verde); }
+.selo-reservado { background: var(--color-ambar-fraco); color: var(--color-ambar); }
+.selo-vendido { background: var(--color-vermelho-fraco); color: var(--color-vermelho); }
+.selo-indisponivel { background: var(--color-papel-alt); color: var(--color-cinza); }
+.selo-neutro { background: var(--color-papel-alt); color: var(--color-tinta-suave); }
+.selo-marca { background: var(--color-vinho-fraco); color: var(--color-vinho); }
+.selo-ouro { background: var(--color-dourado-fraco); color: var(--color-dourado-escuro); }
+
+/* barra vinho no topo, ecoando a folha impressa */
+.faixa-topo {
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--color-vinho) 0%,
+    var(--color-vinho) 72%,
+    var(--color-dourado) 72%,
+    var(--color-dourado) 100%
+  );
+}
+
+/* remove as setinhas dos inputs numéricos */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+@media print {
+  .sem-impressao {
+    display: none !important;
+  }
+}
