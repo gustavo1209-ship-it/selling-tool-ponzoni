@@ -11,13 +11,13 @@ propósito — o Florescer entra depois sem tocar em código. Ver
 ## Comandos
 
 ```bash
-npm run dev         # localhost:3000 (webpack — ver abaixo)
-npm run dev:turbo   # o mesmo, com Turbopack
+npm run dev         # localhost:3000
+npm run dev:webpack # saída de emergência, se o Turbopack der problema
 npm run build
 npm run lint
 npm run typecheck   # tsc --noEmit
 npm run verificar   # confere o motor de cálculo contra as planilhas
-npm run mapa:extrair  # regenera a geometria dos lotes a partir do mapa público
+npm run mapa:extrair -- "<caminho do mapa-lotes-*.html>"   # regenera a geometria
 ```
 
 `npm run verificar` é o teste que importa: ele reproduz números que já
@@ -35,40 +35,61 @@ normalmente, o que despista. Não voltar a pôr `.ts` nos imports nem religar
 
 ## Stack
 
-Next.js 16 (App Router; webpack no dev, Turbopack no build) · React 19 ·
-TypeScript · Tailwind v4 · Supabase (`@supabase/ssr`) · exceljs ·
-lucide-react.
+Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind v4 ·
+Supabase (`@supabase/ssr`) · exceljs · lucide-react.
 
 Mesma stack e mesmas convenções de `controle-gastos/` — inclusive
 `src/proxy.ts` (o Next 16 aposentou `middleware.ts`).
 
-## Por que o dev roda com webpack
+## Onde o projeto vive
 
-`npm run dev` é `next dev --webpack`, de propósito. O `build` continua com
-Turbopack (o padrão do Next 16); só o desenvolvimento saiu dele.
+`C:\Codes\selling-tool-ponzoni` — **fora do OneDrive, de propósito.**
 
-O Turbopack derrubava o dev server várias vezes por sessão, sempre com um de
-dois sintomas: página em branco com "Jest worker encountered 2 child process
-exceptions", ou — quando o processo morria durante uma server action — o
-React mostrando **"An unexpected response was received from the server"**.
-Nos dois casos sem erro real no log, e com `npm run build` passando.
+O projeto morava em `OneDrive\Desktop\Codes Claude	este supabase\` e o dev
+server caía várias vezes por sessão. A causa: o OneDrive sincroniza `.next` e
+`node_modules`, e o Next reescreve centenas de arquivos ali a cada
+compilação. Os sintomas variavam com o bundler, mas eram o mesmo problema:
 
-A causa é o projeto viver dentro do **OneDrive**: `.next` e `node_modules`
-são reparse points do Files On-Demand, e o Turbopack reescreve centenas de
-arquivos em `.next` a cada compilação enquanto o OneDrive tenta sincronizá-los
-— o worker morre com `EPIPE`. Explica por que o `build` (escreve uma vez)
-sempre passou e o `dev` (escreve o tempo todo) quebrava.
+- Turbopack: "Jest worker encountered 2 child process exceptions", tela em
+  branco, e — quando morria no meio de uma server action — o React mostrando
+  "An unexpected response was received from the server";
+- webpack: `EBUSY: resource busy or locked` em `.next/dev/server/*.js`.
 
-O que já foi tentado antes de trocar o bundler:
+`npm run build` sempre passou, porque escreve uma vez só. Foi o que despistou
+por várias sessões.
 
-- limpar `.next` e reiniciar — resolve na hora, volta depois;
-- `attrib +P -U node_modules /s /d`, para o OneDrive não desidratar um módulo
-  no meio do build (mantido, ajuda, não basta);
-- **junction de `.next` para fora do OneDrive — não funciona**: o Turbopack
-  passa a resolver o PostCSS a partir do caminho real em `AppData`, não acha
-  `@tailwindcss/postcss` e o app não sobe.
+**Não tente resolver com junction de `.next` para fora do OneDrive.** Foi
+tentado duas vezes, com os dois bundlers, e quebra a resolução de módulos: o
+Node passa a resolver a partir do caminho real em `AppData` e não acha o
+`node_modules` (com Turbopack falha o `@tailwindcss/postcss`; com webpack,
+`react/jsx-runtime`).
 
-Se o dev travar mesmo assim, a receita continua valendo:
+Fora do OneDrive o Turbopack voltou a ser o padrão e nada mais cai.
+
+### O que ficou no OneDrive
+
+Só as **fontes de dados**, que não vão para o git e precisam de backup:
+
+```
+OneDrive\Desktop\Codes Claude	este supabase\selling-tool-florescer  Planilha valores Lotes INDUSTRIAL 260813.xlsx
+  Propostas de Parcelamento.xlsx
+  Valores terrenos 260812.pdf
+  Valores terrenos VEND260812.pdf
+```
+
+O backup do código é o **GitHub**, não o OneDrive. O `.env.local` é
+recriável a partir do `.env.example` com a chave que está na Vercel.
+
+O repositório do mapa (`site-industrial-ponzoni`) continua no OneDrive e não
+é mais vizinho deste, então `npm run mapa:extrair` precisa do caminho:
+
+```bash
+npm run mapa:extrair -- "C:/Users/gusta/OneDrive/Desktop/Codes Claude/teste supabase/site-industrial-ponzoni/mapa-lotes-ponzoni-industrial.html"
+```
+
+## Se o dev server cair
+
+Não deveria mais, depois da mudança de pasta. Se cair, a receita continua:
 
 ```powershell
 Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
@@ -78,9 +99,8 @@ Remove-Item -Recurse -Force .next
 npm run dev
 ```
 
-Use `npm run dev:turbo` quando quiser reproduzir em desenvolvimento algo que
-só aparece no bundler do `build`. A solução definitiva é mover o projeto para
-fora do OneDrive.
+Antes de caçar o bug, rode `npm run build`: se ele passa, é cache.
+`npm run dev:webpack` fica como saída de emergência.
 
 ## Quando algo falha na tela
 

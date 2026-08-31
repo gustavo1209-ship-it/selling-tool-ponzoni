@@ -1,5 +1,5 @@
 // GERADO POR scripts/extrair-mapa.mjs — não editar à mão.
-// Origem: ../site-industrial-ponzoni/mapa-lotes-ponzoni-industrial.html
+// Origem: mapa-lotes-ponzoni-industrial.html
 // 44 lotes, viewBox 0 0 3192 1858.
 
 export interface LoteMapa {

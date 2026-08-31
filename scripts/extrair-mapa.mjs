@@ -14,14 +14,29 @@
  * `public/` (ver CLAUDE.md).
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 
+// O repositório do mapa não é vizinho deste desde que o código saiu do
+// OneDrive, então o caminho vem por argumento (ou por MAPA_HTML).
 const ORIGEM =
   process.argv[2] ??
+  process.env.MAPA_HTML ??
   "../site-industrial-ponzoni/mapa-lotes-ponzoni-industrial.html";
 const DESTINO = process.argv[3] ?? "src/lib/mapa/industrial-ponzoni.ts";
 
-const html = readFileSync(resolve(ORIGEM), "utf8");
+let html;
+try {
+  html = readFileSync(resolve(ORIGEM), "utf8");
+} catch {
+  console.error(
+    [
+      `Não achei o mapa em ${ORIGEM}.`,
+      "Passe o caminho do HTML do mapa público, por exemplo:",
+      '  npm run mapa:extrair -- "C:/Users/<voce>/OneDrive/Desktop/Codes Claude/teste supabase/site-industrial-ponzoni/mapa-lotes-ponzoni-industrial.html"',
+    ].join("\n")
+  );
+  process.exit(1);
+}
 
 const svg = html.match(/<svg id="svg-root"[^>]*viewBox="([^"]+)"/);
 if (!svg) throw new Error("Não achei o <svg id=\"svg-root\"> com viewBox.");
@@ -48,7 +63,7 @@ lotes.sort((a, b) =>
 );
 
 const saida = `// GERADO POR scripts/extrair-mapa.mjs — não editar à mão.
-// Origem: ${ORIGEM}
+// Origem: ${basename(ORIGEM)}
 // ${lotes.length} lotes, viewBox ${viewBox}.
 
 export interface LoteMapa {
