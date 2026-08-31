@@ -46,6 +46,7 @@ import type {
   PropostaBloco,
   PropostaLote,
 } from "@/lib/db/tipos";
+import { mensagemDeFalha } from "@/lib/erros";
 import { compararLote } from "@/lib/ordenacao";
 import {
   area,
@@ -344,7 +345,7 @@ export default function Simulador({
         });
         setRecado(`"${c.nome}" virou favorita e já aparece em novas propostas.`);
       } catch (e) {
-        setRecado((e as Error).message);
+        setRecado(mensagemDeFalha(e));
       }
       setFavoritando(null);
     });
@@ -458,7 +459,7 @@ export default function Simulador({
         setSujo(false);
         setRecado("Proposta salva.");
       } catch (e) {
-        setRecado((e as Error).message);
+        setRecado(mensagemDeFalha(e));
       }
     });
   }

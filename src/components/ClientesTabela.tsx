@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Pencil, Trash2, X } from "lucide-react";
 import { apagarCliente, atualizarCliente } from "@/app/clientes/acoes";
+import { mensagemDeFalha } from "@/lib/erros";
 import type { Cliente } from "@/lib/db/tipos";
 import { dataBR } from "@/lib/formato";
 
@@ -56,7 +57,7 @@ export default function ClientesTabela({
         setRascunho(null);
         router.refresh();
       } catch (e) {
-        setErro((e as Error).message);
+        setErro(mensagemDeFalha(e));
       }
     });
   }
@@ -69,7 +70,7 @@ export default function ClientesTabela({
         await apagarCliente(c.id);
         router.refresh();
       } catch (e) {
-        setErro((e as Error).message);
+        setErro(mensagemDeFalha(e));
       }
     });
   }

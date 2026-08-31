@@ -12,6 +12,7 @@ import type {
   TabelaPreco,
 } from "@/lib/db/tipos";
 import { area, moeda, moedaCurta, num, pct, precoM2 } from "@/lib/formato";
+import { mensagemDeFalha } from "@/lib/erros";
 import type { LoteStatus } from "@/lib/calc/tipos";
 
 const STATUS: LoteStatus[] = ["livre", "reservado", "vendido", "indisponivel"];
@@ -87,7 +88,7 @@ export default function EspelhoTabela({
         router.refresh();
       }
     } catch (e) {
-      setRecado({ tipo: "erro", texto: (e as Error).message });
+      setRecado({ tipo: "erro", texto: mensagemDeFalha(e) });
     }
     setSincronizando(false);
   }

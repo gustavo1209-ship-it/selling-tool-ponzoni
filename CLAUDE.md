@@ -17,6 +17,7 @@ npm run build
 npm run lint
 npm run typecheck   # tsc --noEmit
 npm run verificar   # confere o motor de cálculo contra as planilhas
+npm run mapa:extrair  # regenera a geometria dos lotes a partir do mapa público
 ```
 
 `npm run verificar` é o teste que importa: ele reproduz números que já
@@ -27,16 +28,16 @@ falha com exit 1 se o motor divergir. **Rodar depois de qualquer mexida em
 
 Ele roda via `tsx`, e não via `node --experimental-strip-types`. A diferença
 importa: o `--experimental-strip-types` exige extensão nos imports
-(`from "./tipos.ts"`), e essas extensões **quebram o resolvedor do Turbopack
-em modo dev** — a página que importa `@/lib/calc` fica em branco com
-"Jest worker encountered 2 child process exceptions" e nenhum erro real no
-log, enquanto `next build` compila normalmente. Não voltar a pôr `.ts` nos
-imports nem religar `allowImportingTsExtensions` no tsconfig.
+(`from "./tipos.ts"`), e essas extensões quebram o resolvedor do Turbopack —
+a página que importa `@/lib/calc` fica em branco, e `next build` compila
+normalmente, o que despista. Não voltar a pôr `.ts` nos imports nem religar
+`allowImportingTsExtensions` no tsconfig.
 
 ## Stack
 
-Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind v4 ·
-Supabase (`@supabase/ssr`) · exceljs · lucide-react.
+Next.js 16 (App Router; webpack no dev, Turbopack no build) · React 19 ·
+TypeScript · Tailwind v4 · Supabase (`@supabase/ssr`) · exceljs ·
+lucide-react.
 
 Mesma stack e mesmas convenções de `controle-gastos/` — inclusive
 `src/proxy.ts` (o Next 16 aposentou `middleware.ts`).
@@ -81,14 +82,29 @@ Use `npm run dev:turbo` quando quiser reproduzir em desenvolvimento algo que
 só aparece no bundler do `build`. A solução definitiva é mover o projeto para
 fora do OneDrive.
 
+## Quando algo falha na tela
+
+Duas peças, e as duas existem por causa das quedas do dev server:
+
+- `src/lib/erros.ts` — `mensagemDeFalha()` traduz "An unexpected response was
+  received from the server", "Failed to fetch" e afins para uma frase que diz
+  o que interessa: **nada foi gravado e o que está na tela não se perdeu,
+  basta tentar de novo**. Usada nos `catch` do simulador, dos clientes e do
+  espelho. Ao escrever `catch` novo, use ela em vez de `(e as Error).message`.
+- `src/app/error.tsx` — error boundary do app. Sem ela, uma falha de
+  renderização dá tela branca sem explicação.
+
 ## Supabase
 
 Projeto **`selling-tool`** (`qemzikxbvzghspltoejn`, região `sa-east-1`).
 Variáveis em `.env.local` (ver `.env.example`).
 
-Migrations versionadas em `supabase/migrations/`, com o mesmo timestamp
-aplicado no projeto remoto. Ao mudar o schema, aplicar **e** gravar o arquivo
-— senão o repositório e o banco divergem em silêncio.
+Migrations versionadas em `supabase/migrations/`. **O nome do arquivo carrega
+o timestamp exato com que a migration foi aplicada no remoto** — é assim que
+o Supabase CLI sabe o que já rodou. Ao mudar o schema: aplicar, conferir o
+timestamp em `list_migrations` e gravar o arquivo com esse nome. Se o
+timestamp do arquivo não bater com o aplicado, um `supabase db push` tenta
+rodar tudo de novo.
 
 ### Primeiro acesso
 
@@ -465,16 +481,44 @@ parcela a parcela). Nome de aba do Excel não aceita `/ \ ? * [ ] :` e corta
 em 31 caracteres — `nomeDeAba` cuida disso e desambigua repetidos.
 `exceljs` está em `serverExternalPackages` no `next.config.ts`.
 
-## Adicionar um empreendimento
+## Adicionar um empreendimento (o caminho do Florescer)
 
-Nada de código. Um `insert` em `empreendimentos` (com `espelho_csv_url`
-apontando para o CSV publicado da planilha dele), um em `tabelas_preco` e as
-linhas de `condicoes_pagamento` com os `template` dos blocos. Os lotes entram
-pelo `insert` do seed ou pelo próprio botão "Sincronizar com o Sheets", que
-cria os que não existirem.
+Quase tudo é dado, não código. A ordem que funciona:
 
-É assim que o Florescer entra: mesma ferramenta, outra linha em
-`empreendimentos`.
+**1. A linha em `empreendimentos`.** Além de `slug`, `nome` e cidade, são
+cinco URLs, e cada uma serve a uma coisa diferente:
+
+| Coluna | Para quê |
+|---|---|
+| `espelho_csv_url` | CSV publicado do Google Sheets, no formato `gviz/tq?tqx=out:csv` — alimenta o botão Sincronizar |
+| `mapa_url` | HTML do mapa interativo, embutido na aba Mapa de lotes |
+| `mapa_publico_url` | página do site com o mapa, para mandar ao cliente |
+| `mapa_imagem_url` | foto aérea em `public/`, desenhada na folha da proposta |
+| `logo_url` | logo em `public/`, no cabeçalho do app e no topo da proposta |
+
+**2. `tabelas_preco` e `condicoes_pagamento`.** Uma tabela vigente com o INCC
+e a taxa de valor presente, e uma condição por coluna do espelho. Nas
+condições, `oficial = true` e o **último bloco do template absorvendo o
+resíduo** (ver "Três armadilhas da estrutura de pagamento").
+
+**3. Os lotes.** Pelo botão "Sincronizar com o Sheets", que cria os que não
+existirem — mais rápido e menos sujeito a erro que um `insert` à mão.
+
+**4. Os dois assets em `public/`.** Logo e foto aérea, copiados do site do
+empreendimento.
+
+**5. A geometria do mapa**, se quiser a seção "Localização no parque":
+
+```bash
+npm run mapa:extrair -- ../site-florescer/mapa-lotes-florescer.html   src/lib/mapa/florescer.ts
+```
+
+Este é o único ponto que pede código: `MapaDaProposta` importa
+`src/lib/mapa/industrial-ponzoni.ts` direto. Para o segundo empreendimento,
+trocar esse import por um mapa de `slug → módulo`.
+
+**6. Conferir.** `npm run verificar` continua passando (o motor não depende do
+empreendimento), e vale abrir uma proposta de teste e o PDF antes de soltar.
 
 ## Fontes de dados
 
