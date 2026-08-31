@@ -53,6 +53,22 @@ const STATUS: PropostaStatus[] = [
 
 const LETRAS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+/**
+ * O nome da opção vira o título da seção no PDF, e ele nasce da condição da
+ * tabela ("40% Entrada + 36x INCC"). Se o vendedor mexe na entrada, o nome
+ * passa a mentir justamente no número que o cliente lê primeiro.
+ */
+function nomeDesatualizado(nome: string, entradaPct: number): number | null {
+  const m = nome.match(/(\d{1,3})\s*%/);
+  if (!m) return null;
+  const noNome = Number(m[1]) / 100;
+  return Math.abs(noNome - entradaPct) > 0.005 ? noNome : null;
+}
+
+function corrigirPercentualNoNome(nome: string, entradaPct: number): string {
+  return nome.replace(/(\d{1,3})\s*%/, `${Math.round(entradaPct * 100)}%`);
+}
+
 const idLocal = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -268,6 +284,26 @@ export default function Simulador({
     marcar();
   }
 
+  /** Faz o último bloco que não é entrada absorver o que falta ou sobra. */
+  function fecharConta(cenarioId: string) {
+    setCenarios((cs) =>
+      cs.map((c) => {
+        if (c.id !== cenarioId) return c;
+        const alvo = [...c.blocos].reverse().find((b) => b.tipo !== "entrada");
+        if (!alvo) return c;
+        return {
+          ...c,
+          blocos: c.blocos.map((b) =>
+            b.id === alvo.id
+              ? { ...b, absorve_residuo: true, base_percentual: null, base_valor: null }
+              : b
+          ),
+        };
+      })
+    );
+    marcar();
+  }
+
   function recomendar(id: string) {
     setCenarios((cs) => cs.map((c) => ({ ...c, recomendado: c.id === id })));
     marcar();
@@ -409,20 +445,31 @@ export default function Simulador({
 
         <div className="flex items-center gap-2 flex-wrap sem-impressao">
           <SeloProposta status={status} />
-          <Link
-            href={`/propostas/${proposta.id}/imprimir`}
-            target="_blank"
-            className="btn btn-secundario"
-          >
-            <Printer size={15} /> Proposta em PDF
-          </Link>
-          <a
-            href={`/api/propostas/${proposta.id}/xlsx`}
-            className="btn btn-secundario"
-            title="Planilha com o fluxo completo de cada opção"
-          >
-            <Download size={15} /> XLSX
-          </a>
+          {sujo ? (
+            <span
+              className="btn btn-secundario opacity-50 cursor-not-allowed"
+              title="O PDF e a planilha leem o que está salvo. Salve para gerar."
+            >
+              <Printer size={15} /> Salve para gerar PDF/XLSX
+            </span>
+          ) : (
+            <>
+              <Link
+                href={`/propostas/${proposta.id}/imprimir`}
+                target="_blank"
+                className="btn btn-secundario"
+              >
+                <Printer size={15} /> Proposta em PDF
+              </Link>
+              <a
+                href={`/api/propostas/${proposta.id}/xlsx`}
+                className="btn btn-secundario"
+                title="Planilha com o fluxo completo de cada opção"
+              >
+                <Download size={15} /> XLSX
+              </a>
+            </>
+          )}
           <button
             className="btn btn-fantasma"
             onClick={() => duplicarProposta(proposta.id)}
@@ -791,15 +838,48 @@ export default function Simulador({
             </div>
 
             {resultado.avisos.length > 0 && (
-              <div className="rounded-md px-3 py-2.5 bg-ambar-fraco text-ambar flex gap-2">
+              <div className="rounded-md px-3 py-2.5 bg-ambar-fraco text-ambar flex gap-2 items-start flex-wrap">
                 <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                <ul className="text-sm flex flex-col gap-0.5">
+                <ul className="text-sm flex flex-col gap-0.5 flex-1 min-w-56">
                   {resultado.avisos.map((a) => (
                     <li key={a}>{a}</li>
                   ))}
                 </ul>
+                {Math.abs(resultado.residuo) >= 0.5 && (
+                  <button
+                    className="btn btn-secundario"
+                    onClick={() => fecharConta(ativo.id)}
+                    title="O último bloco passa a absorver o que falta ou sobra"
+                  >
+                    Fechar a conta
+                  </button>
+                )}
               </div>
             )}
+
+            {(() => {
+              const noNome = nomeDesatualizado(ativo.nome, resultado.entradaPct);
+              if (noNome === null) return null;
+              return (
+                <div className="rounded-md px-3 py-2.5 bg-ambar-fraco text-ambar flex gap-2 items-center flex-wrap">
+                  <AlertTriangle size={16} className="shrink-0" />
+                  <span className="text-sm flex-1 min-w-56">
+                    O nome diz {pct(noNome, 0)} de entrada, mas esta opção está com{" "}
+                    {pct(resultado.entradaPct, 0)}. O nome é o título da seção no PDF.
+                  </span>
+                  <button
+                    className="btn btn-secundario"
+                    onClick={() =>
+                      mudarCenario(ativo.id, {
+                        nome: corrigirPercentualNoNome(ativo.nome, resultado.entradaPct),
+                      })
+                    }
+                  >
+                    Corrigir nome
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* resumo do cenário */}
             <div className="grid gap-3 grid-cols-2 lg:grid-cols-6">

@@ -1,6 +1,6 @@
 "use client";
 
-import { Printer } from "lucide-react";
+import { AlertTriangle, Printer } from "lucide-react";
 import type { Resultado } from "@/lib/calc/tipos";
 import type {
   Cliente,
@@ -162,6 +162,12 @@ export default function FolhaProposta({
   const referencia = opcoes.find((o) => o.cenario.recomendado) ?? opcoes[0];
   const somaLotes = lotes.reduce((s, l) => s + Number(l.valor_negociado), 0);
 
+  // uma opção cujos blocos não somam o valor negociado não pode ir para o
+  // cliente sem que o vendedor veja; o aviso fica só na tela, não no papel
+  const naoFecham = opcoes.filter(
+    (o) => Math.abs(o.resultado.residuo) >= 0.5
+  );
+
   let secao = 0;
   const n = () => ++secao;
 
@@ -177,6 +183,32 @@ export default function FolhaProposta({
           Na caixa de impressão: papel A4, margens padrão e &ldquo;Gráficos de fundo&rdquo; ligado.
         </span>
       </div>
+
+      {naoFecham.length > 0 && (
+        <div className="alerta sem-impressao">
+          <AlertTriangle size={17} />
+          <div>
+            <strong>
+              {naoFecham.length === 1
+                ? "Uma opção não fecha a conta."
+                : `${naoFecham.length} opções não fecham a conta.`}
+            </strong>{" "}
+            Os blocos não somam o valor negociado, então o cronograma abaixo não
+            quita o terreno. Volte ao simulador e use &ldquo;Fechar a conta&rdquo;
+            antes de enviar.
+            <ul>
+              {naoFecham.map(({ cenario, resultado }) => (
+                <li key={cenario.id}>
+                  {cenario.nome}:{" "}
+                  {resultado.residuo > 0
+                    ? `faltam ${moeda(resultado.residuo)}`
+                    : `sobram ${moeda(Math.abs(resultado.residuo))}`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       <article className="folha">
         <div className="topo" />
@@ -461,6 +493,14 @@ body{ background:#e9e6e2; }
   padding:8px 14px; font-size:14px; font-weight:600; cursor:pointer;
 }
 .barra-acao .dica{ font-size:12px; color:var(--cinza); }
+
+.alerta{
+  display:flex; gap:10px; align-items:flex-start;
+  max-width:210mm; margin:16px auto -8px; padding:12px 16px;
+  background:#F7ECD8; color:#8A5B0B; border-radius:6px; font-size:13px;
+  line-height:1.5;
+}
+.alerta ul{ margin:6px 0 0; padding-left:18px; }
 
 .folha{
   width:210mm; min-height:297mm; margin:16px auto; background:#fff;

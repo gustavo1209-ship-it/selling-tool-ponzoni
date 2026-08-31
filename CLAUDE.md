@@ -295,6 +295,32 @@ assim que um `campo w-auto` ficou preso no `width: 100%` de `.campo` e
 colapsou o campo vizinho num flex. Ao acrescentar classe nova, pôr dentro da
 camada.
 
+## O PDF só mostra o que está salvo
+
+A folha de impressão e o XLSX são rotas próprias que leem do banco; o
+simulador calcula no navegador. Enquanto houver alteração não salva, os
+botões de PDF e XLSX somem e dão lugar a "Salve para gerar PDF/XLSX". Sem
+essa trava o vendedor mexia na entrada, abria o PDF e via o número antigo,
+sem nada indicando o porquê.
+
+## Três armadilhas da estrutura de pagamento
+
+**O nome da opção é texto, não é derivado.** Ele nasce da condição da tabela
+("40% Entrada + 36x INCC") e vira o título da seção no PDF. Mudar a entrada
+não muda o nome. O simulador compara o percentual escrito no nome com a
+entrada calculada e oferece "Corrigir nome" quando divergem.
+
+**A conta precisa fechar.** Se os blocos não somam o valor negociado, o
+cronograma não quita o terreno. O aviso traz "Fechar a conta", que faz o
+último bloco que não é entrada absorver a diferença. A folha de impressão
+repete o alerta em barra amarela **só na tela** — nunca no papel, para não ir
+para o cliente.
+
+**Os templates das condições já vêm com o último bloco absorvendo o
+resíduo**, então mexer na entrada rebalanceia sozinho. Propostas criadas
+antes disso guardam cópia própria dos blocos e mantêm o percentual travado —
+use "Fechar a conta" nelas.
+
 ## Proposta para o cliente (PDF)
 
 `/propostas/[id]/imprimir` renderiza uma folha A4 autocontida com **todas as
