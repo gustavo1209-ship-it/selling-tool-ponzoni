@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "verificar": "tsx src/lib/calc/verificar.ts"
+    "verificar": "tsx src/lib/calc/verificar.ts",
+    "mapa:extrair": "node scripts/extrair-mapa.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

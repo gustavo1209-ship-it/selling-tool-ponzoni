@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, Printer } from "lucide-react";
+import MapaDaProposta from "./MapaDaProposta";
 import type { Resultado } from "@/lib/calc/tipos";
 import type {
   Cliente,
@@ -283,6 +284,24 @@ export default function FolhaProposta({
             </tfoot>
           </table>
         </section>
+
+        {/* ----------------------------------------------------------- mapa */}
+        {empreendimento.mapa_imagem_url && (
+          <section>
+            <h2>
+              <span className="num-secao">{n()}</span> Localização no parque
+            </h2>
+            <MapaDaProposta
+              lotes={lotes}
+              imagem={empreendimento.mapa_imagem_url}
+            />
+            <p className="texto nota" style={{ marginTop: "2.5mm" }}>
+              Em destaque, {lotes.length === 1 ? "o lote desta proposta" : "os lotes desta proposta"}.
+              Os demais contornos são as divisas do parque e não indicam
+              disponibilidade.
+            </p>
+          </section>
+        )}
 
         {/* --------------------------------------------------- comparativo */}
         {varias && (
@@ -592,6 +611,18 @@ h3{ font-size:9.5pt; margin:0 0 2mm; color:var(--vinho); }
 .totais .destaque-caixa{ background:var(--vinho); border-color:var(--vinho); }
 .totais .destaque-caixa span, .totais .destaque-caixa em{ color:#F0DCDA; }
 .totais .destaque-caixa strong{ color:#fff; }
+
+.mapa-proposta{ position:relative; }
+.mapa-principal{
+  display:block; width:100%; height:auto; aspect-ratio:16/9;
+  border-radius:1.5mm; overflow:hidden; background:var(--papel);
+}
+.mapa-mini{
+  position:absolute; right:3mm; bottom:3mm;
+  width:34mm; height:auto; aspect-ratio:3192/1858;
+  border:.5mm solid #fff; border-radius:1mm;
+  box-shadow:0 1mm 3mm rgba(0,0,0,.35);
+}
 
 .texto{ margin:0; font-size:9.5pt; white-space:pre-wrap; }
 .nota{ color:var(--cinza); font-size:8.5pt; margin-bottom:3mm; }

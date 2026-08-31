@@ -25,6 +25,8 @@ Florescer sem mexer em código.
   por opção.
 - **Valor presente** de cada estrutura, para comparar propostas que têm o
   mesmo nominal mas prazos diferentes.
+- **Mapa na proposta** — recorte da foto aérea com os lotes da proposta
+  destacados e miniatura do parque marcando onde ficam.
 - **Proposta em PDF** para entregar ao cliente e **planilha XLSX** com o
   fluxo completo para uso interno.
 
@@ -47,6 +49,7 @@ Primeiro acesso: `/login` → "Criar uma conta" → confirmar pelo e-mail.
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run verificar` | confere o motor de cálculo contra as planilhas da casa |
+| `npm run mapa:extrair` | regenera a geometria dos lotes a partir do mapa público |
 
 ## Estrutura
 

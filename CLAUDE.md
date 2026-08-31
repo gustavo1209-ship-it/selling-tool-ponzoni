@@ -268,6 +268,36 @@ criar uma "condição da tabela" com o desconto que quisesse.
 Na tela de criação as duas listas aparecem separadas, "Da tabela" e
 "Favoritas do time".
 
+## Mapa na proposta
+
+A folha traz uma seção "Localização no parque" com a foto aérea, os lotes da
+proposta destacados e uma miniatura do parque inteiro no canto marcando de
+onde saiu o recorte.
+
+O desenho é **SVG local, não iframe**: o PDF é gerado pelo navegador e não
+pode depender de rede na hora de imprimir. São duas peças:
+
+- `src/lib/mapa/industrial-ponzoni.ts` — geometria dos 44 polígonos, gerada
+  por `npm run mapa:extrair` a partir do HTML do mapa público. **Não editar à
+  mão**; se o mapa mudar, rodar o script de novo.
+- `public/mapa-industrial-ponzoni.jpg` — a foto aérea, copiada à mão de
+  `site-industrial-ponzoni/ponzoni-mapa-bg.jpg` (785 KB, muda pouco).
+  `empreendimentos.mapa_imagem_url` aponta para ela.
+
+O id do mapa é quadra + número com dois dígitos (`C11`), enquanto o banco
+guarda `quadra` e `numero` separados — `idDoMapa()` faz a ponte.
+
+`enquadrar()` calcula o recorte: bounding box dos lotes escolhidos, mais uma
+folga de 55% da maior dimensão, ajustada para 16:9 e presa dentro da imagem.
+A folga é proporcional de propósito — um lote de 900 m² e uma quadra inteira
+precisam de margens diferentes para "ver a rua" em volta. Com lotes em pontas
+opostas do parque o recorte cresce até virar o mapa inteiro, que é o
+comportamento certo.
+
+**Os demais lotes saem só em contorno branco translúcido, sem cor de
+status.** É deliberado: a proposta não deve informar ao cliente o que está
+livre ou vendido.
+
 ## Marca
 
 `empreendimentos.logo_url` aponta para um arquivo em `public/`. Aparece no

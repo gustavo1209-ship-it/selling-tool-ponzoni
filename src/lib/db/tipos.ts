@@ -26,6 +26,8 @@ export interface Empreendimento {
   mapa_url: string | null;
   /** Página pública do mapa, para mandar ao cliente. */
   mapa_publico_url: string | null;
+  /** Foto aérea servida de `public/`, desenhada na folha da proposta. */
+  mapa_imagem_url: string | null;
   /** Logo do empreendimento, servido de `public/`. */
   logo_url: string | null;
   cor_primaria: string;
