@@ -50,6 +50,7 @@ import { mensagemDeFalha } from "@/lib/erros";
 import { compararLote } from "@/lib/ordenacao";
 import {
   area,
+  descontoOuAcrescimo,
   METRICAS_PARCELA,
   moeda,
   NOTA_METRICA_PARCELA,
@@ -699,9 +700,7 @@ export default function Simulador({
                       {c.nome}
                     </td>
                     <td className="num">
-                      {r.descontoEfetivoPct > 0.0001
-                        ? `−${pct(r.descontoEfetivoPct, 2)}`
-                        : "—"}
+                      {descontoOuAcrescimo(r.descontoEfetivoPct, 2)}
                     </td>
                     <td className="num">{moeda(r.valorNegociado)}</td>
                     <td className="num">{moeda(r.entrada)}</td>
@@ -836,7 +835,9 @@ export default function Simulador({
                 />
               </div>
               <div className="w-36">
-                <label className="rotulo">Desconto %</label>
+                <label className="rotulo" title="Negativo vira acréscimo sobre o preço de tabela">
+                  Desconto %
+                </label>
                 <CampoNumero
                   valor={Number(ativo.desconto_pct) * 100}
                   aoMudar={(v) =>
@@ -957,7 +958,7 @@ export default function Simulador({
                   [
                     "Valor negociado",
                     moeda(resultado.valorNegociado),
-                    `−${pct(resultado.descontoEfetivoPct, 2)} · ${precoM2(resultado.precoM2Negociado)}`,
+                    `${descontoOuAcrescimo(resultado.descontoEfetivoPct, 2)} · ${precoM2(resultado.precoM2Negociado)}`,
                   ],
                   [
                     "Entrada",

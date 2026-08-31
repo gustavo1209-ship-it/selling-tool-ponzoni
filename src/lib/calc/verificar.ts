@@ -186,6 +186,75 @@ conferir("maior parcela = mês de reforço", rReforco.maiorParcela, 20000);
 // 48 vencimentos, 8 deles com reforço de 16.000: (48×4.000 + 8×16.000)/48
 conferir("parcela média dilui os reforços", rReforco.parcelaMedia, 6666.67, 0.01);
 
+// ---------------------------------------------------------------- Florescer
+//
+// O espelho e o app guardam, como preço de tabela do Florescer, o valor da
+// condição "40% + 6x" — é o que o vendedor abre. As demais condições sobem a
+// partir dele, então entram no cenário com desconto negativo. Os números de
+// referência são do lote A-1 em "Valores Terrenos Florescer 260226.pdf":
+// PREÇO 589.743,59 · 18x 518.974,36 · 12x 489.487,18 · 6x 460.000,00.
+const A1_SEIS = 460000;
+const FLORESCER: [string, number, number][] = [
+  ["12x", 1 - 0.83 / 0.78, 489487.18],
+  ["18x", 1 - 0.88 / 0.78, 518974.36],
+  ["preço cheio", 1 - 1 / 0.78, 589743.59],
+];
+
+for (const [rotulo, descontoPct, esperado] of FLORESCER) {
+  const r = calcular({
+    lotes: [
+      {
+        quadra: "A",
+        numero: "1",
+        area_m2: 653.22,
+        preco_tabela: A1_SEIS,
+        valor_negociado: A1_SEIS,
+      },
+    ],
+    desconto_pct: descontoPct,
+    desconto_valor: 0,
+    premissas,
+    blocos: [
+      bloco({ id: "e", rotulo: "Entrada", tipo: "entrada", base_percentual: 0.4, mes_inicio: 0 }),
+      bloco({ id: "p", rotulo: "Parcelas", qtd_parcelas: 6, absorve_residuo: true }),
+    ],
+  });
+  // tolerância de um real: o preço de 6x é redondo e a volta para o cheio
+  // reintroduz os centavos que o arredondamento da tabela comeu
+  conferir(`Florescer A-1 ${rotulo}`, r.valorNegociado, esperado, 1);
+  conferir(`Florescer A-1 ${rotulo} — resíduo zerado`, r.residuo, 0, 0.01);
+  // sem correção o cliente soma a coluna: o total tem de bater no centavo
+  conferir(
+    `Florescer A-1 ${rotulo} — total nominal = valor da proposta`,
+    r.totalNominal,
+    r.valorNegociado,
+    0.001
+  );
+}
+
+// e a condição de referência não mexe em nada
+const a1Seis = calcular({
+  lotes: [
+      {
+        quadra: "A",
+        numero: "1",
+        area_m2: 653.22,
+        preco_tabela: A1_SEIS,
+        valor_negociado: A1_SEIS,
+      },
+    ],
+  desconto_pct: 0,
+  desconto_valor: 0,
+  premissas,
+  blocos: [
+    bloco({ id: "e", rotulo: "Entrada", tipo: "entrada", base_percentual: 0.4, mes_inicio: 0 }),
+    bloco({ id: "p", rotulo: "Parcelas", qtd_parcelas: 6, absorve_residuo: true }),
+  ],
+});
+conferir("Florescer A-1 6x é o preço do espelho", a1Seis.valorNegociado, A1_SEIS, 0.01);
+conferir("Florescer A-1 6x — entrada de 40%", a1Seis.entrada, 184000, 0.01);
+conferir("Florescer A-1 6x — 6 parcelas de 46.000", a1Seis.parcelaInicial, 46000, 0.01);
+
 console.log(
   falhas === 0
     ? "\nTodas as conferências passaram.\n"

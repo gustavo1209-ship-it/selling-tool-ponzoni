@@ -44,6 +44,8 @@ export interface Lote {
   area_m2: number;
   preco_tabela: number | null;
   status: LoteStatus;
+  /** Zoneamento do lote no espelho: "Residencial", "Misto I", "Misto II". */
+  tipo: string | null;
   comprador: string | null;
   observacao: string | null;
   atualizado_em: string;

@@ -11,6 +11,7 @@ import type {
   PropostaLote,
 } from "@/lib/db/tipos";
 import { valorDaMetrica } from "@/lib/calc";
+import { clarear, escurecer } from "@/lib/cores";
 import {
   adjetivoPeriodicidade,
   NOTA_METRICA_PARCELA,
@@ -18,6 +19,7 @@ import {
   ROTULO_METRICA_PARCELA,
   area,
   dataBR,
+  descontoOuAcrescimo,
   moeda,
   num,
   pct,
@@ -28,6 +30,17 @@ import {
 export interface Opcao {
   cenario: PropostaCenario;
   resultado: Resultado;
+}
+
+/**
+ * Alguma parcela desta opção é corrigida? No Florescer as condições são
+ * "sem juros" e nada é indexado — dizer "já com correção projetada" ali
+ * seria promessa de reajuste que o contrato não tem.
+ */
+function temCorrecao(r: Resultado): boolean {
+  return r.blocos.some(
+    (b) => b.bloco.indexador !== "nenhum" || Number(b.bloco.juros_mensal) > 0
+  );
 }
 
 /** Frase de venda de um bloco, do jeito que se lê em voz alta. */
@@ -181,7 +194,7 @@ export default function FolhaProposta({
 
   return (
     <>
-      <style>{estilo}</style>
+      <style>{estilo(empreendimento)}</style>
 
       <div className="barra-acao sem-impressao">
         <button className="btn-imprimir" onClick={() => window.print()}>
@@ -299,8 +312,11 @@ export default function FolhaProposta({
               <span className="num-secao">{n()}</span> Localização no parque
             </h2>
             <MapaDaProposta
+              slug={empreendimento.slug}
               lotes={lotes}
               imagem={empreendimento.mapa_imagem_url}
+              corPreenchimento={empreendimento.cor_primaria}
+              corContorno={empreendimento.cor_secundaria}
             />
             <p className="texto nota" style={{ marginTop: "2.5mm" }}>
               Em destaque, {lotes.length === 1 ? "o lote desta proposta" : "os lotes desta proposta"}.
@@ -363,7 +379,8 @@ export default function FolhaProposta({
 
         {/* ------------------------------------------------ cada opção */}
         {opcoes.map(({ cenario, resultado }, idx) => {
-          const temDesconto = resultado.descontoValor > 0.5;
+          // negativo é acréscimo (prazo maior que o da tabela), e também conta
+          const temAjuste = Math.abs(resultado.descontoValor) > 0.5;
           const vencimentos = resultado.fluxo.filter((f) => f.mes > 0);
           return (
             <section key={cenario.id} className={varias && idx > 0 ? "quebra-leve" : ""}>
@@ -390,7 +407,7 @@ export default function FolhaProposta({
                 })}
               </ol>
 
-              {temDesconto && (
+              {temAjuste && (
                 <table className="t t-resumo">
                   <tbody>
                     <tr>
@@ -399,12 +416,15 @@ export default function FolhaProposta({
                     </tr>
                     <tr>
                       <td>
-                        Condição especial desta opção
+                        {resultado.descontoValor > 0
+                          ? "Condição especial desta opção"
+                          : "Ajuste pelo prazo escolhido"}
                         {cenario.desconto_motivo ? ` — ${cenario.desconto_motivo}` : ""}
                       </td>
                       <td className="d desconto">
-                        − {moeda(resultado.descontoValor)} (
-                        {pct(resultado.descontoEfetivoPct, 2)})
+                        {resultado.descontoValor > 0 ? "−" : "+"}{" "}
+                        {moeda(Math.abs(resultado.descontoValor))} (
+                        {descontoOuAcrescimo(resultado.descontoEfetivoPct, 2)})
                       </td>
                     </tr>
                   </tbody>
@@ -443,7 +463,11 @@ export default function FolhaProposta({
                 <div className="destaque-caixa">
                   <span>Total do investimento</span>
                   <strong>{moeda(resultado.totalNominal)}</strong>
-                  <em>valor nominal, já com correção projetada</em>
+                  <em>
+                    {temCorrecao(resultado)
+                      ? "valor nominal, já com correção projetada"
+                      : "soma de todas as parcelas, sem correção"}
+                  </em>
                 </div>
               </div>
             </section>
@@ -466,11 +490,17 @@ export default function FolhaProposta({
             <h2>
               <span className="num-secao">{n()}</span> Cronograma de vencimentos
             </h2>
-            <p className="texto nota">
-              Valores projetados com a correção informada em cada bloco (padrão:{" "}
-              {pct(Number(proposta.incc_mensal), 3)} ao mês). As parcelas indexadas são
-              reajustadas pelo índice efetivamente apurado no período.
-            </p>
+            {opcoes.some((o) => temCorrecao(o.resultado)) ? (
+              <p className="texto nota">
+                Valores projetados com a correção informada em cada bloco (padrão:{" "}
+                {pct(Number(proposta.incc_mensal), 3)} ao mês). As parcelas indexadas
+                são reajustadas pelo índice efetivamente apurado no período.
+              </p>
+            ) : (
+              <p className="texto nota">
+                Parcelas fixas, sem correção monetária nem juros.
+              </p>
+            )}
 
             {opcoes.map(({ cenario, resultado }) => {
               if (!resultado.fluxo.some((f) => f.mes > 0)) return null;
@@ -492,9 +522,13 @@ export default function FolhaProposta({
             financiamento, à análise de crédito da instituição financeira.
           </p>
           <p>
-            Parcelas indicadas como corrigidas são reajustadas mensalmente pelo INCC; os
-            valores acima usam a projeção informada e podem variar. Proposta válida até{" "}
-            {validade.toLocaleDateString("pt-BR")}.
+            {opcoes.some((o) => temCorrecao(o.resultado)) && (
+              <>
+                Parcelas indicadas como corrigidas são reajustadas mensalmente pelo
+                INCC; os valores acima usam a projeção informada e podem variar.{" "}
+              </>
+            )}
+            Proposta válida até {validade.toLocaleDateString("pt-BR")}.
           </p>
           <p className="assinatura">
             {empreendimento.logo_url && (
@@ -510,9 +544,15 @@ export default function FolhaProposta({
   );
 }
 
-const estilo = `
+/**
+ * O papel veste as cores do empreendimento. `--vinho` e `--ouro` mantêm os
+ * nomes de quando só existia o Industrial: são os papéis (cor de marca e cor
+ * de destaque), não os tons — o Florescer entra roxo e dourado nos mesmos.
+ */
+const estilo = (e: Empreendimento) => `
 :root{
-  --vinho:#7C2A28; --vinho-fraco:#F4E7E5; --ouro:#E0A221; --ouro-escuro:#A3730F;
+  --vinho:${e.cor_primaria}; --vinho-fraco:${clarear(e.cor_primaria, 0.9)};
+  --ouro:${e.cor_secundaria}; --ouro-escuro:${escurecer(e.cor_secundaria, 0.3)};
   --tinta:#22201F; --cinza:#6B6662; --linha:#DDD7D1; --linha-forte:#C9C2BB;
   --papel:#F3F1EF; --verm:#96262C;
 }

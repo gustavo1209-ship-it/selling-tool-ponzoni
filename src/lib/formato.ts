@@ -31,6 +31,20 @@ export function pct(v: number | null | undefined, casas = 2): string {
 
 export const area = (v: number | null | undefined) => `${num(v)} m²`;
 
+/**
+ * Desconto e acréscimo saem do mesmo número: o Florescer guarda o preço à
+ * vista como preço de tabela, então prazos maiores entram com percentual
+ * negativo. "−12,82%", "+12,82%" ou "—".
+ */
+export function descontoOuAcrescimo(
+  v: number | null | undefined,
+  casas = 2
+): string {
+  const n = v ?? 0;
+  if (Math.abs(n) < 0.0001) return "—";
+  return `${n > 0 ? "−" : "+"}${pct(Math.abs(n), casas)}`;
+}
+
 export const precoM2 = (v: number | null | undefined) => `${moeda(v)}/m²`;
 
 /** Aceita "1.234,56", "1234.56" e "R$ 1.234,56". */
@@ -66,6 +80,7 @@ export const ROTULO_STATUS_LOTE: Record<string, string> = {
   livre: "Livre",
   reservado: "Reservado",
   vendido: "Vendido",
+  projeto: "Projeto",
   indisponivel: "Não disponível",
 };
 

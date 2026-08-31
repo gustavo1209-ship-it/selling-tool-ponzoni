@@ -11,7 +11,13 @@ export type Indexador =
   | "cdi"
   | "selic";
 export type BlocoTipo = "entrada" | "sinal" | "parcelas" | "balao" | "financiamento";
-export type LoteStatus = "livre" | "reservado" | "vendido" | "indisponivel";
+/** "projeto" = lote com projeto aprovado/em obra, fora da prateleira de venda. */
+export type LoteStatus =
+  | "livre"
+  | "reservado"
+  | "vendido"
+  | "projeto"
+  | "indisponivel";
 
 /** Qual parcela a proposta expõe. Ver `metricas_parcela` em `propostas`. */
 export type MetricaParcela = "inicial" | "media" | "final" | "maior";

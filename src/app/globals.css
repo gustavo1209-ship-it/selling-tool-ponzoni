@@ -29,6 +29,8 @@
   --color-verde-fraco: #e0ede5;
   --color-ambar: #8a5b0b;
   --color-ambar-fraco: #f7ecd8;
+  --color-roxo: #5b2166;
+  --color-roxo-fraco: #efe4f2;
   --color-vermelho: #96262c;
   --color-vermelho-fraco: #f5e0e0;
 
@@ -210,6 +212,7 @@ body {
 .selo-livre { background: var(--color-verde-fraco); color: var(--color-verde); }
 .selo-reservado { background: var(--color-ambar-fraco); color: var(--color-ambar); }
 .selo-vendido { background: var(--color-vermelho-fraco); color: var(--color-vermelho); }
+.selo-projeto { background: var(--color-roxo-fraco); color: var(--color-roxo); }
 .selo-indisponivel { background: var(--color-papel-alt); color: var(--color-cinza); }
 .selo-neutro { background: var(--color-papel-alt); color: var(--color-tinta-suave); }
 .selo-marca { background: var(--color-vinho-fraco); color: var(--color-vinho); }

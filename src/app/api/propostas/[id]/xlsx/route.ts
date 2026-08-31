@@ -21,16 +21,26 @@ import {
   rotuloPeriodicidade,
 } from "@/lib/formato";
 
+/** Fallback quando o empreendimento não tem cor cadastrada. */
 const VINHO = "FF7C2A28";
+
+/** "#5B2166" → "FF5B2166", que é como o ExcelJS quer a cor. */
+const argb = (hex: string | null | undefined) =>
+  hex ? "FF" + hex.replace("#", "").toUpperCase().padStart(6, "0") : VINHO;
 const PAPEL = "FFF3F1EF";
 const MOEDA = 'R$ #,##0.00;[Red]-R$ #,##0.00';
 const PORCENTO = "0.000%";
 
-function cabecalhoDaAba(ws: ExcelJS.Worksheet, titulo: string, largura: number) {
+function cabecalhoDaAba(
+  ws: ExcelJS.Worksheet,
+  titulo: string,
+  largura: number,
+  cor: string
+) {
   const linha = ws.addRow([titulo]);
   ws.mergeCells(linha.number, 1, linha.number, largura);
   linha.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" }, name: "Arial" };
-  linha.fill = { type: "pattern", pattern: "solid", fgColor: { argb: VINHO } };
+  linha.fill = { type: "pattern", pattern: "solid", fgColor: { argb: cor } };
   linha.height = 22;
   linha.alignment = { vertical: "middle", indent: 1 };
   ws.addRow([]);
@@ -94,6 +104,8 @@ export async function GET(
   };
 
   const lotes = [...(lotesBrutos ?? [])].sort(compararLote);
+  // a planilha veste a cor do empreendimento, como a folha da proposta
+  const corDaMarca = argb(empreendimento.cor_primaria);
 
   const premissas = {
     incc_mensal: Number(proposta.incc_mensal),
@@ -146,7 +158,12 @@ export async function GET(
     { width: 18 },
     { width: 18 },
   ];
-  cabecalhoDaAba(resumo, `${proposta.codigo} — ${cliente?.nome ?? proposta.titulo ?? ""}`, 8);
+  cabecalhoDaAba(
+    resumo,
+    `${proposta.codigo} — ${cliente?.nome ?? proposta.titulo ?? ""}`,
+    8,
+    corDaMarca
+  );
 
   for (const [rotulo, valor] of [
     ["Empreendimento", empreendimento.nome],
@@ -235,7 +252,12 @@ export async function GET(
       { width: 14 }, { width: 12 }, { width: 14 }, { width: 12 }, { width: 16 },
       { width: 16 },
     ];
-    cabecalhoDaAba(ws, `${cenario.nome}${cenario.recomendado ? "  (recomendada)" : ""}`, 10);
+    cabecalhoDaAba(
+      ws,
+      `${cenario.nome}${cenario.recomendado ? "  (recomendada)" : ""}`,
+      10,
+      corDaMarca
+    );
 
     tituloTabela(ws, ["Resumo da opção", "Valor"]);
     for (const [rotulo, valor, formato] of [
@@ -326,7 +348,7 @@ export async function GET(
       { width: 16 }, { width: 14 }, { width: 14 }, { width: 14 },
       { width: 16 }, { width: 16 },
     ];
-    cabecalhoDaAba(amort, `${cenario.nome} — parcela a parcela`, 10);
+    cabecalhoDaAba(amort, `${cenario.nome} — parcela a parcela`, 10, corDaMarca);
     tituloTabela(amort, [
       "Bloco", "Nº", "Mês", "Vencimento", "Parcela", "Amortização", "Juros",
       "Correção", "Saldo devedor", "Valor presente",

@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
   const { data: atuais } = await supabase
     .from("lotes")
-    .select("id, quadra, numero, area_m2, preco_tabela, status, comprador")
+    .select("id, quadra, numero, area_m2, preco_tabela, status, comprador, tipo")
     .eq("empreendimento_id", empreendimentoId);
 
   const porChave = new Map((atuais ?? []).map((l) => [`${l.quadra}|${l.numero}`, l]));
@@ -77,6 +77,7 @@ export async function POST(request: Request) {
         preco_tabela: linha.preco_tabela,
         status: linha.status ?? "livre",
         comprador: linha.comprador,
+        tipo: linha.tipo,
       });
       alteracoes.push(`${chave.replace("|", "-")}: novo lote`);
       continue;
@@ -96,6 +97,9 @@ export async function POST(request: Request) {
     }
     if (linha.area_m2 !== null && Number(atual.area_m2) !== linha.area_m2) {
       patch.area_m2 = linha.area_m2;
+    }
+    if (linha.tipo !== null && linha.tipo !== atual.tipo) {
+      patch.tipo = linha.tipo;
     }
 
     if (Object.keys(patch).length > 0) {

@@ -4,9 +4,10 @@ Ferramenta interna de vendas: espelho de lotes, simulador de condições de
 pagamento e proposta pronta para entregar ao cliente (PDF) ou levar para a
 mesa (XLSX).
 
-Nasceu para o **Industrial Ponzoni**, mas o schema é multi-empreendimento de
-propósito — o Florescer entra depois sem tocar em código. Ver
-[Adicionar um empreendimento](#adicionar-um-empreendimento).
+Atende dois empreendimentos — **Industrial Ponzoni** e **Florescer Parque
+Residencial** — e o schema é multi-empreendimento de propósito: quase tudo é
+dado. Ver [Adicionar um empreendimento](#adicionar-um-empreendimento), que
+hoje já tem dois casos reais e bem diferentes para comparar.
 
 ## Comandos
 
@@ -224,6 +225,47 @@ chegou à mesma escada por outro caminho e estimou a taxa embutida na tabela
 em **~0,9% a.m. real** — é a referência para escolher a taxa de valor
 presente quando se quer comparar estruturas.
 
+### A do Florescer é o contrário
+
+No Florescer (`Valores Terrenos Florescer 260226.pdf`) a âncora é o **PREÇO
+cheio** e as condições descem dele, todas sem juros e sem indexador:
+
+| Condição | Fator sobre o PREÇO |
+|---|---|
+| PREÇO | 1,00 |
+| 40% + 18x | 0,88 |
+| 40% + 12x | 0,83 |
+| 40% + 6x | 0,78 ← **é o que sai no PDF de VENDAS** |
+
+O vendedor abre o valor de **6x**, que é o do `Florescer 260226 VENDAS.pdf` —
+já descontado como à vista. Por isso `lotes.preco_tabela` guarda esse número,
+e não o PREÇO cheio: é ele que aparece no espelho e na primeira frase da
+conversa.
+
+A consequência é que **as demais condições entram com `desconto_pct`
+negativo** — são acréscimos sobre a base de 6x:
+
+| Condição | `desconto_pct` | Como a tela mostra |
+|---|---|---|
+| 40% + 6x | 0 | — |
+| 40% + 12x | `1 − 0,83/0,78` = −0,064103 | +6,41% |
+| 40% + 18x | `1 − 0,88/0,78` = −0,128205 | +12,82% |
+| Preço de tabela | `1 − 1/0,78` = −0,282051 | +28,21% |
+
+`descontoOuAcrescimo()` em `src/lib/formato.ts` é quem troca o sinal e o
+rótulo; a folha da proposta diz "Ajuste pelo prazo escolhido" no lugar de
+"Condição especial" quando o número é negativo.
+
+**Seis casas decimais, não quatro.** `condicoes_pagamento.desconto_pct` e
+`proposta_cenarios.desconto_pct` são `numeric(9,6)` desde a migration 20.
+Os fatores do Florescer são dízimas; em quatro casas o preço cheio de um lote
+de R$ 590 mil saía R$ 22 fora do PDF que o vendedor tem na mão.
+
+**Cuidado com "à vista".** No Florescer à vista é a coluna de 6x, não o PREÇO
+cheio. A condição "Preço de tabela" nasceu com o bloco rotulado "Pagamento à
+vista" e foi renomeada na migration 21 — do jeito errado, o vendedor cotaria
+dinheiro na mão por R$ 589 mil onde o certo são R$ 460 mil.
+
 ## Motor de cálculo (`src/lib/calc/`)
 
 Funções puras, sem React e sem Supabase — o mesmo código roda no cliente
@@ -365,6 +407,12 @@ justamente na última linha — que é a que todo mundo confere. `sac()` e
 `price()` fazem o contrário de propósito: a última parcela absorve o resíduo
 para o saldo devedor zerar exatamente.
 
+**Exceção: bloco sem correção e sem juros.** Aí `calcularBloco()` joga a sobra
+de centavos na última parcela. É o caso do Florescer, onde tudo é "sem juros":
+sem esse ajuste o "total do investimento" saía seis centavos abaixo do "valor
+da proposta" na mesma página do PDF, e o cliente soma a coluna à mão. Onde há
+correção o comportamento antigo continua — a sobra ali não é arredondamento.
+
 ## Montar opção personalizada
 
 `MontarOpcao.tsx` gera os blocos a partir do formato que o mercado usa:
@@ -408,11 +456,16 @@ onde saiu o recorte.
 O desenho é **SVG local, não iframe**: o PDF é gerado pelo navegador e não
 pode depender de rede na hora de imprimir. São duas peças:
 
-- `src/lib/mapa/industrial-ponzoni.ts` — geometria dos 44 polígonos, gerada
-  por `npm run mapa:extrair` a partir do HTML do mapa público. **Não editar à
-  mão**; se o mapa mudar, rodar o script de novo.
-- `public/mapa-industrial-ponzoni.jpg` — a foto aérea, copiada à mão de
-  `site-industrial-ponzoni/ponzoni-mapa-bg.jpg` (785 KB, muda pouco).
+- `src/lib/mapa/<slug>.ts` — geometria dos polígonos, gerada por
+  `npm run mapa:extrair` a partir do HTML do mapa público. **Não editar à
+  mão**; se o mapa mudar, rodar o script de novo. Hoje são dois:
+  `industrial-ponzoni.ts` (44 lotes, viewBox 3192×1858) e `florescer.ts`
+  (127 lotes, viewBox 1920×1080).
+- `src/lib/mapa/index.ts` — o registro `slug → mapa`. `MapaDaProposta` recebe
+  o slug do empreendimento e pergunta a ele; empreendimento sem mapa extraído
+  simplesmente não ganha a seção.
+- `public/mapa-<slug>.jpg` — a foto aérea, copiada à mão do site do
+  empreendimento (785 KB no Industrial, 481 KB no Florescer; mudam pouco).
   `empreendimentos.mapa_imagem_url` aponta para ela.
 
 O id do mapa é quadra + número com dois dígitos (`C11`), enquanto o banco
@@ -429,13 +482,34 @@ comportamento certo.
 status.** É deliberado: a proposta não deve informar ao cliente o que está
 livre ou vendido.
 
+O destaque veste as cores do empreendimento: `cor_primaria` no preenchimento
+(62% de opacidade) e `cor_secundaria` no contorno e na miniatura.
+
 ## Marca
 
-`empreendimentos.logo_url` aponta para um arquivo em `public/`. Aparece no
-cabeçalho do app e no topo da folha da proposta (mais um selo pequeno na
-assinatura do rodapé). O do Industrial é o mesmo `ponzoni-logo.jpg` do
-`site-industrial-ponzoni` — marca branca sobre quadrado vinho, que funciona
-como selo sem precisar de versão negativa.
+`empreendimentos.logo_url` aponta para um arquivo em `public/`, e
+`cor_primaria` / `cor_secundaria` guardam as duas cores da marca.
+
+**O cabeçalho do app é sempre Ponzoni.** `Cabecalho.tsx` busca o logo pelo
+slug fixo `industrial-ponzoni` (constante `MARCA`): a ferramenta é da casa e
+atende vários empreendimentos, então o topo não pode trocar de marca conforme
+o que estiver aberto. Antes ele pegava "o primeiro empreendimento ativo em
+ordem alfabética", e a entrada do Florescer virou a marca da ferramenta.
+
+O logo do empreendimento aparece **ao lado do título** nas páginas de Espelho
+e Mapa, e no topo da folha da proposta.
+
+**A folha da proposta veste as cores do empreendimento.** O CSS dela é uma
+função (`estilo(empreendimento)`) e as variáveis `--vinho` / `--ouro`
+mantiveram o nome de quando só existia o Industrial: hoje são papéis (cor de
+marca e cor de destaque), não tons. `--vinho-fraco` e `--ouro-escuro` saem por
+cálculo de `src/lib/cores.ts`, para não virarem mais duas colunas no banco. O
+XLSX faz o mesmo com a faixa de cabeçalho das abas.
+
+| Empreendimento | Primária | Secundária |
+|---|---|---|
+| Industrial Ponzoni | `#7C2A28` vinho | `#E0A221` dourado |
+| Florescer | `#5B2166` roxo | `#C4A550` dourado |
 
 ## Cliente
 
@@ -474,19 +548,37 @@ o espelho sem nenhuma integração entre os dois.
 
 ## Espelho de vendas
 
-A fonte de verdade de **status e comprador** continua sendo o
-[Espelho de Vendas Industrial](https://docs.google.com/spreadsheets/d/1KAKfuVyV3T6IoLI2FrxANUv1h12knJS9gDbMxJqXiS0/edit)
-no Google Sheets — é ele que alimenta o mapa público de
-`site-industrial-ponzoni`. A ferramenta **lê** dele; não escreve.
+A fonte de verdade de **status e comprador** continua sendo o Google Sheets
+de cada empreendimento — é ele que alimenta o mapa público. A ferramenta
+**lê** dele; não escreve. O rodapé do espelho linka a planilha certa,
+derivando o `/edit` do `espelho_csv_url` do empreendimento aberto.
+
+- [Espelho Industrial](https://docs.google.com/spreadsheets/d/1KAKfuVyV3T6IoLI2FrxANUv1h12knJS9gDbMxJqXiS0/edit)
+- [Espelho Florescer](https://docs.google.com/spreadsheets/d/1o4-YxN0ujoNQ52Nu7MkM_d6usSMkhTl8z939m7JVBSw/edit)
 
 `POST /api/espelho/sync` baixa o CSV publicado (`empreendimentos.espelho_csv_url`,
 no formato `gviz/tq?tqx=out:csv`, o mesmo `GS_URL` do mapa) e reconcilia com
 a tabela `lotes`. O parser (`src/lib/espelho.ts`) acha as colunas **pelo
 nome**, não pela posição — a planilha ganha coluna de tempos em tempos. O
-nome do comprador mora numa coluna sem título fixo ("Coluna 1").
+nome do comprador mora numa coluna sem título fixo ("Coluna 1") no
+Industrial e numa coluna "Comprador" no Florescer — o parser aceita as duas.
 
 Preço só é sobrescrito quando a planilha traz um: lotes vendidos vêm com a
-célula de valor vazia e não podem zerar o preço no banco.
+célula de valor vazia e não podem zerar o preço no banco. **O espelho do
+Florescer não tem coluna de valor nenhuma** — os preços vieram do PDF e ficam
+intocados pela sincronização, que ali só mexe em status, comprador, área e
+tipo.
+
+### Dois campos que nasceram com o Florescer
+
+- **Status `projeto`** (5º valor do enum): lote com projeto em andamento, nem
+  livre nem vendido. Os cartões de contagem do espelho só mostram o de
+  "Em projeto" onde existe algum, para o Industrial não ganhar uma coluna
+  vazia.
+- **`lotes.tipo`** — o zoneamento (`Residencial`, `Misto I`, `Misto II`), que
+  define o que se pode construir e por isso entra na conversa de venda. A
+  coluna aparece na tabela do espelho **só quando algum lote a preenche**, e
+  entra na busca junto com lote e comprador. No Industrial fica nula.
 
 `observacao` é **campo livre da ferramenta e a sincronização não encosta
 nele** — é editável na própria tabela do espelho, gravando ao sair do campo.
@@ -580,29 +672,52 @@ cinco URLs, e cada uma serve a uma coisa diferente:
 | `mapa_imagem_url` | foto aérea em `public/`, desenhada na folha da proposta |
 | `logo_url` | logo em `public/`, no cabeçalho do app e no topo da proposta |
 
+Mais `cor_primaria` e `cor_secundaria`, que vestem a folha da proposta e o
+XLSX.
+
 **2. `tabelas_preco` e `condicoes_pagamento`.** Uma tabela vigente com o INCC
-e a taxa de valor presente, e uma condição por coluna do espelho. Nas
+e a taxa de valor presente, e uma condição por coluna da tabela de preços. Nas
 condições, `oficial = true` e o **último bloco do template absorvendo o
 resíduo** (ver "Três armadilhas da estrutura de pagamento").
 
-**3. Os lotes.** Pelo botão "Sincronizar com o Sheets", que cria os que não
-existirem — mais rápido e menos sujeito a erro que um `insert` à mão.
+Aqui mora a decisão que mais custa desfazer depois: **qual coluna vira
+`preco_tabela`**. No Industrial é a do meio da escada (40% + 36x INCC) e as
+outras são descontos; no Florescer é a ponta de baixo (40% + 6x) e as outras
+são acréscimos. A regra é a mesma nos dois: `preco_tabela` é **o número que o
+vendedor abre com o cliente**, e todo o resto se conta a partir dele.
+
+`condicao_base` deve dizer qual condição é essa em português — é o que sai no
+subtítulo do espelho e no rodapé do seletor de nova proposta.
+
+**3. Os lotes.** Se a planilha traz tudo, pelo botão "Sincronizar com o
+Sheets", que cria os que não existirem. Se os preços vierem de fora (o caso do
+Florescer, cuja planilha não tem coluna de valor), um `insert` por migration
+cruzando as duas fontes — ver a migration 19, que documenta de onde veio cada
+campo e o que fazer quando as fontes divergem (o Sheets ganha; o PDF é uma
+foto de uma data).
 
 **4. Os dois assets em `public/`.** Logo e foto aérea, copiados do site do
-empreendimento.
+empreendimento — `logo-<slug>.png` e `mapa-<slug>.jpg`.
 
 **5. A geometria do mapa**, se quiser a seção "Localização no parque":
 
 ```bash
-npm run mapa:extrair -- ../site-florescer/mapa-lotes-florescer.html   src/lib/mapa/florescer.ts
+npm run mapa:extrair -- "C:/.../site-florescer/mapa-lotes-florescer.html"   src/lib/mapa/florescer.ts
 ```
 
-Este é o único ponto que pede código: `MapaDaProposta` importa
-`src/lib/mapa/industrial-ponzoni.ts` direto. Para o segundo empreendimento,
-trocar esse import por um mapa de `slug → módulo`.
+e registrar o módulo em `src/lib/mapa/index.ts`. É o único ponto que pede
+código.
 
 **6. Conferir.** `npm run verificar` continua passando (o motor não depende do
-empreendimento), e vale abrir uma proposta de teste e o PDF antes de soltar.
+empreendimento) — e vale acrescentar ali um punhado de conferências contra a
+tabela nova, como as do Florescer que checam os quatro valores do lote A-1
+contra o PDF. Depois abrir uma proposta de teste e o PDF antes de soltar.
+
+**7. Olhar o texto do PDF.** Frases escritas quando só existia o Industrial
+assumiam correção pelo INCC ("valor nominal, já com correção projetada", a
+nota do cronograma, o parágrafo legal do rodapé). Todas passaram a depender de
+`temCorrecao()`; se aparecer outra promessa de reajuste num empreendimento sem
+indexador, é do mesmo tipo.
 
 ## Fontes de dados
 
@@ -615,6 +730,9 @@ Os arquivos de origem **não vão para o repositório** (`.gitignore` bloqueia
 | `Propostas de Parcelamento.xlsx` | as estruturas de parcelamento e os números de conferência do motor |
 | `Valores terrenos 260812.pdf` / `...VEND260812.pdf` | versões impressas da mesma tabela |
 | Espelho de Vendas Industrial (Google Sheets) | status, comprador e o valor publicado |
+| `Valores Terrenos Florescer 260226.pdf` | a escada completa do Florescer (PREÇO, 18x, 12x, 6x) |
+| `Florescer 260226 VENDAS.pdf` | a coluna de 6x — os valores que o vendedor abre |
+| Espelho de Vendas Florescer (Google Sheets) | status, comprador, área e tipo dos 127 lotes |
 
 ## Projetos vizinhos
 

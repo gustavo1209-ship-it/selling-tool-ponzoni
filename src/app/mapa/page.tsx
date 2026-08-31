@@ -47,13 +47,23 @@ export default async function MapaPage({
       <Cabecalho />
       <main className="max-w-[1600px] mx-auto px-5 py-6 flex flex-col gap-4">
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+          <div className="flex items-center gap-3">
+            {atual.logo_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={atual.logo_url}
+                alt={atual.nome}
+                className="w-12 h-12 rounded object-contain shrink-0"
+              />
+            )}
+            <div>
             <p className="eyebrow">Mapa de lotes</p>
             <h1 className="serif text-3xl mt-1">{atual.nome}</h1>
             <p className="text-sm text-cinza">
               O mesmo mapa do site, com os status vindos do espelho no Google
               Sheets.
             </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

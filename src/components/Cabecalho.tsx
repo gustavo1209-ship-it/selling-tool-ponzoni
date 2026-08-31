@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import SairBotao from "./SairBotao";
 
+const MARCA = "industrial-ponzoni";
+
 const LINKS = [
   { href: "/", rotulo: "Início" },
   { href: "/mapa", rotulo: "Mapa de lotes" },
@@ -20,14 +22,13 @@ export default async function Cabecalho() {
     user
       ? supabase.from("perfis").select("nome, papel").eq("id", user.id).single()
       : Promise.resolve({ data: null }),
-    // o logo é do empreendimento; com mais de um, vale o primeiro ativo
+    // A ferramenta é da casa e atende vários empreendimentos, então o topo
+    // carrega sempre a marca Ponzoni — o logo do empreendimento aparece nas
+    // páginas dele e na folha da proposta.
     supabase
       .from("empreendimentos")
       .select("nome, logo_url")
-      .eq("ativo", true)
-      .not("logo_url", "is", null)
-      .order("nome")
-      .limit(1)
+      .eq("slug", MARCA)
       .maybeSingle(),
   ]);
 

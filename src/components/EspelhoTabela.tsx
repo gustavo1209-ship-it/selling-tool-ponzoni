@@ -11,11 +11,31 @@ import type {
   Lote,
   TabelaPreco,
 } from "@/lib/db/tipos";
-import { area, moeda, moedaCurta, num, pct, precoM2 } from "@/lib/formato";
+import {
+  ROTULO_STATUS_LOTE,
+  area,
+  moeda,
+  moedaCurta,
+  num,
+  pct,
+  precoM2,
+} from "@/lib/formato";
 import { mensagemDeFalha } from "@/lib/erros";
 import type { LoteStatus } from "@/lib/calc/tipos";
 
-const STATUS: LoteStatus[] = ["livre", "reservado", "vendido", "indisponivel"];
+const STATUS: LoteStatus[] = [
+  "livre",
+  "reservado",
+  "vendido",
+  "projeto",
+  "indisponivel",
+];
+
+/** O CSV publicado é `.../d/<id>/gviz/...`; a planilha para abrir é `/edit`. */
+function urlDaPlanilha(csv: string | null): string | null {
+  const id = csv?.match(/\/spreadsheets\/d\/([^/]+)/)?.[1];
+  return id ? `https://docs.google.com/spreadsheets/d/${id}/edit` : null;
+}
 
 export default function EspelhoTabela({
   empreendimentos,
@@ -38,6 +58,10 @@ export default function EspelhoTabela({
   const [busca, setBusca] = useState("");
   const [mostrarCondicoes, setMostrarCondicoes] = useState(true);
 
+  // o Florescer separa Residencial / Misto I / Misto II; o Industrial não
+  const temTipo = lotes.some((l) => l.tipo);
+  const planilha = urlDaPlanilha(empreendimento.espelho_csv_url);
+
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     return lotes.filter((l) => {
@@ -46,7 +70,8 @@ export default function EspelhoTabela({
       return (
         `${l.quadra}${l.numero}`.toLowerCase().includes(termo) ||
         `${l.quadra}-${l.numero}`.toLowerCase().includes(termo) ||
-        (l.comprador ?? "").toLowerCase().includes(termo)
+        (l.comprador ?? "").toLowerCase().includes(termo) ||
+        (l.tipo ?? "").toLowerCase().includes(termo)
       );
     });
   }, [lotes, filtro, busca]);
@@ -58,6 +83,7 @@ export default function EspelhoTabela({
       livre: conta("livre"),
       reservado: conta("reservado"),
       vendido: conta("vendido"),
+      projeto: conta("projeto"),
       indisponivel: conta("indisponivel"),
       vgv: livres.reduce((s, l) => s + Number(l.preco_tabela ?? 0), 0),
       areaLivre: livres.reduce((s, l) => s + Number(l.area_m2), 0),
@@ -106,7 +132,16 @@ export default function EspelhoTabela({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+        <div className="flex items-center gap-3">
+          {empreendimento.logo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={empreendimento.logo_url}
+              alt={empreendimento.nome}
+              className="w-12 h-12 rounded object-contain shrink-0"
+            />
+          )}
+          <div>
           <p className="eyebrow">Espelho de vendas</p>
           <h1 className="serif text-3xl mt-1">{empreendimento.nome}</h1>
           <p className="text-sm text-cinza">
@@ -114,6 +149,7 @@ export default function EspelhoTabela({
               ? `Tabela ${tabela.referencia} — preço de referência: ${tabela.condicao_base}`
               : "Sem tabela de preços vigente"}
           </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -158,12 +194,20 @@ export default function EspelhoTabela({
         </p>
       )}
 
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-6">
+      <div
+        className={`grid gap-3 grid-cols-2 lg:grid-cols-4 ${
+          resumo.projeto > 0 ? "xl:grid-cols-7" : "xl:grid-cols-6"
+        }`}
+      >
         {(
           [
             ["Livres", resumo.livre, "selo-livre"],
             ["Reservados", resumo.reservado, "selo-reservado"],
             ["Vendidos", resumo.vendido, "selo-vendido"],
+            // "Projeto" é do Florescer; some onde o empreendimento não usa
+            ...(resumo.projeto > 0
+              ? ([["Em projeto", resumo.projeto, "selo-projeto"]] as const)
+              : []),
             ["Não disponíveis", resumo.indisponivel, "selo-indisponivel"],
           ] as const
         ).map(([rotulo, valor, classe]) => (
@@ -206,7 +250,7 @@ export default function EspelhoTabela({
                 <thead>
                   <tr>
                     <th>Condição</th>
-                    <th className="num">Desconto</th>
+                    <th className="num">Desconto / acréscimo</th>
                     <th className="num">Fator sobre o preço</th>
                     <th>Como fica</th>
                   </tr>
@@ -216,7 +260,11 @@ export default function EspelhoTabela({
                     <tr key={c.id}>
                       <td className="font-semibold">{c.nome}</td>
                       <td className="num">
-                        {c.desconto_pct > 0 ? `−${pct(c.desconto_pct)}` : "—"}
+                        {c.desconto_pct > 0
+                          ? `−${pct(c.desconto_pct)}`
+                          : c.desconto_pct < 0
+                            ? `+${pct(-c.desconto_pct)}`
+                            : "—"}
                       </td>
                       <td className="num tabular">
                         ×{(1 - c.desconto_pct).toLocaleString("pt-BR", {
@@ -252,7 +300,7 @@ export default function EspelhoTabela({
               <option value="todos">Todos os status</option>
               {STATUS.map((s) => (
                 <option key={s} value={s}>
-                  {s === "indisponivel" ? "Não disponível" : s[0].toUpperCase() + s.slice(1)}
+                  {ROTULO_STATUS_LOTE[s]}
                 </option>
               ))}
             </select>
@@ -264,6 +312,7 @@ export default function EspelhoTabela({
             <thead>
               <tr>
                 <th>Lote</th>
+                {temTipo && <th>Tipo</th>}
                 <th className="num">Área</th>
                 <th className="num">Preço de tabela</th>
                 <th className="num">R$/m²</th>
@@ -278,6 +327,7 @@ export default function EspelhoTabela({
                   <td className="font-semibold whitespace-nowrap">
                     {l.quadra}-{l.numero}
                   </td>
+                  {temTipo && <td className="text-cinza">{l.tipo ?? "—"}</td>}
                   <td className="num">{area(Number(l.area_m2))}</td>
                   <td className="num">
                     {l.preco_tabela ? moeda(Number(l.preco_tabela)) : "—"}
@@ -297,9 +347,7 @@ export default function EspelhoTabela({
                     >
                       {STATUS.map((s) => (
                         <option key={s} value={s}>
-                          {s === "indisponivel"
-                            ? "Não disponível"
-                            : s[0].toUpperCase() + s.slice(1)}
+                          {ROTULO_STATUS_LOTE[s]}
                         </option>
                       ))}
                     </select>
@@ -324,7 +372,7 @@ export default function EspelhoTabela({
               ))}
               {visiveis.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center text-cinza py-6">
+                  <td colSpan={temTipo ? 8 : 7} className="text-center text-cinza py-6">
                     Nenhum lote com esse filtro.
                   </td>
                 </tr>
@@ -336,14 +384,18 @@ export default function EspelhoTabela({
 
       <p className="text-xs text-cinza">
         O status também é mantido no{" "}
-        <a
-          href="https://docs.google.com/spreadsheets/d/1KAKfuVyV3T6IoLI2FrxANUv1h12knJS9gDbMxJqXiS0/edit"
-          target="_blank"
-          rel="noreferrer"
-          className="text-vinho font-semibold"
-        >
-          Espelho de Vendas no Google Sheets
-        </a>
+        {planilha ? (
+          <a
+            href={planilha}
+            target="_blank"
+            rel="noreferrer"
+            className="text-vinho font-semibold"
+          >
+            Espelho de Vendas no Google Sheets
+          </a>
+        ) : (
+          <span className="font-semibold">Espelho de Vendas no Google Sheets</span>
+        )}
         , que alimenta o mapa público. Sincronizar traz de lá; editar aqui não
         escreve na planilha.
       </p>

@@ -51,6 +51,7 @@ export function normalizarStatus(bruto: string): LoteStatus | null {
   if (s.startsWith("livre") || s.startsWith("disponi")) return "livre";
   if (s.startsWith("reserv")) return "reservado";
   if (s.startsWith("vend")) return "vendido";
+  if (s.startsWith("projeto")) return "projeto";
   if (s.startsWith("nao dispon") || s.startsWith("indispon")) return "indisponivel";
   return null;
 }
@@ -70,6 +71,8 @@ export interface LinhaEspelho {
   preco_tabela: number | null;
   status: LoteStatus | null;
   comprador: string | null;
+  /** Zoneamento ("Residencial", "Misto I", "Misto II"); nem todo espelho traz. */
+  tipo: string | null;
 }
 
 /**
@@ -95,6 +98,7 @@ export function lerEspelho(csv: string): LinhaEspelho[] {
   const cArea = acha("area");
   const cValor = acha("valor");
   const cStatus = acha("status");
+  const cTipo = acha("tipo");
   // o nome do comprador vive numa coluna sem título fixo ("Coluna 1")
   const cComprador = acha("comprador", "cliente", "coluna 1");
 
@@ -114,6 +118,7 @@ export function lerEspelho(csv: string): LinhaEspelho[] {
       status: cStatus >= 0 ? normalizarStatus(l[cStatus] ?? "") : null,
       comprador:
         cComprador >= 0 && (l[cComprador] ?? "").trim() ? l[cComprador].trim() : null,
+      tipo: cTipo >= 0 && (l[cTipo] ?? "").trim() ? l[cTipo].trim() : null,
     });
   }
   return saida;

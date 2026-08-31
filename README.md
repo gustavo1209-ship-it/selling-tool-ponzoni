@@ -1,14 +1,15 @@
 # Ferramenta de Vendas — Ponzoni
 
 Espelho de lotes, simulador de condições de pagamento e proposta pronta para
-o cliente. Feita para o **Industrial Ponzoni**, preparada para receber o
-Florescer sem mexer em código.
+o cliente. Atende o **Industrial Ponzoni** e o **Florescer Parque
+Residencial**, cada um com sua tabela, seu mapa e suas cores.
 
 ## O que ela faz
 
 - **Mapa de lotes** — o mesmo mapa interativo do site, dentro da ferramenta.
-- **Espelho de vendas** — os 44 lotes com área, preço, status e comprador,
-  sincronizáveis com o Google Sheets que já alimenta o mapa público.
+- **Espelho de vendas** — os lotes de cada empreendimento (44 no Industrial,
+  127 no Florescer) com área, tipo, preço, status e comprador, sincronizáveis
+  com o Google Sheets que já alimenta o mapa público.
 - **Simulador** — monta a condição de pagamento em blocos: entrada, parcelas
   corrigidas por índice, balão, financiamento Sicredi em SAC até 120 meses.
   Tudo editável: valor da entrada, percentual de cada bloco, número e valor
@@ -30,7 +31,8 @@ Florescer sem mexer em código.
 - **Mapa na proposta** — recorte da foto aérea com os lotes da proposta
   destacados e miniatura do parque marcando onde ficam.
 - **Proposta em PDF** para entregar ao cliente e **planilha XLSX** com o
-  fluxo completo para uso interno.
+  fluxo completo para uso interno — as duas vestidas com o logo e as cores do
+  empreendimento.
 
 ## No ar
 
@@ -73,6 +75,8 @@ src/
   lib/
     calc/                        motor de cálculo (puro, testável)
     espelho.ts                   leitura do CSV do Sheets
+    mapa/                        geometria dos mapas, um módulo por empreendimento
+    cores.ts                     tons derivados da cor da marca
     ordenacao.ts                 ordem natural dos lotes (A-2 antes de A-10)
     supabase/                    clients de browser, servidor e sessão
 supabase/migrations/             schema versionado

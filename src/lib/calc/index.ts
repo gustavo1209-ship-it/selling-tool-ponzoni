@@ -118,6 +118,25 @@ function calcularBloco(
     };
   });
 
+  // Sem correção nem juros, as parcelas são iguais e o cliente soma a coluna
+  // à mão: os centavos que o arredondamento come precisam morar na última,
+  // senão o "total do investimento" sai abaixo do valor da proposta. Onde há
+  // correção isso não se faz — a sobra ali não é arredondamento, e a última
+  // parcela é justamente a que se confere contra a planilha da casa.
+  if (!comJuros && taxaIdx === 0 && parcelas.length > 0) {
+    const ultima = parcelas[parcelas.length - 1];
+    const sobra = arredonda(
+      arredonda(Math.max(base, 0)) - arredonda(parcelas.reduce((s, p) => s + p.valor, 0))
+    );
+    if (sobra !== 0) {
+      ultima.valor = arredonda(ultima.valor + sobra);
+      ultima.amortizacao = arredonda(ultima.amortizacao + sobra);
+      ultima.vp = arredonda(
+        ultima.valor / Math.pow(1 + premissas.juros_vp_mensal, ultima.mes)
+      );
+    }
+  }
+
   const soma = (f: (p: Parcela) => number) =>
     arredonda(parcelas.reduce((s, p) => s + f(p), 0));
 

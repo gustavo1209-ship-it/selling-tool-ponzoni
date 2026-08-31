@@ -14,7 +14,12 @@ import type {
   TabelaPreco,
 } from "@/lib/db/tipos";
 import { compararLote } from "@/lib/ordenacao";
-import { area, moeda, moedaCurta, pct } from "@/lib/formato";
+import {
+  area,
+  descontoOuAcrescimo,
+  moeda,
+  moedaCurta,
+} from "@/lib/formato";
 
 interface OpcaoMontada {
   nome: string;
@@ -114,8 +119,12 @@ export default function NovaPropostaForm({
           </span>
           {marcado && <Check size={14} className="text-vinho shrink-0 mt-0.5" />}
         </span>
-        {c.desconto_pct > 0 && (
-          <span className="selo selo-ouro mt-1">−{pct(c.desconto_pct, 2)}</span>
+        {Math.abs(c.desconto_pct) > 0.0001 && (
+          <span
+            className={`selo mt-1 ${c.desconto_pct > 0 ? "selo-ouro" : "selo-neutro"}`}
+          >
+            {descontoOuAcrescimo(c.desconto_pct, 2)}
+          </span>
         )}
         {c.descricao && (
           <span className="block text-xs text-cinza mt-1">{c.descricao}</span>
@@ -164,7 +173,9 @@ export default function NovaPropostaForm({
           </select>
           {tabela && (
             <p className="text-xs text-cinza mt-1">
-              Tabela {tabela.referencia} — INCC {pct(tabela.incc_mensal, 3)} a.m.
+              {/* a condição base diz mais que o INCC: no Florescer nada é
+                  indexado, e anunciar INCC ali confundia o vendedor */}
+              Tabela {tabela.referencia} — referência: {tabela.condicao_base}
             </p>
           )}
         </div>
