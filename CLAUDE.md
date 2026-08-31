@@ -468,6 +468,17 @@ nome do comprador mora numa coluna sem título fixo ("Coluna 1").
 Preço só é sobrescrito quando a planilha traz um: lotes vendidos vêm com a
 célula de valor vazia e não podem zerar o preço no banco.
 
+`observacao` é **campo livre da ferramenta e a sincronização não encosta
+nele** — é editável na própria tabela do espelho, gravando ao sair do campo.
+Nasceu preenchido com a coluna "Observação" da planilha de origem (TRAVADO,
+Permuta, Lote de entrada…), que era nota interna da tabela de preços e foi
+limpa. Os valores originais estão na migration `03_seed_industrial_ponzoni`
+se um dia fizerem falta.
+
+Ela aparece **só no espelho**, nunca na proposta do cliente. Quem pode
+editar é quem pode editar lote — qualquer usuário do time, mesma regra do
+status.
+
 ## CSS: camadas importam
 
 As classes da casa (`.campo`, `.btn`, `.cartao`, `.tabela`…) vivem dentro de

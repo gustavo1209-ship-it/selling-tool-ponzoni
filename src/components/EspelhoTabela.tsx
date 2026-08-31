@@ -269,7 +269,7 @@ export default function EspelhoTabela({
                 <th className="num">R$/m²</th>
                 <th>Status</th>
                 <th>Comprador</th>
-                <th>Observação</th>
+                <th className="w-56">Observação</th>
               </tr>
             </thead>
             <tbody>
@@ -305,12 +305,20 @@ export default function EspelhoTabela({
                     </select>
                   </td>
                   <td className="text-cinza">{l.comprador ?? "—"}</td>
-                  <td className="text-cinza">
-                    {l.observacao ? (
-                      <span className="selo selo-neutro">{l.observacao}</span>
-                    ) : (
-                      "—"
-                    )}
+                  <td>
+                    {/* grava ao sair do campo, não a cada tecla */}
+                    <input
+                      key={`${l.id}-${l.observacao ?? ""}`}
+                      className="campo py-1 text-xs"
+                      defaultValue={l.observacao ?? ""}
+                      placeholder="—"
+                      onBlur={(e) => {
+                        const novo = e.target.value.trim() || null;
+                        if (novo !== (l.observacao ?? null)) {
+                          alterar(l, { observacao: novo });
+                        }
+                      }}
+                    />
                   </td>
                 </tr>
               ))}
