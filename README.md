@@ -32,6 +32,11 @@ Florescer sem mexer em código.
 - **Proposta em PDF** para entregar ao cliente e **planilha XLSX** com o
   fluxo completo para uso interno.
 
+## No ar
+
+**https://selling-tool-ponzoni.vercel.app** — todo push em `main` publica
+sozinho.
+
 ## Rodar
 
 ```bash

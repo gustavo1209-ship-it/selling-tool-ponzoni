@@ -94,6 +94,34 @@ Duas peças, e as duas existem por causa das quedas do dev server:
 - `src/app/error.tsx` — error boundary do app. Sem ela, uma falha de
   renderização dá tela branca sem explicação.
 
+## Hospedagem
+
+Produção em **https://selling-tool-ponzoni.vercel.app** (projeto Vercel
+`selling-tool-ponzoni`, time `gustavo-ponzoni-s-projects`, plano Hobby).
+
+O projeto está **conectado ao repositório do GitHub**: todo push em `main`
+publica sozinho. Para publicar do zero da máquina, `vercel --prod`.
+
+As duas variáveis (`NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
+estão em Production e Development. **Preview ficou sem elas** — o `env add`
+para preview não passou pelo CLI 54; se um dia for usar deploy de branch,
+acrescente pelo painel.
+
+### O que fica exposto
+
+A URL é pública e o cadastro de conta está **aberto** no Supabase
+(`disable_signup: false`). Como a RLS deixa qualquer usuário autenticado ler
+tudo — lotes, preços, propostas e clientes —, quem descobrir o endereço e
+confirmar um e-mail vê a base inteira.
+
+Para um time fechado, o certo é desligar o cadastro em Supabase → Auth →
+Providers → Email → *Enable sign ups*, e criar as contas pelo painel.
+
+Ao publicar, o **Site URL** do Supabase (Auth → URL Configuration) precisa
+apontar para o domínio da Vercel, senão o link de confirmação de e-mail leva
+o usuário para `localhost:3000`. Manter as duas URLs na lista de redirect
+enquanto o desenvolvimento local continuar.
+
 ## Supabase
 
 Projeto **`selling-tool`** (`qemzikxbvzghspltoejn`, região `sa-east-1`).
