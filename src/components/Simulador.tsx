@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  BookmarkPlus,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -22,6 +23,7 @@ import { SeloProposta } from "./SeloStatus";
 import {
   apagarProposta,
   duplicarProposta,
+  favoritarCenario,
   salvarProposta,
   type CenarioPayload,
 } from "@/app/propostas/acoes";
@@ -122,6 +124,7 @@ export default function Simulador({
   const [montando, setMontando] = useState(false);
 
   const [salvando, iniciarSalvar] = useTransition();
+  const [favoritando, setFavoritando] = useState<string | null>(null);
   const [recado, setRecado] = useState<string | null>(null);
   const [sujo, setSujo] = useState(false);
 
@@ -302,6 +305,31 @@ export default function Simulador({
       })
     );
     marcar();
+  }
+
+  /** Guarda a estrutura da opção na tabela para reaparecer em novas propostas. */
+  function favoritar(c: CenarioComBlocos) {
+    if (!proposta.tabela_preco_id) {
+      setRecado("Esta proposta não está ligada a uma tabela de preços.");
+      return;
+    }
+    setRecado(null);
+    setFavoritando(c.id);
+    iniciarSalvar(async () => {
+      try {
+        await favoritarCenario({
+          tabela_preco_id: proposta.tabela_preco_id!,
+          nome: c.nome,
+          descricao: `Favorita montada em ${proposta.codigo}.`,
+          desconto_pct: Number(c.desconto_pct),
+          blocos: c.blocos,
+        });
+        setRecado(`"${c.nome}" virou favorita e já aparece em novas propostas.`);
+      } catch (e) {
+        setRecado((e as Error).message);
+      }
+      setFavoritando(null);
+    });
   }
 
   function recomendar(id: string) {
@@ -818,6 +846,14 @@ export default function Simulador({
                     <Star size={15} />
                   </button>
                 )}
+                <button
+                  className="btn btn-fantasma"
+                  onClick={() => favoritar(ativo)}
+                  disabled={favoritando !== null}
+                  title="Favoritar: guarda esta estrutura para reusar em novas propostas"
+                >
+                  <BookmarkPlus size={15} />
+                </button>
                 <button
                   className="btn btn-fantasma"
                   onClick={() => duplicarCenario(ativo.id)}

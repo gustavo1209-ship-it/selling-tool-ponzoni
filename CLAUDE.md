@@ -40,6 +40,24 @@ Supabase (`@supabase/ssr`) · exceljs · lucide-react.
 Mesma stack e mesmas convenções de `controle-gastos/` — inclusive
 `src/proxy.ts` (o Next 16 aposentou `middleware.ts`).
 
+## Quando o dev server fica em branco
+
+O dev do Turbopack quebra de vez em quando depois de mudança de enum, de tipo
+compartilhado ou de arquivo novo em `src/lib`, e o sintoma é sempre o mesmo:
+página em branco com "Jest worker encountered 2 child process exceptions" e
+nenhum erro real no log, enquanto `npm run build` compila normalmente. É
+cache, não código. A receita:
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+  Where-Object { $_.CommandLine -match 'next' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+Remove-Item -Recurse -Force .next
+npm run dev
+```
+
+Antes de sair caçando o bug, rode `npm run build`: se ele passa, é isto.
+
 ## Supabase
 
 Projeto **`selling-tool`** (`qemzikxbvzghspltoejn`, região `sa-east-1`).
@@ -218,14 +236,37 @@ para o saldo devedor zerar exatamente.
 
 ## Montar opção personalizada
 
-O botão "Montar opção" no simulador (`MontarOpcao.tsx`) gera os blocos a
-partir do formato que o mercado usa: entrada % + mensais + reforços
-periódicos. Ele existe porque montar bloco a bloco é preciso mas lento, e o
-vendedor monta condição nova no meio da conversa com o cliente.
+`MontarOpcao.tsx` gera os blocos a partir do formato que o mercado usa:
+entrada % + mensais + reforços periódicos. Ele aparece nos **dois** lugares
+onde a condição é escolhida — na criação da proposta e no simulador — porque
+montar bloco a bloco é preciso mas lento, e o vendedor monta condição nova no
+meio da conversa com o cliente.
+
+Na tela de criação a opção montada não existe como condição salva, então
+viaja no `<form>` como JSON num `input[name=opcao_custom]` — um formulário só
+carrega texto. `criarProposta` desserializa e cria um cenário para cada uma,
+depois das escolhidas na tabela.
 
 A prévia é sem correção e sem juros de propósito: é a conta que o vendedor
 faz de cabeça e precisa bater. Os valores com correção aparecem no
 comparativo depois de criar.
+
+## Condições oficiais × favoritas
+
+`condicoes_pagamento.oficial` separa duas coisas que pareciam uma só:
+
+- **oficial = true** — veio do seed da tabela de preços. É política
+  comercial (a escada de desconto do R n.º5) e só admin mexe.
+- **oficial = false** — favorita: o time salvou uma estrutura que deu certo
+  para reusar. Quem criou edita e apaga; admin também.
+
+O botão de favoritar fica no cabeçalho da opção no simulador e chama
+`favoritarCenario`, que copia os blocos para o `template` da condição. A
+favorita nasce sempre `oficial = false` — sem isso, um vendedor conseguiria
+criar uma "condição da tabela" com o desconto que quisesse.
+
+Na tela de criação as duas listas aparecem separadas, "Da tabela" e
+"Favoritas do time".
 
 ## Marca
 

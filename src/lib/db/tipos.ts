@@ -84,6 +84,9 @@ export interface CondicaoPagamento {
   ordem: number;
   template: BlocoTemplate[];
   ativa: boolean;
+  /** true = veio da tabela de preços; false = favorita montada pelo time. */
+  oficial: boolean;
+  criado_por: string | null;
 }
 
 /** Taxa de referência de um índice, com a fonte — não é número mágico. */

@@ -1,17 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Plus, Star, Trash2 } from "lucide-react";
 import { criarProposta } from "@/app/propostas/acoes";
+import MontarOpcao from "./MontarOpcao";
 import type {
+  BlocoTemplate,
   Cliente,
   CondicaoPagamento,
   Empreendimento,
+  IndexadorRef,
   Lote,
   TabelaPreco,
 } from "@/lib/db/tipos";
 import { compararLote } from "@/lib/ordenacao";
 import { area, moeda, moedaCurta, pct } from "@/lib/formato";
+
+interface OpcaoMontada {
+  nome: string;
+  blocos: BlocoTemplate[];
+}
 
 export default function NovaPropostaForm({
   empreendimentos,
@@ -19,16 +27,21 @@ export default function NovaPropostaForm({
   tabelas,
   condicoes,
   clientes,
+  indexadores,
 }: {
   empreendimentos: Empreendimento[];
   lotes: Lote[];
   tabelas: TabelaPreco[];
   condicoes: CondicaoPagamento[];
   clientes: Cliente[];
+  indexadores: IndexadorRef[];
 }) {
   const [empreendimentoId, setEmpreendimentoId] = useState(empreendimentos[0]?.id ?? "");
   const [selecionados, setSelecionados] = useState<string[]>([]);
   const [clienteId, setClienteId] = useState("");
+  const [condicoesEscolhidas, setCondicoesEscolhidas] = useState<string[]>([]);
+  const [montando, setMontando] = useState(false);
+  const [customs, setCustoms] = useState<OpcaoMontada[]>([]);
 
   const tabela = useMemo(
     () => tabelas.find((t) => t.empreendimento_id === empreendimentoId) ?? null,
@@ -40,15 +53,22 @@ export default function NovaPropostaForm({
     [condicoes, tabela]
   );
 
-  const [condicoesEscolhidas, setCondicoesEscolhidas] = useState<string[]>([]);
-  const efetivas = condicoesEscolhidas.length
-    ? condicoesEscolhidas
-    : condicoesDaTabela[0]
-      ? [condicoesDaTabela[0].id]
-      : [];
+  const oficiais = condicoesDaTabela.filter((c) => c.oficial);
+  const favoritas = condicoesDaTabela.filter((c) => !c.oficial);
+
+  // sem nada marcado e sem opção montada, a 1ª condição da tabela entra sozinha
+  const efetivas =
+    condicoesEscolhidas.length || customs.length
+      ? condicoesEscolhidas
+      : oficiais[0]
+        ? [oficiais[0].id]
+        : [];
 
   const disponiveis = useMemo(
-    () => [...lotes].filter((l) => l.empreendimento_id === empreendimentoId).sort(compararLote),
+    () =>
+      [...lotes]
+        .filter((l) => l.empreendimento_id === empreendimentoId)
+        .sort(compararLote),
     [lotes, empreendimentoId]
   );
 
@@ -70,16 +90,59 @@ export default function NovaPropostaForm({
     a.localeCompare(b, "pt-BR", { numeric: true })
   );
 
+  function CartaoCondicao({ c }: { c: CondicaoPagamento }) {
+    const posicao = efetivas.indexOf(c.id);
+    const marcado = posicao >= 0;
+    return (
+      <button
+        type="button"
+        onClick={() => alternarCondicao(c.id)}
+        className={`text-left rounded-lg border px-3 py-2.5 transition ${
+          marcado
+            ? "border-vinho bg-vinho-fraco"
+            : "border-linha bg-superficie hover:bg-papel-alt"
+        }`}
+      >
+        <span className="flex items-start justify-between gap-2">
+          <span className="font-semibold text-sm">
+            {marcado && (
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-vinho text-white text-[11px] mr-1.5 align-middle">
+                {posicao + 1}
+              </span>
+            )}
+            {c.nome}
+          </span>
+          {marcado && <Check size={14} className="text-vinho shrink-0 mt-0.5" />}
+        </span>
+        {c.desconto_pct > 0 && (
+          <span className="selo selo-ouro mt-1">−{pct(c.desconto_pct, 2)}</span>
+        )}
+        {c.descricao && (
+          <span className="block text-xs text-cinza mt-1">{c.descricao}</span>
+        )}
+      </button>
+    );
+  }
+
   return (
     <form action={criarProposta} className="flex flex-col gap-6">
       <input type="hidden" name="empreendimento_id" value={empreendimentoId} />
       {efetivas.map((id) => (
         <input key={id} type="hidden" name="condicao_id" value={id} />
       ))}
+      {customs.map((c, i) => (
+        <input
+          key={`${c.nome}-${i}`}
+          type="hidden"
+          name="opcao_custom"
+          value={JSON.stringify(c)}
+        />
+      ))}
       {selecionados.map((id) => (
         <input key={id} type="hidden" name="lote_id" value={id} />
       ))}
 
+      {/* --------------------------------------------------------- cliente */}
       <section className="cartao p-5 grid gap-4 sm:grid-cols-2">
         <div>
           <label className="rotulo">Empreendimento</label>
@@ -90,6 +153,7 @@ export default function NovaPropostaForm({
               setEmpreendimentoId(e.target.value);
               setSelecionados([]);
               setCondicoesEscolhidas([]);
+              setCustoms([]);
             }}
           >
             {empreendimentos.map((e) => (
@@ -136,60 +200,7 @@ export default function NovaPropostaForm({
         </div>
       </section>
 
-      <section className="cartao">
-        <div className="cartao-titulo">
-          <h2 className="serif text-lg">
-            Opções de parcelamento
-            <span className="text-sm text-cinza font-sans ml-2">
-              marque quantas quiser; a ordem de clique é a ordem das abas
-            </span>
-          </h2>
-          <span className="text-sm text-cinza">{efetivas.length} selecionada(s)</span>
-        </div>
-
-        <div className="p-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {condicoesDaTabela.map((c) => {
-            const posicao = efetivas.indexOf(c.id);
-            const marcado = posicao >= 0;
-            return (
-              <button
-                type="button"
-                key={c.id}
-                onClick={() => alternarCondicao(c.id)}
-                className={`text-left rounded-lg border px-3 py-2.5 transition ${
-                  marcado
-                    ? "border-vinho bg-vinho-fraco"
-                    : "border-linha bg-superficie hover:bg-papel-alt"
-                }`}
-              >
-                <span className="flex items-start justify-between gap-2">
-                  <span className="font-semibold text-sm">
-                    {marcado && (
-                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-vinho text-white text-[11px] mr-1.5 align-middle">
-                        {posicao + 1}
-                      </span>
-                    )}
-                    {c.nome}
-                  </span>
-                  {marcado && <Check size={14} className="text-vinho shrink-0 mt-0.5" />}
-                </span>
-                {c.desconto_pct > 0 && (
-                  <span className="selo selo-ouro mt-1">−{pct(c.desconto_pct, 2)}</span>
-                )}
-                {c.descricao && (
-                  <span className="block text-xs text-cinza mt-1">{c.descricao}</span>
-                )}
-              </button>
-            );
-          })}
-          {condicoesDaTabela.length === 0 && (
-            <p className="text-sm text-cinza">
-              Nenhuma condição cadastrada para a tabela vigente.
-            </p>
-          )}
-        </div>
-      </section>
-
+      {/* -------------------------------------------------------- terrenos */}
       <section className="cartao">
         <div className="cartao-titulo">
           <h2 className="serif text-lg">Terrenos</h2>
@@ -250,6 +261,118 @@ export default function NovaPropostaForm({
         </div>
       </section>
 
+      {/* ---------------------------------------------------------- opções */}
+      <section className="cartao">
+        <div className="cartao-titulo flex-wrap">
+          <h2 className="serif text-lg">
+            Opções de parcelamento
+            <span className="text-sm text-cinza font-sans ml-2">
+              marque quantas quiser; a ordem de clique é a ordem das abas
+            </span>
+          </h2>
+          <span className="text-sm text-cinza">
+            {efetivas.length + customs.length} selecionada(s)
+          </span>
+        </div>
+
+        <div className="p-4 flex flex-col gap-5">
+          <div>
+            <p className="eyebrow mb-2">Da tabela {tabela?.referencia ?? ""}</p>
+            {oficiais.length === 0 ? (
+              <p className="text-sm text-cinza">
+                Nenhuma condição cadastrada para a tabela vigente.
+              </p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {oficiais.map((c) => (
+                  <CartaoCondicao key={c.id} c={c} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {favoritas.length > 0 && (
+            <div>
+              <p className="eyebrow mb-2 flex items-center gap-1.5">
+                <Star size={12} className="text-dourado-escuro" /> Favoritas do time
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {favoritas.map((c) => (
+                  <CartaoCondicao key={c.id} c={c} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <p className="eyebrow">Montada agora</p>
+              {!montando && (
+                <button
+                  type="button"
+                  className="btn btn-secundario"
+                  onClick={() => setMontando(true)}
+                  disabled={escolhidos.length === 0}
+                  title={
+                    escolhidos.length === 0
+                      ? "Escolha os terrenos primeiro — a prévia usa o valor deles"
+                      : "Monta entrada, parcelas, índice e reforços"
+                  }
+                >
+                  <Plus size={15} /> Montar opção
+                </button>
+              )}
+            </div>
+
+            {customs.length > 0 && (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 mb-3">
+                {customs.map((c, i) => (
+                  <div
+                    key={`${c.nome}-${i}`}
+                    className="rounded-lg border border-vinho bg-vinho-fraco px-3 py-2.5 flex items-start justify-between gap-2"
+                  >
+                    <span>
+                      <span className="font-semibold text-sm">{c.nome}</span>
+                      <span className="block text-xs text-cinza mt-1">
+                        {c.blocos.length} blocos · montada nesta proposta
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-fantasma px-2 text-vermelho"
+                      onClick={() => setCustoms((cs) => cs.filter((_, k) => k !== i))}
+                      title="Remover"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {montando && (
+              <MontarOpcao
+                indexadores={indexadores}
+                valorReferencia={somaTabela}
+                aoFechar={() => setMontando(false)}
+                aoCriar={(nome, blocos) => {
+                  setCustoms((cs) => [...cs, { nome, blocos }]);
+                  setMontando(false);
+                }}
+              />
+            )}
+
+            {!montando && customs.length === 0 && (
+              <p className="text-sm text-cinza">
+                Monte uma condição do zero — entrada, parcelas, índice e reforços
+                periódicos — sem sair desta tela. Depois de criada, dá para
+                favoritá-la no simulador e ela passa a aparecer aqui.
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
       {escolhidos.length > 0 && (
         <section className="cartao p-5 grid gap-4 sm:grid-cols-3 text-center">
           <div>
@@ -262,7 +385,9 @@ export default function NovaPropostaForm({
           </div>
           <div>
             <p className="eyebrow">Opções a montar</p>
-            <p className="serif text-xl tabular text-vinho">{efetivas.length}</p>
+            <p className="serif text-xl tabular text-vinho">
+              {efetivas.length + customs.length}
+            </p>
           </div>
         </section>
       )}

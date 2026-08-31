@@ -3,6 +3,7 @@ import NovaPropostaForm from "@/components/NovaPropostaForm";
 import { createClient } from "@/lib/supabase/server";
 import type {
   Cliente,
+  IndexadorRef,
   CondicaoPagamento,
   Empreendimento,
   Lote,
@@ -25,11 +26,10 @@ export default async function NovaPropostaPage() {
       supabase.from("clientes").select("*").order("nome"),
     ]);
 
-  const { data: condicoes } = await supabase
-    .from("condicoes_pagamento")
-    .select("*")
-    .eq("ativa", true)
-    .order("ordem");
+  const [{ data: condicoes }, { data: indexadores }] = await Promise.all([
+    supabase.from("condicoes_pagamento").select("*").eq("ativa", true).order("ordem"),
+    supabase.from("indexadores").select("*").order("ordem"),
+  ]);
 
   return (
     <>
@@ -43,6 +43,7 @@ export default async function NovaPropostaPage() {
           tabelas={(tabelas ?? []) as TabelaPreco[]}
           condicoes={(condicoes ?? []) as unknown as CondicaoPagamento[]}
           clientes={(clientes ?? []) as Cliente[]}
+          indexadores={(indexadores ?? []) as IndexadorRef[]}
         />
       </main>
     </>

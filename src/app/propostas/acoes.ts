@@ -68,6 +68,19 @@ export async function criarProposta(formData: FormData) {
 
   const empreendimentoId = String(formData.get("empreendimento_id") ?? "");
   const condicaoIds = formData.getAll("condicao_id").map(String).filter(Boolean);
+  // opções montadas na própria tela de criação, que ainda não existem como
+  // condição salva; chegam serializadas porque um <form> só carrega texto
+  const customs = formData
+    .getAll("opcao_custom")
+    .map(String)
+    .map((s) => {
+      try {
+        return JSON.parse(s) as { nome: string; blocos: BlocoTemplate[] };
+      } catch {
+        return null;
+      }
+    })
+    .filter((x): x is { nome: string; blocos: BlocoTemplate[] } => Boolean(x));
   const loteIds = formData.getAll("lote_id").map(String).filter(Boolean);
   const nomeCliente = String(formData.get("cliente_nome") ?? "").trim();
   const clienteExistente = String(formData.get("cliente_id") ?? "").trim();
@@ -143,27 +156,38 @@ export async function criarProposta(formData: FormData) {
     .map((id) => (condicoes ?? []).find((c) => c.id === id))
     .filter((c): c is NonNullable<typeof c> => Boolean(c));
 
-  const aCriar = escolhidas.length
-    ? escolhidas.map((c, i) => ({
-        proposta_id: proposta.id,
-        ordem: i,
-        nome: c.nome,
-        condicao_origem: c.nome,
-        desconto_pct: Number(c.desconto_pct),
-        recomendado: i === 0,
-        template: (c.template as BlocoTemplate[] | null) ?? TEMPLATE_PADRAO,
-      }))
+  const daTabela = escolhidas.map((c) => ({
+    nome: c.nome,
+    condicao_origem: c.nome,
+    desconto_pct: Number(c.desconto_pct),
+    template: (c.template as BlocoTemplate[] | null) ?? TEMPLATE_PADRAO,
+  }));
+
+  const montadas = customs.map((c) => ({
+    nome: c.nome,
+    condicao_origem: null,
+    desconto_pct: 0,
+    template: c.blocos,
+  }));
+
+  const todas = [...daTabela, ...montadas];
+
+  const aCriar = (todas.length
+    ? todas
     : [
         {
-          proposta_id: proposta.id,
-          ordem: 0,
           nome: "Opção A",
           condicao_origem: null,
           desconto_pct: 0,
-          recomendado: true,
           template: TEMPLATE_PADRAO,
         },
-      ];
+      ]
+  ).map((c, i) => ({
+    proposta_id: proposta.id,
+    ordem: i,
+    recomendado: i === 0,
+    ...c,
+  }));
 
   const { data: cenarios, error: erroCenarios } = await supabase
     .from("proposta_cenarios")
@@ -374,6 +398,76 @@ export async function salvarProposta(payload: PayloadSalvar) {
   revalidatePath("/propostas");
   revalidatePath("/clientes");
   return { ok: true, cliente_id: clienteId };
+}
+
+/**
+ * Salva a estrutura de um cenário como condição reutilizável ("favorita").
+ *
+ * Nasce sempre com `oficial = false`: a escada de desconto da tabela é
+ * política comercial e continua sendo coisa de admin. O desconto da favorita
+ * vai junto porque é parte da estrutura que se quer repetir.
+ */
+export async function favoritarCenario(payload: {
+  tabela_preco_id: string;
+  nome: string;
+  descricao: string | null;
+  desconto_pct: number;
+  blocos: PropostaBloco[];
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Não autenticado.");
+
+  const nome = payload.nome.trim();
+  if (!nome) throw new Error("Dê um nome à opção antes de favoritar.");
+  if (payload.blocos.length === 0) {
+    throw new Error("A opção não tem nenhum bloco.");
+  }
+
+  const { data: ultima } = await supabase
+    .from("condicoes_pagamento")
+    .select("ordem")
+    .eq("tabela_preco_id", payload.tabela_preco_id)
+    .order("ordem", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const template: BlocoTemplate[] = payload.blocos
+    .slice()
+    .sort((a, b) => a.ordem - b.ordem)
+    .map((b) => ({
+      rotulo: b.rotulo,
+      tipo: b.tipo,
+      base_percentual: b.base_percentual,
+      base_valor: b.base_valor,
+      absorve_residuo: b.absorve_residuo,
+      qtd_parcelas: b.qtd_parcelas,
+      mes_inicio: b.mes_inicio,
+      periodicidade_meses: b.periodicidade_meses,
+      indexador: b.indexador,
+      taxa_indexador_mensal: b.taxa_indexador_mensal,
+      juros_mensal: b.juros_mensal,
+      amortizacao: b.amortizacao,
+      parcela_fixa: b.parcela_fixa,
+      observacao: b.observacao,
+    }));
+
+  const { error } = await supabase.from("condicoes_pagamento").insert({
+    tabela_preco_id: payload.tabela_preco_id,
+    nome,
+    descricao: payload.descricao,
+    desconto_pct: payload.desconto_pct,
+    ordem: (ultima?.ordem ?? 0) + 1,
+    template,
+    oficial: false,
+    criado_por: user.id,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/propostas/nova");
+  return { ok: true };
 }
 
 export async function apagarProposta(id: string) {
