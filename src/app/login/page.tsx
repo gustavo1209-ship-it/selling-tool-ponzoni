@@ -136,6 +136,19 @@ function traduzir(mensagem: string): string {
   if (/Email not confirmed/i.test(mensagem)) return "E-mail ainda não confirmado.";
   if (/User already registered/i.test(mensagem)) return "Já existe conta com esse e-mail.";
   if (/Password should be/i.test(mensagem)) return "A senha precisa de ao menos 6 caracteres.";
+  // as duas abaixo são configuração do projeto, não erro de quem está entrando
+  if (/Email logins are disabled/i.test(mensagem)) {
+    return (
+      "O login por e-mail está desligado no Supabase. Ligue em " +
+      "Authentication → Sign In / Providers → Email."
+    );
+  }
+  if (/Signups not allowed|signup is disabled/i.test(mensagem)) {
+    return (
+      "O cadastro está fechado. Peça a um admin para criar sua conta pelo " +
+      "painel do Supabase."
+    );
+  }
   return mensagem;
 }
 

@@ -103,9 +103,21 @@ O projeto está **conectado ao repositório do GitHub**: todo push em `main`
 publica sozinho. Para publicar do zero da máquina, `vercel --prod`.
 
 As duas variáveis (`NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
-estão em Production e Development. **Preview ficou sem elas** — o `env add`
-para preview não passou pelo CLI 54; se um dia for usar deploy de branch,
-acrescente pelo painel.
+estão nos três ambientes.
+
+**Use `vercel env add NOME ambiente --value "..." --yes`, e o CLI 59 ou mais
+novo.** O CLI 54 grava string vazia quando o valor vem por pipe ou por
+redirecionamento de arquivo — e ainda imprime "Added Environment Variable",
+então o erro passa despercebido. O sintoma na aplicação é um `fetch` do
+supabase-js estourando com *"String contains non ISO-8859-1 code point"*,
+porque o cliente é construído com URL e chave vazias.
+
+Conferir sempre depois de gravar:
+
+```bash
+vercel env pull /tmp/env.txt --environment=production --yes
+grep SUPABASE /tmp/env.txt
+```
 
 ### O que fica exposto
 
@@ -114,8 +126,21 @@ A URL é pública e o cadastro de conta está **aberto** no Supabase
 tudo — lotes, preços, propostas e clientes —, quem descobrir o endereço e
 confirmar um e-mail vê a base inteira.
 
-Para um time fechado, o certo é desligar o cadastro em Supabase → Auth →
-Providers → Email → *Enable sign ups*, e criar as contas pelo painel.
+Para um time fechado, o certo é **manter o provedor Email ligado** e desligar
+só o *Allow new users to sign up*, criando as contas pelo painel. São dois
+interruptores diferentes na mesma tela, e trocar um pelo outro derruba o
+login de todo mundo: com o provedor desligado, `auth/v1/settings` passa a
+responder `external.email: false` e qualquer tentativa de entrar devolve
+"Email logins are disabled".
+
+Para conferir sem abrir o painel:
+
+```bash
+curl -s "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/settings" -H "apikey: $CHAVE"   | python -c "import sys,json;d=json.load(sys.stdin);print(d['external']['email'], d['disable_signup'])"
+```
+
+O primeiro tem de ser `True` (dá para entrar) e o segundo `True` também
+(ninguém se cadastra sozinho).
 
 Ao publicar, o **Site URL** do Supabase (Auth → URL Configuration) precisa
 apontar para o domínio da Vercel, senão o link de confirmação de e-mail leva
