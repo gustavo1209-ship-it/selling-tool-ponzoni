@@ -125,6 +125,23 @@ export function adjetivoPeriodicidade(meses: number): string {
   return ADJETIVO_PERIODICIDADE[meses] ?? `a cada ${meses} meses`;
 }
 
+export const ROTULO_METRICA_PARCELA: Record<string, string> = {
+  inicial: "Parcela inicial",
+  media: "Parcela média",
+  final: "Parcela final",
+  maior: "Maior parcela",
+};
+
+/** Explica cada métrica onde ela aparece — nenhuma é óbvia sozinha. */
+export const NOTA_METRICA_PARCELA: Record<string, string> = {
+  inicial: "1º vencimento",
+  media: "média dos vencimentos",
+  final: "último vencimento",
+  maior: "mês de maior soma",
+};
+
+export const METRICAS_PARCELA = ["inicial", "media", "final", "maior"] as const;
+
 export const ROTULO_TIPO_BLOCO: Record<string, string> = {
   entrada: "Entrada",
   sinal: "Sinal",

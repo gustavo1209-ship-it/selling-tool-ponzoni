@@ -1,5 +1,6 @@
 import type {
   Amortizacao,
+  MetricaParcela,
   BlocoTipo,
   Indexador,
   LoteStatus,
@@ -161,6 +162,7 @@ export interface Proposta {
   incc_mensal: number;
   juros_vp_mensal: number;
   correcao_primeira_parcela: boolean;
+  metricas_parcela: MetricaParcela[];
   observacoes: string | null;
   /** Snapshot do cenário recomendado — é o que as listagens leem. */
   resultado: Resultado | null;

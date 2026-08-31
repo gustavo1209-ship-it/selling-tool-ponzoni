@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { calcular } from "@/lib/calc";
-import type { Bloco, Resultado } from "@/lib/calc/tipos";
+import type { Bloco, MetricaParcela, Resultado } from "@/lib/calc/tipos";
 import type {
   BlocoTemplate,
   PropostaBloco,
@@ -234,6 +234,7 @@ export interface PayloadSalvar {
   incc_mensal: number;
   juros_vp_mensal: number;
   correcao_primeira_parcela: boolean;
+  metricas_parcela: MetricaParcela[];
   observacoes: string | null;
   lotes: PropostaLote[];
   cenarios: CenarioPayload[];
@@ -325,6 +326,9 @@ export async function salvarProposta(payload: PayloadSalvar) {
       incc_mensal: payload.incc_mensal,
       juros_vp_mensal: payload.juros_vp_mensal,
       correcao_primeira_parcela: payload.correcao_primeira_parcela,
+      metricas_parcela: payload.metricas_parcela.length
+        ? payload.metricas_parcela
+        : ["inicial"],
       observacoes: payload.observacoes,
       resultado: recomendado ? resultados.get(recomendado.id) : null,
     })

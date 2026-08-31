@@ -198,6 +198,25 @@ O comparativo continua honesto porque a coluna "maior parcela" pega o mês em
 que a mensal e o reforço caem juntos — que é o mês que o cliente precisa
 conseguir pagar.
 
+### Qual parcela a proposta mostra
+
+`propostas.metricas_parcela` escolhe entre `inicial`, `media`, `final` e
+`maior`, e vale para o comparativo, a folha e o XLSX. O padrão é só a
+**inicial**.
+
+A "maior parcela" era a única e é a métrica errada para abrir a conversa: com
+reforço periódico ela é o mês em que a mensal e o reforço caem juntos, um
+número que assusta e que não é o que o cliente paga na maioria dos meses.
+
+As quatro se separam justamente quando há reforço ou correção. Numa proposta
+real com 36x e reforços: inicial R$ 6.499,83, média R$ 9.978,57, final
+R$ 26.314,38. Cada uma responde a uma pergunta diferente — quanto começo
+pagando, quanto pago em média, quanto termino pagando — e a "maior" continua
+disponível para a pergunta que o crédito faz: qual é o pior mês.
+
+Todas saem do **fluxo consolidado**, não de um bloco: é a soma do que vence
+no mês, que é o que o cliente efetivamente paga.
+
 ### Correção × juros
 
 São coisas diferentes e não se misturam no mesmo bloco:

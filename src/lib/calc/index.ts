@@ -1,6 +1,7 @@
 import { arredonda, baseParaParcela, tabela } from "./amortizacao";
 import type {
   Bloco,
+  MetricaParcela,
   BlocoCalculado,
   EntradaCalculo,
   Parcela,
@@ -134,6 +135,19 @@ function calcularBloco(
   };
 }
 
+export function valorDaMetrica(r: Resultado, m: MetricaParcela): number {
+  switch (m) {
+    case "inicial":
+      return r.parcelaInicial;
+    case "media":
+      return r.parcelaMedia;
+    case "final":
+      return r.parcelaFinal;
+    case "maior":
+      return r.maiorParcela;
+  }
+}
+
 export function calcular(entrada: EntradaCalculo): Resultado {
   const { lotes, premissas, desconto_pct, desconto_valor } = entrada;
   const blocos = [...entrada.blocos].sort((a, b) => a.ordem - b.ordem);
@@ -200,6 +214,13 @@ export function calcular(entrada: EntradaCalculo): Resultado {
     totalJuros: arredonda(calculados.reduce((s, c) => s + c.totalJuros, 0)),
     totalCorrecao: arredonda(calculados.reduce((s, c) => s + c.totalCorrecao, 0)),
     prazoMeses: meses.length ? Math.max(...meses) : 0,
+    parcelaInicial: parcelasFuturas[0]?.valor ?? 0,
+    parcelaMedia: parcelasFuturas.length
+      ? arredonda(
+          parcelasFuturas.reduce((s, f) => s + f.valor, 0) / parcelasFuturas.length
+        )
+      : 0,
+    parcelaFinal: parcelasFuturas[parcelasFuturas.length - 1]?.valor ?? 0,
     maiorParcela: parcelasFuturas.length
       ? Math.max(...parcelasFuturas.map((f) => f.valor))
       : 0,

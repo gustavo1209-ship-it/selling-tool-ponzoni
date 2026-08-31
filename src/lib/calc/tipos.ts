@@ -12,6 +12,9 @@ export type Indexador =
   | "selic";
 export type BlocoTipo = "entrada" | "sinal" | "parcelas" | "balao" | "financiamento";
 export type LoteStatus = "livre" | "reservado" | "vendido" | "indisponivel";
+
+/** Qual parcela a proposta expõe. Ver `metricas_parcela` em `propostas`. */
+export type MetricaParcela = "inicial" | "media" | "final" | "maior";
 export type PropostaStatus =
   | "rascunho"
   | "enviada"
@@ -134,6 +137,13 @@ export interface Resultado {
   totalJuros: number;
   totalCorrecao: number;
   prazoMeses: number;
+  /** 1º vencimento depois do ato — a parcela com que se abre a conversa. */
+  parcelaInicial: number;
+  /** Média dos vencimentos; com reforço, dilui o mês de pico. */
+  parcelaMedia: number;
+  /** Último vencimento; em parcela corrigida é bem maior que a inicial. */
+  parcelaFinal: number;
+  /** Mês de maior soma — é o que o cliente precisa conseguir pagar. */
   maiorParcela: number;
   precoM2Tabela: number;
   precoM2Negociado: number;

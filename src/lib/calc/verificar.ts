@@ -178,6 +178,14 @@ conferir(
   20000
 );
 
+// as quatro métricas de parcela, no caso em que elas mais divergem: sem
+// correção, a mensal é sempre 4.000 e o mês de reforço salta para 20.000
+conferir("parcela inicial = a mensal", rReforco.parcelaInicial, 4000);
+conferir("parcela final = mês 48, com reforço", rReforco.parcelaFinal, 20000);
+conferir("maior parcela = mês de reforço", rReforco.maiorParcela, 20000);
+// 48 vencimentos, 8 deles com reforço de 16.000: (48×4.000 + 8×16.000)/48
+conferir("parcela média dilui os reforços", rReforco.parcelaMedia, 6666.67, 0.01);
+
 console.log(
   falhas === 0
     ? "\nTodas as conferências passaram.\n"

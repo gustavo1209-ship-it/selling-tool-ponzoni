@@ -1,8 +1,8 @@
 import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { calcular } from "@/lib/calc";
-import type { Bloco, Resultado } from "@/lib/calc/tipos";
+import { calcular, valorDaMetrica } from "@/lib/calc";
+import type { Bloco, MetricaParcela, Resultado } from "@/lib/calc/tipos";
 import { compararLote } from "@/lib/ordenacao";
 import type {
   Cliente,
@@ -14,6 +14,7 @@ import type {
 } from "@/lib/db/tipos";
 import {
   ROTULO_AMORTIZACAO,
+  ROTULO_METRICA_PARCELA,
   ROTULO_INDEXADOR,
   ROTULO_TIPO_BLOCO,
   rotuloMes,
@@ -125,6 +126,10 @@ export async function GET(
       }),
     }));
 
+  const metricas: MetricaParcela[] = proposta.metricas_parcela?.length
+    ? proposta.metricas_parcela
+    : ["inicial"];
+
   const wb = new ExcelJS.Workbook();
   wb.creator = "Ferramenta de Vendas Ponzoni";
   wb.created = new Date();
@@ -183,7 +188,7 @@ export async function GET(
     "Desconto",
     "Valor negociado",
     "Entrada",
-    "Maior parcela",
+    ...metricas.map((m) => ROTULO_METRICA_PARCELA[m]),
     "Prazo (meses)",
     "Total nominal",
     "Valor presente",
@@ -194,14 +199,17 @@ export async function GET(
       resultado.descontoEfetivoPct,
       resultado.valorNegociado,
       resultado.entrada,
-      resultado.maiorParcela,
+      ...metricas.map((m) => valorDaMetrica(resultado, m)),
       resultado.prazoMeses,
       resultado.totalNominal,
       resultado.totalVP,
     ]);
     if (cenario.recomendado) l.font = { bold: true, name: "Arial", size: 10 };
     l.getCell(2).numFmt = "0.00%";
-    for (const c of [3, 4, 5, 7, 8]) l.getCell(c).numFmt = MOEDA;
+    const ultima = 4 + metricas.length + 3;
+    for (let c = 3; c <= ultima; c++) {
+      if (c !== 5 + metricas.length) l.getCell(c).numFmt = MOEDA;
+    }
   }
 
   const avisos = opcoes.flatMap(({ cenario, resultado }) =>
@@ -242,6 +250,9 @@ export async function GET(
       ["Correção monetária projetada", resultado.totalCorrecao, MOEDA],
       ["Valor presente do fluxo", resultado.totalVP, MOEDA],
       ["Prazo (meses)", resultado.prazoMeses, "0"],
+      ["Parcela inicial", resultado.parcelaInicial, MOEDA],
+      ["Parcela média", resultado.parcelaMedia, MOEDA],
+      ["Parcela final", resultado.parcelaFinal, MOEDA],
       ["Maior parcela", resultado.maiorParcela, MOEDA],
       ["R$/m² negociado", resultado.precoM2Negociado, MOEDA],
       ["R$/m² a valor presente", resultado.precoM2VP, MOEDA],

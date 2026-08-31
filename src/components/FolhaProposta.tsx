@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Printer } from "lucide-react";
 import MapaDaProposta from "./MapaDaProposta";
-import type { Resultado } from "@/lib/calc/tipos";
+import type { MetricaParcela, Resultado } from "@/lib/calc/tipos";
 import type {
   Cliente,
   Empreendimento,
@@ -10,9 +10,12 @@ import type {
   PropostaCenario,
   PropostaLote,
 } from "@/lib/db/tipos";
+import { valorDaMetrica } from "@/lib/calc";
 import {
   adjetivoPeriodicidade,
+  NOTA_METRICA_PARCELA,
   ROTULO_INDEXADOR,
+  ROTULO_METRICA_PARCELA,
   area,
   dataBR,
   moeda,
@@ -169,6 +172,10 @@ export default function FolhaProposta({
     (o) => Math.abs(o.resultado.residuo) >= 0.5
   );
 
+  const metricas: MetricaParcela[] = proposta.metricas_parcela?.length
+    ? proposta.metricas_parcela
+    : ["inicial"];
+
   let secao = 0;
   const n = () => ++secao;
 
@@ -319,7 +326,11 @@ export default function FolhaProposta({
                   <th>Opção</th>
                   <th className="d">Entrada</th>
                   <th className="d">Parcelas</th>
-                  <th className="d">Maior parcela</th>
+                  {metricas.map((m) => (
+                    <th key={m} className="d">
+                      {ROTULO_METRICA_PARCELA[m]}
+                    </th>
+                  ))}
                   <th className="d">Valor da proposta</th>
                 </tr>
               </thead>
@@ -334,9 +345,14 @@ export default function FolhaProposta({
                     <td className="d">
                       {resultado.prazoMeses > 0 ? `${resultado.prazoMeses} meses` : "—"}
                     </td>
-                    <td className="d">
-                      {resultado.maiorParcela > 0 ? moeda(resultado.maiorParcela) : "—"}
-                    </td>
+                    {metricas.map((m) => {
+                      const v = valorDaMetrica(resultado, m);
+                      return (
+                        <td key={m} className="d">
+                          {v > 0 ? moeda(v) : "—"}
+                        </td>
+                      );
+                    })}
                     <td className="d">{moeda(resultado.valorNegociado)}</td>
                   </tr>
                 ))}
@@ -414,13 +430,16 @@ export default function FolhaProposta({
                   </strong>
                   <em>{vencimentos.length} vencimentos</em>
                 </div>
-                <div>
-                  <span>Maior parcela</span>
-                  <strong>
-                    {resultado.maiorParcela > 0 ? moeda(resultado.maiorParcela) : "—"}
-                  </strong>
-                  <em>no mês de maior soma</em>
-                </div>
+                {metricas.map((m) => {
+                  const v = valorDaMetrica(resultado, m);
+                  return (
+                    <div key={m}>
+                      <span>{ROTULO_METRICA_PARCELA[m]}</span>
+                      <strong>{v > 0 ? moeda(v) : "—"}</strong>
+                      <em>{NOTA_METRICA_PARCELA[m]}</em>
+                    </div>
+                  );
+                })}
                 <div className="destaque-caixa">
                   <span>Total do investimento</span>
                   <strong>{moeda(resultado.totalNominal)}</strong>

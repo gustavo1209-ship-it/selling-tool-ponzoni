@@ -23,6 +23,8 @@ Florescer sem mexer em código.
   lado, com comparativo e uma marcada como recomendada.
 - **Vários terrenos numa proposta**, com desconto em percentual ou em reais
   por opção.
+- **Parcela inicial, média, final ou maior** — escolha por proposta o que
+  vai ao cliente; o padrão é a inicial.
 - **Valor presente** de cada estrutura, para comparar propostas que têm o
   mesmo nominal mas prazos diferentes.
 - **Mapa na proposta** — recorte da foto aérea com os lotes da proposta

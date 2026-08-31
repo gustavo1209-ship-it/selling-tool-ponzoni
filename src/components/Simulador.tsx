@@ -27,8 +27,13 @@ import {
   salvarProposta,
   type CenarioPayload,
 } from "@/app/propostas/acoes";
-import { calcular } from "@/lib/calc";
-import type { Bloco, PropostaStatus, Resultado } from "@/lib/calc/tipos";
+import { calcular, valorDaMetrica } from "@/lib/calc";
+import type {
+  Bloco,
+  MetricaParcela,
+  PropostaStatus,
+  Resultado,
+} from "@/lib/calc/tipos";
 import type {
   BlocoTemplate,
   CenarioComBlocos,
@@ -42,7 +47,17 @@ import type {
   PropostaLote,
 } from "@/lib/db/tipos";
 import { compararLote } from "@/lib/ordenacao";
-import { area, moeda, num, pct, precoM2, rotuloMes } from "@/lib/formato";
+import {
+  area,
+  METRICAS_PARCELA,
+  moeda,
+  NOTA_METRICA_PARCELA,
+  num,
+  pct,
+  precoM2,
+  ROTULO_METRICA_PARCELA,
+  rotuloMes,
+} from "@/lib/formato";
 
 const STATUS: PropostaStatus[] = [
   "rascunho",
@@ -107,6 +122,9 @@ export default function Simulador({
     proposta.correcao_primeira_parcela
   );
   const [observacoes, setObservacoes] = useState(proposta.observacoes ?? "");
+  const [metricas, setMetricas] = useState<MetricaParcela[]>(
+    proposta.metricas_parcela?.length ? proposta.metricas_parcela : ["inicial"]
+  );
   const [clienteId, setClienteId] = useState(proposta.cliente_id);
   const [criandoCliente, setCriandoCliente] = useState(false);
   const [dadosCliente, setDadosCliente] = useState(() => ({
@@ -428,6 +446,7 @@ export default function Simulador({
           incc_mensal: incc,
           juros_vp_mensal: jurosVP,
           correcao_primeira_parcela: corrigePrimeira,
+          metricas_parcela: metricas,
           observacoes: observacoes || null,
           lotes,
           cenarios: cenarios as unknown as CenarioPayload[],
@@ -649,7 +668,11 @@ export default function Simulador({
                 <th className="num">Desconto</th>
                 <th className="num">Valor negociado</th>
                 <th className="num">Entrada</th>
-                <th className="num">Maior parcela</th>
+                {metricas.map((m) => (
+                  <th key={m} className="num">
+                    {ROTULO_METRICA_PARCELA[m]}
+                  </th>
+                ))}
                 <th className="num">Prazo</th>
                 <th className="num">Total nominal</th>
                 <th className="num">Valor presente</th>
@@ -681,7 +704,11 @@ export default function Simulador({
                     </td>
                     <td className="num">{moeda(r.valorNegociado)}</td>
                     <td className="num">{moeda(r.entrada)}</td>
-                    <td className="num">{moeda(r.maiorParcela)}</td>
+                    {metricas.map((m) => (
+                      <td key={m} className="num">
+                        {moeda(valorDaMetrica(r, m))}
+                      </td>
+                    ))}
                     <td className="num text-cinza">{r.prazoMeses}m</td>
                     <td className="num">{moeda(r.totalNominal)}</td>
                     <td className="num font-semibold">{moeda(r.totalVP)}</td>
@@ -947,9 +974,17 @@ export default function Simulador({
                     `a ${pct(jurosVP, 2)} a.m. · ${precoM2(resultado.precoM2VP)}`,
                   ],
                   [
-                    "Maior parcela",
-                    moeda(resultado.maiorParcela),
-                    `juros + correção ${moeda(resultado.totalJuros + resultado.totalCorrecao)}`,
+                    ROTULO_METRICA_PARCELA[metricas[0]],
+                    moeda(valorDaMetrica(resultado, metricas[0])),
+                    metricas.length > 1
+                      ? metricas
+                          .slice(1)
+                          .map(
+                            (m) =>
+                              `${ROTULO_METRICA_PARCELA[m].toLowerCase()} ${moeda(valorDaMetrica(resultado, m))}`
+                          )
+                          .join(" · ")
+                      : NOTA_METRICA_PARCELA[metricas[0]],
                   ],
                 ] as const
               ).map(([rotulo, valor, nota], i) => (
@@ -1304,6 +1339,37 @@ export default function Simulador({
               </select>
             </div>
           </div>
+          <div>
+            <label className="rotulo">Parcela mostrada ao cliente</label>
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+              {METRICAS_PARCELA.map((m) => (
+                <label key={m} className="flex items-center gap-1.5 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={metricas.includes(m)}
+                    onChange={(e) => {
+                      setMetricas((atual) => {
+                        const novo = e.target.checked
+                          ? METRICAS_PARCELA.filter(
+                              (x) => atual.includes(x) || x === m
+                            )
+                          : atual.filter((x) => x !== m);
+                        // sempre sobra ao menos uma; sem isso o comparativo
+                        // fica sem coluna de parcela
+                        return novo.length ? [...novo] : atual;
+                      });
+                      marcar();
+                    }}
+                  />
+                  {ROTULO_METRICA_PARCELA[m]}
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-cinza mt-1">
+              Vale para o comparativo e para a folha da proposta.
+            </p>
+          </div>
+
           <div>
             <label className="rotulo">Observações (saem na proposta)</label>
             <textarea
