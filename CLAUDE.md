@@ -40,13 +40,14 @@ Supabase (`@supabase/ssr`) · exceljs · lucide-react.
 Mesma stack e mesmas convenções de `controle-gastos/` — inclusive
 `src/proxy.ts` (o Next 16 aposentou `middleware.ts`).
 
-## Quando o dev server fica em branco
+## Quando o dev server morre no meio
 
-O dev do Turbopack quebra de vez em quando depois de mudança de enum, de tipo
-compartilhado ou de arquivo novo em `src/lib`, e o sintoma é sempre o mesmo:
-página em branco com "Jest worker encountered 2 child process exceptions" e
-nenhum erro real no log, enquanto `npm run build` compila normalmente. É
-cache, não código. A receita:
+Dois sintomas, mesma origem: página em branco com "Jest worker encountered 2
+child process exceptions", ou, se o processo morre durante uma server action,
+o React mostrando **"An unexpected response was received from the server"**.
+Nos dois casos não há erro real no log e `npm run build` compila normalmente.
+
+A receita:
 
 ```powershell
 Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
@@ -57,6 +58,26 @@ npm run dev
 ```
 
 Antes de sair caçando o bug, rode `npm run build`: se ele passa, é isto.
+
+### Por que acontece
+
+O projeto vive dentro do **OneDrive**, e `.next` e `node_modules` são
+*reparse points* — placeholders do Files On-Demand. O Turbopack reescreve
+centenas de arquivos em `.next` a cada compilação enquanto o OneDrive tenta
+sincronizá-los, e o worker morre com `EPIPE`. É por isso que o `build`
+(escreve uma vez) passa e o `dev` (escreve o tempo todo) quebra.
+
+Mitigação aplicada: `node_modules` fixado como sempre local
+(`attrib +P -U node_modules /s /d`), para o OneDrive não desidratar um módulo
+no meio de um build.
+
+**Não tente mover `.next` para fora do OneDrive com junction.** Foi tentado:
+o Turbopack passa a resolver o PostCSS a partir do caminho real
+(`AppData\Local\...`), não acha `@tailwindcss/postcss` e o app não sobe.
+
+Se as quedas voltarem a incomodar, as saídas de verdade são, nesta ordem:
+mover o projeto para fora do OneDrive, ou rodar `next dev --webpack` para
+sair do Turbopack em desenvolvimento.
 
 ## Supabase
 
