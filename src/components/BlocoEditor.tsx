@@ -2,7 +2,7 @@
 
 import { ChevronDown, ChevronUp, Copy, Trash2 } from "lucide-react";
 import CampoNumero from "./CampoNumero";
-import type { PropostaBloco } from "@/lib/db/tipos";
+import type { IndexadorRef, PropostaBloco } from "@/lib/db/tipos";
 import type {
   Amortizacao,
   BlocoCalculado,
@@ -13,6 +13,7 @@ import {
   moeda,
   pct,
   rotuloMes,
+  rotuloPeriodicidade,
   ROTULO_AMORTIZACAO,
   ROTULO_INDEXADOR,
   ROTULO_TIPO_BLOCO,
@@ -22,7 +23,11 @@ type Calculado = Omit<BlocoCalculado, "bloco">;
 
 const TIPOS: BlocoTipo[] = ["entrada", "sinal", "parcelas", "balao", "financiamento"];
 const AMORTIZACOES: Amortizacao[] = ["nenhuma", "sac", "price", "americano"];
-const INDEXADORES: Indexador[] = ["nenhum", "incc", "igpm", "ipca", "cdi", "selic"];
+const INDEXADORES: Indexador[] = [
+  "nenhum", "incc", "igpm", "ipca", "inpc", "igpdi", "cub", "tr", "cdi", "selic",
+];
+
+const PERIODICIDADES = [1, 2, 3, 4, 6, 12];
 
 /** Como a base do bloco está definida agora. */
 function modoBase(b: PropostaBloco): "percentual" | "valor" | "parcela" | "residuo" {
@@ -37,6 +42,7 @@ export default function BlocoEditor({
   calculado,
   dataBase,
   inccProposta,
+  indexadores,
   primeiro,
   ultimo,
   aoMudar,
@@ -48,6 +54,7 @@ export default function BlocoEditor({
   calculado: Calculado | undefined;
   dataBase: string;
   inccProposta: number;
+  indexadores: IndexadorRef[];
   primeiro: boolean;
   ultimo: boolean;
   aoMudar: (patch: Partial<PropostaBloco>) => void;
@@ -58,6 +65,13 @@ export default function BlocoEditor({
   const modo = modoBase(bloco);
   const comAmortizacao = bloco.amortizacao !== "nenhuma";
   const noAto = bloco.mes_inicio === 0;
+  const passo = bloco.periodicidade_meses || 1;
+  const ref = indexadores.find((i) => i.codigo === bloco.indexador);
+  const taxaSugerida = ref?.taxa_mensal_referencia ?? null;
+  const usandoSugerida =
+    bloco.taxa_indexador_mensal === null ||
+    (taxaSugerida !== null &&
+      Math.abs(bloco.taxa_indexador_mensal - taxaSugerida) < 1e-9);
 
   return (
     <article className="border border-linha rounded-lg bg-superficie">
@@ -186,6 +200,29 @@ export default function BlocoEditor({
         </div>
 
         <div>
+          <label className="rotulo">Periodicidade</label>
+          <select
+            className="campo"
+            value={passo}
+            onChange={(e) =>
+              aoMudar({ periodicidade_meses: Number(e.target.value) || 1 })
+            }
+            disabled={noAto}
+          >
+            {PERIODICIDADES.map((m) => (
+              <option key={m} value={m}>
+                {rotuloPeriodicidade(m)}
+              </option>
+            ))}
+          </select>
+          {passo > 1 && (
+            <p className="text-[11px] text-cinza mt-1">
+              vence até o mês {bloco.mes_inicio + (bloco.qtd_parcelas - 1) * passo}
+            </p>
+          )}
+        </div>
+
+        <div>
           <label className="rotulo">1º vencimento</label>
           <input
             type="number"
@@ -220,7 +257,19 @@ export default function BlocoEditor({
           <select
             className="campo"
             value={bloco.indexador}
-            onChange={(e) => aoMudar({ indexador: e.target.value as Indexador })}
+            onChange={(e) => {
+              const novo = e.target.value as Indexador;
+              const alvo = indexadores.find((i) => i.codigo === novo);
+              // trocar de índice troca a taxa junto; só o INCC segue herdando
+              // a das premissas, que é o comportamento das condições da tabela
+              aoMudar({
+                indexador: novo,
+                taxa_indexador_mensal:
+                  novo === "incc" || novo === "nenhum"
+                    ? null
+                    : (alvo?.taxa_mensal_referencia ?? null),
+              });
+            }}
           >
             {INDEXADORES.map((i) => (
               <option key={i} value={i}>
@@ -247,9 +296,35 @@ export default function BlocoEditor({
             sufixo="%"
             disabled={bloco.indexador === "nenhum"}
             placeholder={
-              bloco.indexador === "nenhum" ? "—" : `herda ${pct(inccProposta, 3)}`
+              bloco.indexador === "nenhum"
+                ? "—"
+                : taxaSugerida !== null
+                  ? `${pct(taxaSugerida, 3)} (${ref?.referencia ?? "referência"})`
+                  : `herda ${pct(inccProposta, 3)}`
             }
           />
+          {bloco.indexador !== "nenhum" && ref && (
+            <p className="text-[11px] text-cinza mt-1">
+              {taxaSugerida !== null ? (
+                <>
+                  {ref.nome} {pct(taxaSugerida, 3)} a.m.
+                  {ref.acumulado_12m !== null &&
+                    ` (${pct(ref.acumulado_12m, 2)} em 12m, ${ref.fonte} ${ref.referencia})`}
+                  {!usandoSugerida && (
+                    <button
+                      type="button"
+                      className="text-vinho font-semibold ml-1 underline"
+                      onClick={() => aoMudar({ taxa_indexador_mensal: null })}
+                    >
+                      usar referência
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>{ref.nome} sem taxa de referência — informe a taxa.</>
+              )}
+            </p>
+          )}
         </div>
 
         <div>
@@ -272,7 +347,9 @@ export default function BlocoEditor({
               <p className="tabular font-semibold">{moeda(calculado.base)}</p>
             </div>
             <div>
-              <p className="eyebrow">1ª parcela</p>
+              <p className="eyebrow">
+                {passo > 1 ? "1º reforço" : "1ª parcela"}
+              </p>
               <p className="tabular font-semibold">{moeda(calculado.primeiraParcela)}</p>
             </div>
             <div>

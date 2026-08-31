@@ -16,19 +16,40 @@ export default async function Cabecalho() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: perfil } = user
-    ? await supabase.from("perfis").select("nome, papel").eq("id", user.id).single()
-    : { data: null };
+  const [{ data: perfil }, { data: marca }] = await Promise.all([
+    user
+      ? supabase.from("perfis").select("nome, papel").eq("id", user.id).single()
+      : Promise.resolve({ data: null }),
+    // o logo é do empreendimento; com mais de um, vale o primeiro ativo
+    supabase
+      .from("empreendimentos")
+      .select("nome, logo_url")
+      .eq("ativo", true)
+      .not("logo_url", "is", null)
+      .order("nome")
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   return (
     <header className="bg-superficie border-b border-linha sticky top-0 z-30">
       <div className="faixa-topo" />
       <div className="max-w-[1400px] mx-auto px-5 h-14 flex items-center gap-6">
-        <Link href="/" className="flex items-baseline gap-2 shrink-0">
-          <span className="serif text-lg leading-none text-vinho font-semibold">
-            Ponzoni
+        <Link href="/" className="flex items-center gap-2.5 shrink-0">
+          {marca?.logo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={marca.logo_url}
+              alt={marca.nome}
+              className="w-8 h-8 rounded object-cover"
+            />
+          )}
+          <span className="flex items-baseline gap-2">
+            <span className="serif text-lg leading-none text-vinho font-semibold">
+              Ponzoni
+            </span>
+            <span className="eyebrow hidden sm:inline">Vendas</span>
           </span>
-          <span className="eyebrow hidden sm:inline">Vendas</span>
         </Link>
 
         <nav className="flex items-center gap-1 overflow-x-auto">

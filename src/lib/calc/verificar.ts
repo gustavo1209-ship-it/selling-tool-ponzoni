@@ -32,6 +32,7 @@ function bloco(p: Partial<Bloco> & { id: string; rotulo: string }): Bloco {
     absorve_residuo: false,
     qtd_parcelas: 1,
     mes_inicio: 1,
+    periodicidade_meses: 1,
     indexador: "nenhum",
     taxa_indexador_mensal: null,
     juros_mensal: 0,
@@ -140,6 +141,42 @@ conferir("entrada travada em valor", rTravado.entrada, 200000);
 conferir("bloco de parcela travada = 2 × 30.000", rTravado.blocos[1].base, 60000);
 conferir("bloco residual = 621.741,72 − 260.000", rTravado.blocos[2].base, 361741.72, 0.05);
 conferir("resíduo zerado", rTravado.residuo, 0, 0.01);
+
+console.log("\n— Reforços semestrais: 20% entrada + 8 semestrais + o resto em 48x —");
+const rReforco = calcular({
+  lotes: [
+    { quadra: "D", numero: "1", area_m2: 915.08, preco_tabela: 400000, valor_negociado: 400000 },
+  ],
+  blocos: [
+    bloco({ id: "e", rotulo: "Entrada", tipo: "entrada", base_percentual: 0.2, mes_inicio: 0 }),
+    bloco({ id: "m", rotulo: "48x", absorve_residuo: true, qtd_parcelas: 48, ordem: 1 }),
+    bloco({
+      id: "r", rotulo: "8 reforços semestrais", tipo: "balao",
+      base_percentual: 0.32, qtd_parcelas: 8, mes_inicio: 6,
+      periodicidade_meses: 6, ordem: 2,
+    }),
+  ],
+  premissas,
+  desconto_pct: 0,
+  desconto_valor: 0,
+});
+const mensais = rReforco.blocos[1];
+const reforcos = rReforco.blocos[2];
+conferir("entrada 20%", rReforco.entrada, 80000);
+conferir("reforços somam 32% do valor", reforcos.base, 128000);
+conferir("cada reforço = 128.000 / 8", reforcos.primeiraParcela, 16000);
+conferir("mensais ficam com o resíduo (48%)", mensais.base, 192000);
+conferir("mensal = 192.000 / 48", mensais.primeiraParcela, 4000);
+conferir("1º reforço vence no mês 6", reforcos.parcelas[0].mes, 6);
+conferir("8º reforço vence no mês 48", reforcos.parcelas[7].mes, 48);
+conferir("prazo total 48 meses", rReforco.prazoMeses, 48);
+conferir("resíduo zerado", rReforco.residuo, 0, 0.01);
+// o mês 6 acumula mensal + reforço; é o que faz a mensal parecer menor
+conferir(
+  "no mês de reforço o cliente paga mensal + reforço",
+  rReforco.fluxo.find((f) => f.mes === 6)!.valor,
+  20000
+);
 
 console.log(
   falhas === 0

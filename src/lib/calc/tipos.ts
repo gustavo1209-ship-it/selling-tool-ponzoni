@@ -1,5 +1,15 @@
 export type Amortizacao = "nenhuma" | "sac" | "price" | "americano";
-export type Indexador = "nenhum" | "incc" | "igpm" | "ipca" | "cdi" | "selic";
+export type Indexador =
+  | "nenhum"
+  | "incc"
+  | "igpm"
+  | "ipca"
+  | "inpc"
+  | "igpdi"
+  | "cub"
+  | "tr"
+  | "cdi"
+  | "selic";
 export type BlocoTipo = "entrada" | "sinal" | "parcelas" | "balao" | "financiamento";
 export type LoteStatus = "livre" | "reservado" | "vendido" | "indisponivel";
 export type PropostaStatus =
@@ -31,6 +41,11 @@ export interface Bloco {
   qtd_parcelas: number;
   /** Mês do primeiro vencimento. 0 = no ato (entrada). */
   mes_inicio: number;
+  /**
+   * Meses entre vencimentos: 1 mensal, 3 trimestral, 6 semestral, 12 anual.
+   * É o que transforma um bloco de parcelas num bloco de reforços.
+   */
+  periodicidade_meses: number;
   indexador: Indexador;
   /** null significa "herda a taxa do indexador definida na proposta". */
   taxa_indexador_mensal: number | null;

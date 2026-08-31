@@ -17,6 +17,7 @@ import {
   ROTULO_INDEXADOR,
   ROTULO_TIPO_BLOCO,
   rotuloMes,
+  rotuloPeriodicidade,
 } from "@/lib/formato";
 
 const VINHO = "FF7C2A28";
@@ -222,8 +223,9 @@ export async function GET(
       views: [{ showGridLines: false }],
     });
     ws.columns = [
-      { width: 32 }, { width: 14 }, { width: 10 }, { width: 12 }, { width: 14 },
-      { width: 14 }, { width: 14 }, { width: 16 }, { width: 16 }, { width: 16 },
+      { width: 32 }, { width: 14 }, { width: 10 }, { width: 14 }, { width: 10 },
+      { width: 14 }, { width: 12 }, { width: 14 }, { width: 12 }, { width: 16 },
+      { width: 16 },
     ];
     cabecalhoDaAba(ws, `${cenario.nome}${cenario.recomendado ? "  (recomendada)" : ""}`, 10);
 
@@ -251,8 +253,8 @@ export async function GET(
 
     ws.addRow([]);
     tituloTabela(ws, [
-      "Bloco", "Tipo", "Parcelas", "1º mês", "Amortização", "Índice",
-      "Taxa índice a.m.", "Juros a.m.", "Valor do bloco", "Total nominal",
+      "Bloco", "Tipo", "Parcelas", "Periodicidade", "1º mês", "Amortização",
+      "Índice", "Taxa índice a.m.", "Juros a.m.", "Valor do bloco", "Total nominal",
     ]);
     for (const b of resultado.blocos) {
       const bl = b.bloco;
@@ -260,6 +262,7 @@ export async function GET(
         bl.rotulo,
         ROTULO_TIPO_BLOCO[bl.tipo],
         b.parcelas.length,
+        rotuloPeriodicidade(bl.periodicidade_meses || 1),
         bl.mes_inicio,
         ROTULO_AMORTIZACAO[bl.amortizacao],
         ROTULO_INDEXADOR[bl.indexador],
@@ -270,10 +273,10 @@ export async function GET(
         b.base,
         b.totalNominal,
       ]);
-      l.getCell(7).numFmt = PORCENTO;
       l.getCell(8).numFmt = PORCENTO;
-      l.getCell(9).numFmt = MOEDA;
+      l.getCell(9).numFmt = PORCENTO;
       l.getCell(10).numFmt = MOEDA;
+      l.getCell(11).numFmt = MOEDA;
     }
 
     ws.addRow([]);

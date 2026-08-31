@@ -9,7 +9,17 @@ import type {
   PropostaCenario,
   PropostaLote,
 } from "@/lib/db/tipos";
-import { area, dataBR, moeda, num, pct, precoM2, rotuloMes } from "@/lib/formato";
+import {
+  adjetivoPeriodicidade,
+  ROTULO_INDEXADOR,
+  area,
+  dataBR,
+  moeda,
+  num,
+  pct,
+  precoM2,
+  rotuloMes,
+} from "@/lib/formato";
 
 export interface Opcao {
   cenario: PropostaCenario;
@@ -33,10 +43,23 @@ function descreverBloco(
     };
   }
 
+  const passo = bloco.periodicidade_meses || 1;
+  const cadencia = adjetivoPeriodicidade(passo);
   const correcao =
     bloco.indexador !== "nenhum" && bloco.amortizacao === "nenhuma"
-      ? " corrigidas pelo INCC"
+      ? ` corrigidas pelo ${ROTULO_INDEXADOR[bloco.indexador]}`
       : "";
+
+  // reforço periódico: o que faz a mensal caber no bolso do cliente
+  if (passo > 1) {
+    return {
+      titulo: bloco.rotulo,
+      detalhe: `${n} reforços ${cadencia}${correcao}, o primeiro em ${venc} e o último em ${rotuloMes(bloco.mes_inicio + (n - 1) * passo, dataBase)}. ${
+        correcao ? `O primeiro de ${moeda(primeiraParcela)} e o último de ${moeda(ultimaParcela)}.` : `De ${moeda(primeiraParcela)} cada.`
+      }`,
+      valor: moeda(totalNominal),
+    };
+  }
 
   if (bloco.amortizacao === "sac") {
     return {
@@ -159,7 +182,11 @@ export default function FolhaProposta({
         <div className="topo" />
 
         <header className="cabecalho">
-          <div>
+          {empreendimento.logo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="marca" src={empreendimento.logo_url} alt={empreendimento.nome} />
+          )}
+          <div className="titulo">
             <p className="eyebrow-p">
               {empreendimento.nome}
               {empreendimento.cidade ? ` · ${empreendimento.cidade}/${empreendimento.uf}` : ""}
@@ -370,9 +397,9 @@ export default function FolhaProposta({
               <span className="num-secao">{n()}</span> Cronograma de vencimentos
             </h2>
             <p className="texto nota">
-              Valores projetados com correção de {pct(Number(proposta.incc_mensal), 3)} ao
-              mês (INCC estimado). As parcelas indexadas são reajustadas pelo índice
-              efetivamente apurado.
+              Valores projetados com a correção informada em cada bloco (padrão:{" "}
+              {pct(Number(proposta.incc_mensal), 3)} ao mês). As parcelas indexadas são
+              reajustadas pelo índice efetivamente apurado no período.
             </p>
 
             {opcoes.map(({ cenario, resultado }) => {
@@ -400,6 +427,10 @@ export default function FolhaProposta({
             {validade.toLocaleDateString("pt-BR")}.
           </p>
           <p className="assinatura">
+            {empreendimento.logo_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="selo-rodape" src={empreendimento.logo_url} alt="" />
+            )}
             {empreendimento.nome} · {proposta.codigo} · emitida em{" "}
             {dataBR(proposta.data_base)}
           </p>
@@ -446,6 +477,11 @@ body{ background:#e9e6e2; }
   display:flex; justify-content:space-between; align-items:flex-end; gap:14mm;
   border-bottom:.6mm solid var(--vinho); padding-bottom:3mm; margin-bottom:7mm;
 }
+.cabecalho .marca{
+  width:20mm; height:20mm; object-fit:cover; border-radius:1mm;
+  align-self:flex-start; margin-right:5mm;
+}
+.cabecalho .titulo{ flex:1; }
 .eyebrow-p{
   font-size:7.5pt; font-weight:bold; letter-spacing:.16em;
   text-transform:uppercase; color:var(--vinho); margin:0;
@@ -531,7 +567,11 @@ h3{ font-size:9.5pt; margin:0 0 2mm; color:var(--vinho); }
   font-size:7.5pt; color:var(--cinza); line-height:1.55;
 }
 .rodape p{ margin:0 0 1.6mm; }
-.rodape .assinatura{ color:var(--vinho); font-weight:bold; letter-spacing:.06em; text-transform:uppercase; }
+.rodape .assinatura{
+  color:var(--vinho); font-weight:bold; letter-spacing:.06em; text-transform:uppercase;
+  display:flex; align-items:center; gap:2mm;
+}
+.rodape .selo-rodape{ width:5mm; height:5mm; object-fit:cover; border-radius:.6mm; }
 
 @media print{
   body{ background:#fff; }

@@ -87,12 +87,43 @@ export const ROTULO_AMORTIZACAO: Record<string, string> = {
 
 export const ROTULO_INDEXADOR: Record<string, string> = {
   nenhum: "Sem correção",
-  incc: "INCC",
+  incc: "INCC-M",
   igpm: "IGP-M",
   ipca: "IPCA",
+  inpc: "INPC",
+  igpdi: "IGP-DI",
+  cub: "CUB-RS",
+  tr: "TR",
   cdi: "CDI",
   selic: "Selic",
 };
+
+/** Reforço semestral vira "a cada 6 meses" na tela e "semestrais" no texto. */
+export const ROTULO_PERIODICIDADE: Record<number, string> = {
+  1: "Mensal",
+  2: "Bimestral",
+  3: "Trimestral",
+  4: "Quadrimestral",
+  6: "Semestral",
+  12: "Anual",
+};
+
+export const ADJETIVO_PERIODICIDADE: Record<number, string> = {
+  1: "mensais",
+  2: "bimestrais",
+  3: "trimestrais",
+  4: "quadrimestrais",
+  6: "semestrais",
+  12: "anuais",
+};
+
+export function rotuloPeriodicidade(meses: number): string {
+  return ROTULO_PERIODICIDADE[meses] ?? `A cada ${meses} meses`;
+}
+
+export function adjetivoPeriodicidade(meses: number): string {
+  return ADJETIVO_PERIODICIDADE[meses] ?? `a cada ${meses} meses`;
+}
 
 export const ROTULO_TIPO_BLOCO: Record<string, string> = {
   entrada: "Entrada",

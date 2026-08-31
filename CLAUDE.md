@@ -143,6 +143,22 @@ nada impede dois blocos começarem no mês 1. É exatamente assim que a planilha
 `20% + 25% 12x + 55% 36x` funciona — nos primeiros 12 meses o cliente paga as
 duas parcelas somadas. Não "sequenciar" os blocos automaticamente.
 
+### Reforços periódicos
+
+`periodicidade_meses` no bloco é o intervalo entre vencimentos: 1 mensal, 3
+trimestral, 6 semestral, 12 anual. O vencimento sai de
+`mes_inicio + (indice − 1) × periodicidade`.
+
+O efeito comercial é o que importa: entrada e reforços são percentuais fixos
+do valor e **as mensais absorvem o resíduo**, então acrescentar reforço
+derruba a mensal sem mudar o total — o principal só muda de lugar no
+calendário. Num terreno de R$ 341.957,94 com 30% de entrada e 36x, tirar 20%
+para 6 reforços semestrais leva a mensal de R$ 6.649 para R$ 4.749.
+
+O comparativo continua honesto porque a coluna "maior parcela" pega o mês em
+que a mensal e o reforço caem juntos — que é o mês que o cliente precisa
+conseguir pagar.
+
 ### Correção × juros
 
 São coisas diferentes e não se misturam no mesmo bloco:
@@ -156,6 +172,29 @@ São coisas diferentes e não se misturam no mesmo bloco:
 `taxa_indexador_mensal = null` significa **herda o INCC da proposta** — é o
 que faz uma condição salva em 2026 continuar coerente quando o INCC muda.
 Não trocar por `0`.
+
+Essa herança só faz sentido para o próprio INCC. Por isso a tela grava a taxa
+**explicitamente** ao escolher qualquer outro índice: um bloco de IPCA com
+taxa nula acabaria corrigido pelo INCC, e a conta sairia errada sem nenhum
+aviso.
+
+### Indexadores
+
+A tabela `indexadores` guarda a taxa de referência de cada índice com a fonte
+e a data — INCC-M, IGP-M, IPCA, INPC, IGP-DI, CUB-RS, TR, CDI e Selic. A taxa
+mensal é derivada do **acumulado em 12 meses**, não da variação do mês:
+
+```
+taxa_mensal = (1 + acumulado_12m)^(1/12) − 1
+```
+
+Isso não é preciosismo. O IGP-M de agosto/2026 fechou em **−0,22%**; projetar
+esse número por 36 parcelas zeraria o saldo devedor. O acumulado suaviza a
+volatilidade, que é o que se quer numa projeção longa.
+
+Índices sem taxa apurada (INPC, IGP-DI, CUB, TR) ficam com `null` de
+propósito — a tela diz "sem taxa de referência" em vez de inventar um número.
+Ao revisar a tabela de preços, revisar também estas taxas.
 
 ### O fator de correção da 1ª parcela
 
@@ -176,6 +215,25 @@ sobra na última parcela afastava o resultado da planilha em alguns centavos
 justamente na última linha — que é a que todo mundo confere. `sac()` e
 `price()` fazem o contrário de propósito: a última parcela absorve o resíduo
 para o saldo devedor zerar exatamente.
+
+## Montar opção personalizada
+
+O botão "Montar opção" no simulador (`MontarOpcao.tsx`) gera os blocos a
+partir do formato que o mercado usa: entrada % + mensais + reforços
+periódicos. Ele existe porque montar bloco a bloco é preciso mas lento, e o
+vendedor monta condição nova no meio da conversa com o cliente.
+
+A prévia é sem correção e sem juros de propósito: é a conta que o vendedor
+faz de cabeça e precisa bater. Os valores com correção aparecem no
+comparativo depois de criar.
+
+## Marca
+
+`empreendimentos.logo_url` aponta para um arquivo em `public/`. Aparece no
+cabeçalho do app e no topo da folha da proposta (mais um selo pequeno na
+assinatura do rodapé). O do Industrial é o mesmo `ponzoni-logo.jpg` do
+`site-industrial-ponzoni` — marca branca sobre quadrado vinho, que funciona
+como selo sem precisar de versão negativa.
 
 ## Cliente
 

@@ -11,7 +11,14 @@ import type {
 export * from "./tipos";
 export * from "./amortizacao";
 
-/** Taxa mensal do indexador do bloco, caindo para o INCC da proposta. */
+/**
+ * Taxa mensal do indexador do bloco.
+ *
+ * Sem taxa explícita, cai para o INCC das premissas — é o que faz as
+ * condições da tabela continuarem coerentes quando o INCC muda. A tela
+ * preenche a taxa explicitamente ao escolher qualquer índice que não seja o
+ * INCC, justamente para um bloco de IPCA não acabar corrigido pelo INCC.
+ */
 export function taxaIndexador(bloco: Bloco, premissas: Premissas): number {
   if (bloco.indexador === "nenhum") return 0;
   if (bloco.taxa_indexador_mensal !== null) return bloco.taxa_indexador_mensal;
@@ -90,8 +97,9 @@ function calcularBloco(
   const i = comJuros ? bloco.juros_mensal + taxaIdx : 0;
   const linhas = tabela(bloco.amortizacao, Math.max(base, 0), n, i);
 
+  const passo = Math.max(1, Math.trunc(bloco.periodicidade_meses || 1));
   const parcelas: Parcela[] = linhas.map((l) => {
-    const mes = bloco.mes_inicio + l.indice - 1;
+    const mes = bloco.mes_inicio + (l.indice - 1) * passo;
     const fator = comJuros ? 1 : fatorCorrecao(taxaIdx, mes, premissas);
     const valor = arredonda(l.parcela * fator);
     const correcao = arredonda(valor - l.parcela);

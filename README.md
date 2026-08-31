@@ -10,9 +10,15 @@ Florescer sem mexer em código.
 - **Espelho de vendas** — os 44 lotes com área, preço, status e comprador,
   sincronizáveis com o Google Sheets que já alimenta o mapa público.
 - **Simulador** — monta a condição de pagamento em blocos: entrada, parcelas
-  corrigidas pelo INCC, balão, financiamento Sicredi em SAC até 120 meses.
+  corrigidas por índice, balão, financiamento Sicredi em SAC até 120 meses.
   Tudo editável: valor da entrada, percentual de cada bloco, número e valor
   das parcelas, sistema de amortização, índice de correção e taxa.
+- **Opção personalizada em um formulário** — entrada %, número de parcelas e
+  índice, com prévia da mensal antes de criar.
+- **Reforços periódicos** — trimestrais, semestrais ou anuais, para baixar a
+  parcela mensal sem mudar o valor total.
+- **Indexadores com fonte** — INCC-M, IGP-M, IPCA, INPC, IGP-DI, CUB-RS, TR,
+  CDI e Selic, cada um com taxa de referência, origem e data.
 - **Várias opções na mesma proposta** — à vista, 24x INCC e Sicredi lado a
   lado, com comparativo e uma marcada como recomendada.
 - **Vários terrenos numa proposta**, com desconto em percentual ou em reais

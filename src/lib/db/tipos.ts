@@ -26,6 +26,8 @@ export interface Empreendimento {
   mapa_url: string | null;
   /** Página pública do mapa, para mandar ao cliente. */
   mapa_publico_url: string | null;
+  /** Logo do empreendimento, servido de `public/`. */
+  logo_url: string | null;
   cor_primaria: string;
   cor_secundaria: string;
   ativo: boolean;
@@ -64,6 +66,7 @@ export interface BlocoTemplate {
   absorve_residuo?: boolean;
   qtd_parcelas: number;
   mes_inicio: number;
+  periodicidade_meses?: number;
   indexador: Indexador;
   taxa_indexador_mensal?: number | null;
   juros_mensal: number;
@@ -81,6 +84,19 @@ export interface CondicaoPagamento {
   ordem: number;
   template: BlocoTemplate[];
   ativa: boolean;
+}
+
+/** Taxa de referência de um índice, com a fonte — não é número mágico. */
+export interface IndexadorRef {
+  codigo: Indexador;
+  nome: string;
+  descricao: string | null;
+  taxa_mensal_referencia: number | null;
+  acumulado_12m: number | null;
+  variacao_mes: number | null;
+  fonte: string | null;
+  referencia: string | null;
+  ordem: number;
 }
 
 export interface Cliente {
@@ -118,6 +134,7 @@ export interface PropostaBloco {
   absorve_residuo: boolean;
   qtd_parcelas: number;
   mes_inicio: number;
+  periodicidade_meses: number;
   indexador: Indexador;
   taxa_indexador_mensal: number | null;
   juros_mensal: number;

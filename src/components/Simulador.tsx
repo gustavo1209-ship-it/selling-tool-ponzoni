@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import BlocoEditor from "./BlocoEditor";
+import MontarOpcao from "./MontarOpcao";
 import CampoNumero from "./CampoNumero";
 import { SeloProposta } from "./SeloStatus";
 import {
@@ -27,8 +28,10 @@ import {
 import { calcular } from "@/lib/calc";
 import type { Bloco, PropostaStatus, Resultado } from "@/lib/calc/tipos";
 import type {
+  BlocoTemplate,
   CenarioComBlocos,
   Cliente,
+  IndexadorRef,
   CondicaoPagamento,
   Empreendimento,
   Lote,
@@ -64,6 +67,7 @@ export default function Simulador({
   cenariosIniciais,
   lotesDisponiveis,
   condicoes,
+  indexadores,
 }: {
   proposta: Proposta;
   empreendimento: Empreendimento;
@@ -73,6 +77,7 @@ export default function Simulador({
   cenariosIniciais: CenarioComBlocos[];
   lotesDisponiveis: Lote[];
   condicoes: CondicaoPagamento[];
+  indexadores: IndexadorRef[];
 }) {
   const [titulo, setTitulo] = useState(proposta.titulo ?? "");
   const [status, setStatus] = useState<PropostaStatus>(proposta.status);
@@ -98,6 +103,7 @@ export default function Simulador({
   const [cenarios, setCenarios] = useState<CenarioComBlocos[]>(cenariosIniciais);
   const [ativoId, setAtivoId] = useState(cenariosIniciais[0]?.id ?? "");
   const [mostrarFluxo, setMostrarFluxo] = useState(false);
+  const [montando, setMontando] = useState(false);
 
   const [salvando, iniciarSalvar] = useTransition();
   const [recado, setRecado] = useState<string | null>(null);
@@ -179,19 +185,26 @@ export default function Simulador({
     marcar();
   }
 
-  function adicionarCenario(condicao?: CondicaoPagamento) {
+  function adicionarCenario(
+    condicao?: CondicaoPagamento,
+    montada?: { nome: string; blocos: BlocoTemplate[] }
+  ) {
+    const modelo = montada?.blocos ?? condicao?.template ?? [];
     const novo: CenarioComBlocos = {
       id: idLocal(),
       proposta_id: proposta.id,
       ordem: cenarios.length,
-      nome: condicao?.nome ?? `Opção ${LETRAS[cenarios.length] ?? cenarios.length + 1}`,
+      nome:
+        montada?.nome ??
+        condicao?.nome ??
+        `Opção ${LETRAS[cenarios.length] ?? cenarios.length + 1}`,
       condicao_origem: condicao?.nome ?? null,
       desconto_pct: condicao ? Number(condicao.desconto_pct) : 0,
       desconto_valor: 0,
       desconto_motivo: null,
       recomendado: cenarios.length === 0,
       resultado: null,
-      blocos: (condicao?.template ?? []).map((b, i) => ({
+      blocos: modelo.map((b, i) => ({
         id: idLocal(),
         cenario_id: "",
         ordem: i,
@@ -202,6 +215,7 @@ export default function Simulador({
         absorve_residuo: b.absorve_residuo ?? false,
         qtd_parcelas: b.qtd_parcelas,
         mes_inicio: b.mes_inicio,
+        periodicidade_meses: b.periodicidade_meses ?? 1,
         indexador: b.indexador,
         taxa_indexador_mensal: b.taxa_indexador_mensal ?? null,
         juros_mensal: b.juros_mensal,
@@ -300,6 +314,7 @@ export default function Simulador({
         qtd_parcelas: 12,
         mes_inicio:
           (bs[bs.length - 1]?.mes_inicio ?? 0) + (bs[bs.length - 1]?.qtd_parcelas ?? 1),
+        periodicidade_meses: 1,
         indexador: "incc",
         taxa_indexador_mensal: null,
         juros_mensal: 0,
@@ -682,11 +697,28 @@ export default function Simulador({
                 </option>
               ))}
             </select>
-            <button className="btn btn-secundario" onClick={() => adicionarCenario()}>
-              <Plus size={15} /> Opção em branco
+            <button
+              className="btn btn-secundario"
+              onClick={() => setMontando((v) => !v)}
+            >
+              <Plus size={15} /> Montar opção
             </button>
           </div>
         </div>
+
+        {montando && (
+          <div className="p-4 pb-0">
+            <MontarOpcao
+              indexadores={indexadores}
+              valorReferencia={somaLotes}
+              aoFechar={() => setMontando(false)}
+              aoCriar={(nome, blocos) => {
+                adicionarCenario(undefined, { nome, blocos });
+                setMontando(false);
+              }}
+            />
+          </div>
+        )}
 
         {ativo && resultado && (
           <div className="p-4 flex flex-col gap-5">
@@ -839,6 +871,7 @@ export default function Simulador({
                   calculado={porBloco.get(b.id)}
                   dataBase={dataBase}
                   inccProposta={incc}
+                  indexadores={indexadores}
                   primeiro={i === 0}
                   ultimo={i === ativo.blocos.length - 1}
                   aoMudar={(patch) => mudarBloco(ativo.id, b.id, patch)}

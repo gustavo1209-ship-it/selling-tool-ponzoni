@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { compararLote } from "@/lib/ordenacao";
 import type {
   CenarioComBlocos,
+  IndexadorRef,
   Cliente,
   CondicaoPagamento,
   Empreendimento,
@@ -48,8 +49,12 @@ export default async function PropostaPage({
     proposta_cenarios: (PropostaCenario & { proposta_blocos: PropostaBloco[] })[];
   };
 
-  const [{ data: disponiveis }, { data: condicoes }, { data: clientes }] =
-    await Promise.all([
+  const [
+    { data: disponiveis },
+    { data: condicoes },
+    { data: clientes },
+    { data: indexadores },
+  ] = await Promise.all([
       supabase
         .from("lotes")
         .select("*")
@@ -63,6 +68,7 @@ export default async function PropostaPage({
             .order("ordem")
       : Promise.resolve({ data: [] }),
       supabase.from("clientes").select("*").order("nome"),
+      supabase.from("indexadores").select("*").order("ordem"),
     ]);
 
   const cenariosOrdenados: CenarioComBlocos[] = [...(cenarios ?? [])]
@@ -85,6 +91,7 @@ export default async function PropostaPage({
           cenariosIniciais={cenariosOrdenados}
           lotesDisponiveis={(disponiveis ?? []) as Lote[]}
           condicoes={(condicoes ?? []) as unknown as CondicaoPagamento[]}
+          indexadores={(indexadores ?? []) as IndexadorRef[]}
         />
       </main>
     </>
