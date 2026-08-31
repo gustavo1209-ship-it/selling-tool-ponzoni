@@ -46,7 +46,8 @@ Primeiro acesso: `/login` → "Criar uma conta" → confirmar pelo e-mail.
 
 | Comando | O que faz |
 |---|---|
-| `npm run dev` | servidor de desenvolvimento |
+| `npm run dev` | servidor de desenvolvimento (webpack; ver CLAUDE.md) |
+| `npm run dev:turbo` | o mesmo, com Turbopack |
 | `npm run build` | build de produção |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |

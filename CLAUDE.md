@@ -11,7 +11,8 @@ propósito — o Florescer entra depois sem tocar em código. Ver
 ## Comandos
 
 ```bash
-npm run dev         # localhost:3000
+npm run dev         # localhost:3000 (webpack — ver abaixo)
+npm run dev:turbo   # o mesmo, com Turbopack
 npm run build
 npm run lint
 npm run typecheck   # tsc --noEmit
@@ -40,14 +41,33 @@ Supabase (`@supabase/ssr`) · exceljs · lucide-react.
 Mesma stack e mesmas convenções de `controle-gastos/` — inclusive
 `src/proxy.ts` (o Next 16 aposentou `middleware.ts`).
 
-## Quando o dev server morre no meio
+## Por que o dev roda com webpack
 
-Dois sintomas, mesma origem: página em branco com "Jest worker encountered 2
-child process exceptions", ou, se o processo morre durante uma server action,
-o React mostrando **"An unexpected response was received from the server"**.
-Nos dois casos não há erro real no log e `npm run build` compila normalmente.
+`npm run dev` é `next dev --webpack`, de propósito. O `build` continua com
+Turbopack (o padrão do Next 16); só o desenvolvimento saiu dele.
 
-A receita:
+O Turbopack derrubava o dev server várias vezes por sessão, sempre com um de
+dois sintomas: página em branco com "Jest worker encountered 2 child process
+exceptions", ou — quando o processo morria durante uma server action — o
+React mostrando **"An unexpected response was received from the server"**.
+Nos dois casos sem erro real no log, e com `npm run build` passando.
+
+A causa é o projeto viver dentro do **OneDrive**: `.next` e `node_modules`
+são reparse points do Files On-Demand, e o Turbopack reescreve centenas de
+arquivos em `.next` a cada compilação enquanto o OneDrive tenta sincronizá-los
+— o worker morre com `EPIPE`. Explica por que o `build` (escreve uma vez)
+sempre passou e o `dev` (escreve o tempo todo) quebrava.
+
+O que já foi tentado antes de trocar o bundler:
+
+- limpar `.next` e reiniciar — resolve na hora, volta depois;
+- `attrib +P -U node_modules /s /d`, para o OneDrive não desidratar um módulo
+  no meio do build (mantido, ajuda, não basta);
+- **junction de `.next` para fora do OneDrive — não funciona**: o Turbopack
+  passa a resolver o PostCSS a partir do caminho real em `AppData`, não acha
+  `@tailwindcss/postcss` e o app não sobe.
+
+Se o dev travar mesmo assim, a receita continua valendo:
 
 ```powershell
 Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
@@ -57,27 +77,9 @@ Remove-Item -Recurse -Force .next
 npm run dev
 ```
 
-Antes de sair caçando o bug, rode `npm run build`: se ele passa, é isto.
-
-### Por que acontece
-
-O projeto vive dentro do **OneDrive**, e `.next` e `node_modules` são
-*reparse points* — placeholders do Files On-Demand. O Turbopack reescreve
-centenas de arquivos em `.next` a cada compilação enquanto o OneDrive tenta
-sincronizá-los, e o worker morre com `EPIPE`. É por isso que o `build`
-(escreve uma vez) passa e o `dev` (escreve o tempo todo) quebra.
-
-Mitigação aplicada: `node_modules` fixado como sempre local
-(`attrib +P -U node_modules /s /d`), para o OneDrive não desidratar um módulo
-no meio de um build.
-
-**Não tente mover `.next` para fora do OneDrive com junction.** Foi tentado:
-o Turbopack passa a resolver o PostCSS a partir do caminho real
-(`AppData\Local\...`), não acha `@tailwindcss/postcss` e o app não sobe.
-
-Se as quedas voltarem a incomodar, as saídas de verdade são, nesta ordem:
-mover o projeto para fora do OneDrive, ou rodar `next dev --webpack` para
-sair do Turbopack em desenvolvimento.
+Use `npm run dev:turbo` quando quiser reproduzir em desenvolvimento algo que
+só aparece no bundler do `build`. A solução definitiva é mover o projeto para
+fora do OneDrive.
 
 ## Supabase
 
