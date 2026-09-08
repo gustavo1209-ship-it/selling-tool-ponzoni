@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "verificar": "tsx src/lib/calc/verificar.ts && tsx src/lib/contratos/verificar.ts",
     "mapa:extrair": "node scripts/extrair-mapa.mjs",
-    "dev:webpack": "next dev --webpack"
+    "dev:webpack": "next dev --webpack",
+    "replicar": "node scripts/replicar.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

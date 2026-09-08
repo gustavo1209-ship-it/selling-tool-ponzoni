@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { calcularContrato } from "@/lib/contratos/correcao";
 import { carregarIndices, serieDe } from "@/lib/contratos/servidor";
 import { mapaDePerfis } from "@/lib/supabase/perfil";
-import type { ContratoCompleto, IndexadorRef } from "@/lib/db/tipos";
+import type { Cliente, ContratoCompleto, IndexadorRef } from "@/lib/db/tipos";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +30,9 @@ export default async function ContratoPage({
     supabase.from("indexadores").select("*").order("ordem"),
     carregarIndices(),
   ]);
+
+  // a RLS filtra: admin vê todos, corretor só os seus
+  const { data: clientes } = await supabase.from("clientes").select("*").order("nome");
 
   if (!data) notFound();
   const contrato = data as unknown as ContratoCompleto;
@@ -71,6 +74,7 @@ export default async function ContratoPage({
           lotes={lotes}
           calculo={calculo}
           indexadores={(indexadores ?? []) as IndexadorRef[]}
+          clientes={(clientes ?? []) as Cliente[]}
           autor={autores.get(contrato.criado_por ?? "") ?? null}
         />
       </main>

@@ -19,6 +19,7 @@ npm run lint
 npm run typecheck   # tsc --noEmit
 npm run verificar   # confere o motor de cálculo contra as planilhas
 npm run mapa:extrair -- "<caminho do mapa-lotes-*.html>"   # regenera a geometria
+npm run replicar    # copia o código-fonte para a pasta do OneDrive
 ```
 
 `npm run verificar` é o teste que importa: ele reproduz números que já
@@ -86,6 +87,22 @@ OneDrive\Desktop\Codes Claude	este supabase\selling-tool-florescer  Planilha val
 
 O backup do código é o **GitHub**, não o OneDrive. O `.env.local` é
 recriável a partir do `.env.example` com a chave que está na Vercel.
+
+### A réplica em `codigo/`
+
+`npm run replicar` copia o código-fonte para
+`selling-tool-florescer/codigo/`, junto das fontes de dados, mais os manuais
+em PDF em `manuais/`. Serve para ter tudo num lugar só e com backup do
+OneDrive.
+
+A réplica leva **só o que `git ls-files` devolve** — nada de `node_modules`,
+`.next` ou `.git`, que é o que tornaria a sincronização um problema. Ela é
+refeita do zero a cada execução, para não deixar para trás arquivo
+renomeado ou apagado.
+
+**É uma foto, não um segundo lugar para trabalhar.** Rodar `npm run dev` de
+dentro dela traz de volta exatamente o problema que a mudança de pasta
+resolveu. O `LEIA-ME` gerado na pasta diz isso a quem chegar por lá.
 
 O repositório do mapa (`site-industrial-ponzoni`) continua no OneDrive e não
 é mais vizinho deste, então `npm run mapa:extrair` precisa do caminho:
@@ -594,6 +611,21 @@ se um dia fizerem falta.
 Ela aparece **só no espelho**, nunca na proposta do cliente. Quem pode
 editar é quem pode editar lote — qualquer usuário do time, mesma regra do
 status.
+
+## `redirect()` não sobrevive a um try/catch
+
+`redirect()` do Next funciona lançando um erro especial, que o runtime
+intercepta para navegar. Numa server action chamada por `<form action={...}>`
+isso é invisível e funciona. Mas quando a tela chama a action dentro de um
+`try/catch` — como faz o `agir()` do `ContratoDetalhe`, para exibir a
+mensagem de falha —, **o catch engole o redirect**: a navegação não acontece
+e o usuário vê um erro para uma operação que deu certo.
+
+Foi o que aconteceu com `apagarContrato`: o contrato era apagado e a tela
+dizia que falhou. A regra que ficou: **action chamada de dentro de
+`try/catch` não redireciona**; ela devolve e quem navega é o cliente, com
+`router.push`. As actions que redirecionam (`criarProposta`,
+`criarContrato`) são as que viajam por `<form action>`.
 
 ## CSS: camadas importam
 

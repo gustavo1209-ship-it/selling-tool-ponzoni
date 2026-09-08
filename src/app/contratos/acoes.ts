@@ -461,12 +461,22 @@ async function quitarSeFechou(contratoId: string) {
   }
 }
 
+/**
+ * Apaga o contrato e todo o histórico de pagamento (as parcelas e os lotes
+ * saem por cascade).
+ *
+ * **Sem `redirect()` aqui.** A tela chama esta ação dentro de um try/catch,
+ * e o redirect do Next é um erro especial: o catch o engolia, a navegação
+ * não acontecia e o usuário via uma mensagem de falha para uma exclusão que
+ * tinha funcionado. Quem navega é o cliente, depois que a promessa resolve.
+ */
 export async function apagarContrato(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("contratos").delete().eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/contratos");
-  redirect("/contratos");
+  revalidatePath("/cobranca");
+  return { ok: true };
 }
 
 /**

@@ -55,6 +55,7 @@ export default function ContratoDetalhe({
   lotes,
   calculo,
   indexadores,
+  clientes,
   autor,
 }: {
   contrato: Contrato;
@@ -63,6 +64,8 @@ export default function ContratoDetalhe({
   lotes: ContratoLote[];
   calculo: ContratoCalculado;
   indexadores: IndexadorRef[];
+  /** Para trocar o comprador do contrato sem refazer o cadastro. */
+  clientes: Cliente[];
   /** Quem cadastrou o contrato — com corretores, deixa de ser óbvio. */
   autor: string | null;
 }) {
@@ -91,6 +94,8 @@ export default function ContratoDetalhe({
 
   const [ajustes, setAjustes] = useState(false);
   const [cfg, setCfg] = useState({
+    titulo: contrato.titulo ?? "",
+    cliente_id: contrato.cliente_id ?? "",
     status: contrato.status as string,
     data_base: contrato.data_base,
     data_contrato: contrato.data_contrato,
@@ -213,8 +218,8 @@ export default function ContratoDetalhe({
   function salvarAjustes() {
     agir(async () => {
       await atualizarContrato(contrato.id, {
-        titulo: contrato.titulo,
-        cliente_id: contrato.cliente_id,
+        titulo: cfg.titulo.trim() || null,
+        cliente_id: cfg.cliente_id || null,
         status: cfg.status,
         data_contrato: cfg.data_contrato,
         data_base: cfg.data_base,
@@ -278,7 +283,7 @@ export default function ContratoDetalhe({
             className="btn btn-secundario"
             onClick={() => setAjustes((a) => !a)}
           >
-            <Settings2 size={15} /> Ajustes
+            <Settings2 size={15} /> Editar contrato
           </button>
           <a
             className="btn btn-secundario"
@@ -381,10 +386,36 @@ export default function ContratoDetalhe({
       {ajustes && (
         <section className="cartao p-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="sm:col-span-2 lg:col-span-4 flex items-center justify-between">
-            <h2 className="serif text-lg">Ajustes do contrato</h2>
+            <h2 className="serif text-lg">Editar contrato</h2>
             <button className="btn btn-fantasma" onClick={() => setAjustes(false)}>
               <X size={15} />
             </button>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="rotulo">Comprador</label>
+            <select
+              className="campo"
+              value={cfg.cliente_id}
+              onChange={(e) => setCfg({ ...cfg, cliente_id: e.target.value })}
+            >
+              <option value="">— sem comprador vinculado —</option>
+              {clientes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                  {c.empresa ? ` · ${c.empresa}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="rotulo">Identificação do contrato</label>
+            <input
+              className="campo"
+              value={cfg.titulo}
+              onChange={(e) => setCfg({ ...cfg, titulo: e.target.value })}
+              placeholder="Ex.: contrato de 12/2024, quadra C"
+            />
           </div>
 
           <div>
@@ -514,20 +545,29 @@ export default function ContratoDetalhe({
               <Check size={15} /> Salvar
             </button>
             <button
-              className="btn btn-fantasma text-vermelho"
-              title="Apagar contrato"
+              className="btn btn-secundario text-vermelho"
               disabled={pendente}
               onClick={() => {
                 if (
                   confirm(
-                    `Apagar o contrato ${contrato.codigo} e todo o histórico de pagamentos?`
+                    `Apagar o contrato ${contrato.codigo} e todo o histórico de pagamentos? Não dá para desfazer.`
                   )
                 ) {
-                  agir(() => apagarContrato(contrato.id));
+                  // a navegação é daqui: a action não redireciona, senão o
+                  // try/catch de `agir` engoliria o redirect do Next
+                  setErro(null);
+                  iniciar(async () => {
+                    try {
+                      await apagarContrato(contrato.id);
+                      router.push("/contratos");
+                    } catch (e) {
+                      setErro(mensagemDeFalha(e));
+                    }
+                  });
                 }
               }}
             >
-              <Trash2 size={15} />
+              <Trash2 size={15} /> Apagar contrato
             </button>
           </div>
         </section>
