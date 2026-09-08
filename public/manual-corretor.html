@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Manual do corretor — Ferramenta de vendas Ponzoni</title>
+<style>
+:root{
+  --vinho:#7C2A28; --vinho-fraco:#F4E7E5; --ouro:#E0A221; --ouro-fraco:#FBF1DC;
+  --tinta:#22201F; --cinza:#6B6662; --linha:#DDD7D1; --linha-forte:#C9C2BB;
+  --papel:#F3F1EF; --verde:#276B4C; --verm:#96262C; --ambar:#8A5B0B;
+}
+@page{ size:A4 portrait; margin:14mm 0 12mm; }
+body{ background:#e9e6e2; margin:0; }
+
+.barra{
+  position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:14px;
+  padding:10px 16px; background:#fff; border-bottom:1px solid var(--linha);
+  font-family:Arial,Helvetica,sans-serif;
+}
+.btn{
+  display:inline-flex; align-items:center; gap:7px; background:var(--vinho); color:#fff;
+  border:none; border-radius:6px; padding:8px 14px; font-size:14px; font-weight:700; cursor:pointer;
+}
+.barra span{ font-size:12px; color:var(--cinza); }
+
+.folha{
+  width:210mm; min-height:297mm; margin:16px auto; background:#fff; padding:0 16mm 14mm;
+  box-shadow:0 2px 18px rgba(0,0,0,.12); color:var(--tinta);
+  font-family:Arial,"Helvetica Neue",Helvetica,sans-serif; font-size:10pt; line-height:1.55;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact;
+}
+.topo{ height:3.2mm; background:var(--vinho); margin:0 -16mm 7mm; }
+
+header.capa{ border-bottom:.6mm solid var(--vinho); padding-bottom:4mm; margin-bottom:8mm; }
+.eyebrow{ font-size:7.5pt; font-weight:bold; letter-spacing:.16em; text-transform:uppercase; color:var(--vinho); margin:0; }
+header.capa h1{ font-size:26pt; line-height:1.05; margin:2mm 0 0; letter-spacing:-.01em; }
+header.capa .sub{ font-size:11pt; color:var(--cinza); margin:2mm 0 0; }
+
+h2{
+  font-size:8.5pt; font-weight:bold; letter-spacing:.13em; text-transform:uppercase; color:#fff;
+  background:var(--vinho); padding:1.8mm 3mm; margin:8mm 0 4mm; display:flex; gap:2mm; align-items:center;
+  break-after:avoid;
+}
+h2 .n{ color:var(--ouro); }
+h3{ font-size:10.5pt; margin:5mm 0 1.5mm; color:var(--vinho); break-after:avoid; }
+p{ margin:0 0 2.5mm; }
+ul,ol{ margin:0 0 3mm; padding-left:5mm; }
+li{ margin-bottom:1.2mm; }
+strong{ color:var(--tinta); }
+code{ font-family:Consolas,"Courier New",monospace; font-size:9pt; background:var(--papel); padding:.3mm 1.2mm; border-radius:1mm; }
+
+.t{ width:100%; border-collapse:collapse; font-size:9.5pt; margin:0 0 3mm; }
+.t th{
+  text-align:left; font-size:7.5pt; letter-spacing:.09em; text-transform:uppercase; color:var(--cinza);
+  font-weight:bold; padding:1.8mm 2mm; border-bottom:.4mm solid var(--linha-forte); background:var(--papel);
+}
+.t td{ padding:1.8mm 2mm; border-bottom:.25mm solid var(--linha); vertical-align:top; }
+.t tr{ break-inside:avoid; }
+
+.caixa{ border-left:.9mm solid var(--ouro); background:var(--ouro-fraco); padding:3mm 4mm; margin:0 0 4mm; break-inside:avoid; }
+.caixa.aviso{ border-color:var(--verm); background:#F5E0E0; }
+.caixa.ok{ border-color:var(--verde); background:#E0EDE5; }
+.caixa p:last-child{ margin-bottom:0; }
+.caixa .rot{ font-size:7.5pt; font-weight:bold; letter-spacing:.12em; text-transform:uppercase; display:block; margin-bottom:1.5mm; color:var(--ambar); }
+.caixa.aviso .rot{ color:var(--verm); }
+.caixa.ok .rot{ color:var(--verde); }
+
+.passos{ counter-reset:passo; list-style:none; padding:0; }
+.passos li{ counter-increment:passo; position:relative; padding-left:8mm; margin-bottom:2.5mm; break-inside:avoid; }
+.passos li::before{
+  content:counter(passo); position:absolute; left:0; top:.2mm; width:5.5mm; height:5.5mm;
+  background:var(--vinho); color:#fff; border-radius:50%; font-size:8pt; font-weight:bold;
+  display:flex; align-items:center; justify-content:center;
+}
+
+.selo{ display:inline-block; border-radius:999px; padding:.3mm 2mm; font-size:7.5pt; font-weight:bold; }
+.s-livre{ background:#E0EDE5; color:var(--verde); }
+.s-reservado{ background:var(--ouro-fraco); color:var(--ambar); }
+.s-vendido{ background:#F5E0E0; color:var(--verm); }
+.s-projeto{ background:#EFE4F2; color:#5B2166; }
+.s-indisp{ background:var(--papel); color:var(--cinza); }
+
+footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9mm; font-size:8pt; color:var(--cinza); }
+.quebra{ break-before:page; }
+
+@media print{
+  body{ background:#fff; }
+  .barra{ display:none !important; }
+  .folha{ width:auto; min-height:0; margin:0; padding:0 16mm; box-shadow:none; }
+  .topo{ margin-top:-14mm; }
+}
+</style>
+</head>
+<body>
+
+<div class="barra">
+  <button class="btn" onclick="window.print()">Imprimir / salvar em PDF</button>
+  <span>Na caixa de impressão: papel A4, margens padrão e &ldquo;Gráficos de fundo&rdquo; ligado.</span>
+</div>
+
+<article class="folha">
+  <div class="topo"></div>
+
+  <header class="capa">
+    <p class="eyebrow">Ponzoni &middot; Ferramenta de vendas</p>
+    <h1>Manual do corretor</h1>
+    <p class="sub">Espelho de lotes, simulação de condições e proposta pronta para o cliente.</p>
+  </header>
+
+  <h2><span class="n">1</span> Entrar</h2>
+  <p>
+    O endereço é <code>selling-tool-ponzoni.vercel.app</code>. A conta é criada
+    pela administração: você recebe o e-mail cadastrado e define a senha no
+    primeiro acesso. <strong>Não existe cadastro por conta própria.</strong>
+  </p>
+  <p>
+    A ferramenta funciona no computador e no celular. Em reunião com o
+    cliente, o mais confortável é o notebook: o simulador e o comparativo de
+    opções são tabelas largas.
+  </p>
+
+  <h2><span class="n">2</span> O que você enxerga</h2>
+  <p>
+    Cada corretor trabalha na própria carteira. Você vê <strong>as propostas,
+    os clientes e os contratos que você mesmo cadastrou</strong>, e não os dos
+    colegas. A regra vale nos dois sentidos: ninguém vê os seus.
+  </p>
+  <table class="t">
+    <thead><tr><th>Compartilhado com todo o time</th><th>Só seu</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Empreendimentos, lotes, mapa, tabela de preços e condições de pagamento</td>
+        <td>Propostas, clientes e contratos que você criou</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Três informações são da administração e não aparecem para você: o
+    <strong>nome do comprador</strong> de cada lote, o <strong>VGV</strong> e o
+    <strong>preço de lotes vendidos ou não disponíveis</strong>. Os lotes que
+    você pode vender mostram o preço normalmente.
+  </p>
+
+  <h2><span class="n">3</span> Espelho de vendas</h2>
+  <p>
+    É a lista de todos os lotes do empreendimento, com área, preço de tabela,
+    R$/m² e situação. Troque de empreendimento no seletor do topo. A busca
+    encontra pelo número do lote, e o filtro deixa ver só um status por vez.
+  </p>
+  <table class="t">
+    <thead><tr><th>Status</th><th>O que significa</th></tr></thead>
+    <tbody>
+      <tr><td><span class="selo s-livre">Livre</span></td><td>disponível para venda</td></tr>
+      <tr><td><span class="selo s-reservado">Reservado</span></td><td>em negociação com alguém; confirme com a administração antes de oferecer</td></tr>
+      <tr><td><span class="selo s-vendido">Vendido</span></td><td>fora da prateleira</td></tr>
+      <tr><td><span class="selo s-projeto">Projeto</span></td><td>lote com projeto em andamento, nem livre nem vendido</td></tr>
+      <tr><td><span class="selo s-indisp">Não disponível</span></td><td>fora de venda por decisão da casa</td></tr>
+    </tbody>
+  </table>
+  <div class="caixa">
+    <span class="rot">A situação do lote muda fora da ferramenta</span>
+    <p>
+      Status e comprador saem da planilha de vendas que a administração
+      mantém, e é ela que alimenta o mapa público. Você consulta; quem altera
+      é a administração. Para reservar um lote, avise a administração.
+    </p>
+  </div>
+
+  <h3>Mapa de lotes</h3>
+  <p>
+    A aba <strong>Mapa de lotes</strong> abre o mesmo mapa interativo que está
+    no site do empreendimento, com as cores por situação. É a forma mais rápida
+    de mostrar ao cliente onde fica o terreno e o que há em volta.
+  </p>
+
+  <h2><span class="n">4</span> Montar uma proposta</h2>
+  <ol class="passos">
+    <li><strong>Propostas &rarr; Nova proposta.</strong> Escolha o empreendimento.</li>
+    <li>
+      <strong>Cliente.</strong> Selecione um cliente já cadastrado seu ou
+      digite o nome de um novo. O cadastro completo (documento, telefone,
+      e-mail) pode ser preenchido depois, dentro da proposta.
+    </li>
+    <li>
+      <strong>Terrenos.</strong> Clique nos lotes. Dá para escolher mais de um;
+      o rodapé soma área e valor de tabela.
+    </li>
+    <li>
+      <strong>Opções de parcelamento.</strong> Marque quantas quiser: cada uma
+      vira uma aba no simulador e uma seção no PDF. A ordem em que você clica é
+      a ordem em que aparecem. Elas vêm em duas listas, <em>Da tabela</em> (a
+      política comercial da casa) e <em>Favoritas do time</em>.
+    </li>
+    <li>
+      <strong>Montar opção personalizada</strong>, se o cliente pediu algo que
+      não está na tabela: entrada em percentual, número de mensais e reforços
+      periódicos. A prévia mostra a conta sem correção, que é a que se faz de
+      cabeça.
+    </li>
+    <li><strong>Criar proposta.</strong> Você cai direto no simulador.</li>
+  </ol>
+
+  <h2><span class="n">5</span> O simulador</h2>
+  <p>
+    É onde a proposta é ajustada com o cliente na frente. Cada aba é uma opção
+    de parcelamento; o <strong>comparativo</strong> no topo põe todas lado a
+    lado, com valor total, valor presente e parcela.
+  </p>
+
+  <h3>Blocos</h3>
+  <p>
+    Cada opção é uma lista de blocos: <em>entrada</em>, <em>36x corrigidas pelo
+    INCC</em>, <em>reforços semestrais</em>. Em cada bloco você mexe no
+    percentual ou no valor, no número de parcelas, no mês do primeiro
+    vencimento e na periodicidade.
+  </p>
+  <p>
+    Blocos podem correr em paralelo: nada impede que as mensais e os reforços
+    comecem no mesmo mês. É assim que o cliente paga as duas coisas somadas
+    naquele mês, e o comparativo mostra isso na coluna de maior parcela.
+  </p>
+
+  <h3>Reforços derrubam a mensal sem mudar o total</h3>
+  <p>
+    Entrada e reforços são valores fixos, e as mensais absorvem o que sobra.
+    Tirar uma parte para reforços semestrais reduz bastante a prestação sem
+    alterar o valor do negócio: o dinheiro só muda de lugar no calendário. É o
+    ajuste mais útil quando o cliente diz que a parcela não cabe.
+  </p>
+
+  <div class="caixa aviso">
+    <span class="rot">A conta precisa fechar</span>
+    <p>
+      Se os blocos não somam o valor negociado, o cronograma não quita o
+      terreno e aparece um aviso amarelo. O botão <strong>Fechar a conta</strong>
+      resolve, jogando a diferença no último bloco. Nunca envie uma proposta com
+      esse aviso aceso.
+    </p>
+  </div>
+
+  <h3>Salvar antes de gerar</h3>
+  <p>
+    O PDF e a planilha leem o que está <strong>salvo</strong>, não o que está na
+    tela. Enquanto houver alteração pendente, os botões somem e aparece
+    &ldquo;Salve para gerar PDF/XLSX&rdquo;. Salve e eles voltam.
+  </p>
+
+  <h2><span class="n">6</span> Entregar ao cliente</h2>
+  <table class="t">
+    <thead><tr><th>Botão</th><th>Para quê</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Proposta em PDF</strong></td>
+        <td>
+          A folha para o cliente, com todas as opções, o cronograma de cada uma
+          e o mapa com os lotes destacados. Abre numa aba nova: use
+          <em>Imprimir</em> e salve como PDF. Na caixa de impressão, deixe
+          &ldquo;Gráficos de fundo&rdquo; ligado, senão os fundos coloridos somem.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>XLSX</strong></td>
+        <td>
+          Planilha de uso interno, com o fluxo completo parcela a parcela. Serve
+          para levar à mesa de negociação, não para mandar ao cliente.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="caixa">
+    <span class="rot">O que a proposta não é</span>
+    <p>
+      A folha traz, no rodapé, a cláusula de que a proposta não é reserva nem
+      contrato: a venda depende de aprovação da diretoria e, quando há
+      financiamento, de análise de crédito. Não prometa reserva de lote nem
+      prazo de aprovação.
+    </p>
+  </div>
+
+  <h2><span class="n">7</span> Clientes</h2>
+  <p>
+    A aba <strong>Clientes</strong> lista os seus, com as propostas de cada um.
+    O lápis edita em linha. Os mesmos dados também podem ser ajustados de
+    dentro da proposta, no cartão Cliente, o que é mais prático quando o erro
+    aparece no meio da conversa.
+  </p>
+  <p>
+    Um cliente com proposta não pode ser apagado. Se precisar, apague ou
+    reatribua as propostas antes.
+  </p>
+
+  <h2><span class="n">8</span> Contratos e o que há a receber</h2>
+  <p>
+    Quando a venda fecha, ela vira um <strong>contrato</strong>, que acompanha
+    os pagamentos. Você vê os contratos que cadastrou e, em
+    <strong>A receber</strong>, o que vence neles.
+  </p>
+  <p>
+    A partir de uma proposta salva, o botão <strong>Gerar contrato</strong>
+    copia o cronograma da opção aberta. A emissão dos boletos e a baixa dos
+    pagamentos são feitas pela administração.
+  </p>
+
+  <h2><span class="n">9</span> Quando algo dá errado</h2>
+  <table class="t">
+    <thead><tr><th>O que aparece</th><th>O que fazer</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>&ldquo;O servidor não respondeu e nada foi gravado&rdquo;</td>
+        <td>
+          Nada se perdeu e nada foi gravado pela metade. Tente salvar de novo.
+          Se repetir, avise a administração.
+        </td>
+      </tr>
+      <tr>
+        <td>Aviso amarelo de conta que não fecha</td>
+        <td>Use <strong>Fechar a conta</strong> antes de gerar o PDF.</td>
+      </tr>
+      <tr>
+        <td>&ldquo;Salve para gerar PDF/XLSX&rdquo;</td>
+        <td>Há alteração não salva. Clique em Salvar.</td>
+      </tr>
+      <tr>
+        <td>Um lote que você esperava ver não está na lista</td>
+        <td>
+          A lista de nova proposta traz só lotes livres e reservados. Se mudou
+          de situação, confirme com a administração.
+        </td>
+      </tr>
+      <tr>
+        <td>Uma proposta sua sumiu</td>
+        <td>
+          Confira se está logado com a sua conta. Você só enxerga o que
+          cadastrou.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer>
+    <p>
+      <strong>Ponzoni &middot; Ferramenta de vendas.</strong> Uso interno. Dúvidas
+      sobre situação de lote, preço, condição especial ou emissão de boleto vão
+      para a administração.
+    </p>
+  </footer>
+</article>
+
+</body>
+</html>

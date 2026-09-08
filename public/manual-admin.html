@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Manual do administrador — Ferramenta de vendas Ponzoni</title>
+<style>
+:root{
+  --vinho:#7C2A28; --vinho-fraco:#F4E7E5; --ouro:#E0A221; --ouro-fraco:#FBF1DC;
+  --tinta:#22201F; --cinza:#6B6662; --linha:#DDD7D1; --linha-forte:#C9C2BB;
+  --papel:#F3F1EF; --verde:#276B4C; --verm:#96262C; --ambar:#8A5B0B;
+}
+@page{ size:A4 portrait; margin:14mm 0 12mm; }
+body{ background:#e9e6e2; margin:0; }
+
+.barra{
+  position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:14px;
+  padding:10px 16px; background:#fff; border-bottom:1px solid var(--linha);
+  font-family:Arial,Helvetica,sans-serif;
+}
+.btn{
+  display:inline-flex; align-items:center; gap:7px; background:var(--vinho); color:#fff;
+  border:none; border-radius:6px; padding:8px 14px; font-size:14px; font-weight:700; cursor:pointer;
+}
+.barra span{ font-size:12px; color:var(--cinza); }
+
+.folha{
+  width:210mm; min-height:297mm; margin:16px auto; background:#fff; padding:0 16mm 14mm;
+  box-shadow:0 2px 18px rgba(0,0,0,.12); color:var(--tinta);
+  font-family:Arial,"Helvetica Neue",Helvetica,sans-serif; font-size:10pt; line-height:1.55;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact;
+}
+.topo{ height:3.2mm; background:var(--vinho); margin:0 -16mm 7mm; }
+
+header.capa{ border-bottom:.6mm solid var(--vinho); padding-bottom:4mm; margin-bottom:8mm; }
+.eyebrow{ font-size:7.5pt; font-weight:bold; letter-spacing:.16em; text-transform:uppercase; color:var(--vinho); margin:0; }
+header.capa h1{ font-size:26pt; line-height:1.05; margin:2mm 0 0; letter-spacing:-.01em; }
+header.capa .sub{ font-size:11pt; color:var(--cinza); margin:2mm 0 0; }
+
+h2{
+  font-size:8.5pt; font-weight:bold; letter-spacing:.13em; text-transform:uppercase; color:#fff;
+  background:var(--vinho); padding:1.8mm 3mm; margin:8mm 0 4mm; display:flex; gap:2mm; align-items:center;
+  break-after:avoid;
+}
+h2 .n{ color:var(--ouro); }
+h3{ font-size:10.5pt; margin:5mm 0 1.5mm; color:var(--vinho); break-after:avoid; }
+p{ margin:0 0 2.5mm; }
+ul,ol{ margin:0 0 3mm; padding-left:5mm; }
+li{ margin-bottom:1.2mm; }
+code{ font-family:Consolas,"Courier New",monospace; font-size:9pt; background:var(--papel); padding:.3mm 1.2mm; border-radius:1mm; }
+
+.t{ width:100%; border-collapse:collapse; font-size:9.5pt; margin:0 0 3mm; }
+.t th{
+  text-align:left; font-size:7.5pt; letter-spacing:.09em; text-transform:uppercase; color:var(--cinza);
+  font-weight:bold; padding:1.8mm 2mm; border-bottom:.4mm solid var(--linha-forte); background:var(--papel);
+}
+.t td{ padding:1.8mm 2mm; border-bottom:.25mm solid var(--linha); vertical-align:top; }
+.t tr{ break-inside:avoid; }
+.t .d{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+.caixa{ border-left:.9mm solid var(--ouro); background:var(--ouro-fraco); padding:3mm 4mm; margin:0 0 4mm; break-inside:avoid; }
+.caixa.aviso{ border-color:var(--verm); background:#F5E0E0; }
+.caixa.ok{ border-color:var(--verde); background:#E0EDE5; }
+.caixa p:last-child{ margin-bottom:0; }
+.caixa .rot{ font-size:7.5pt; font-weight:bold; letter-spacing:.12em; text-transform:uppercase; display:block; margin-bottom:1.5mm; color:var(--ambar); }
+.caixa.aviso .rot{ color:var(--verm); }
+.caixa.ok .rot{ color:var(--verde); }
+
+.passos{ counter-reset:passo; list-style:none; padding:0; }
+.passos li{ counter-increment:passo; position:relative; padding-left:8mm; margin-bottom:2.5mm; break-inside:avoid; }
+.passos li::before{
+  content:counter(passo); position:absolute; left:0; top:.2mm; width:5.5mm; height:5.5mm;
+  background:var(--vinho); color:#fff; border-radius:50%; font-size:8pt; font-weight:bold;
+  display:flex; align-items:center; justify-content:center;
+}
+
+.check{ list-style:none; padding:0; }
+.check li{ position:relative; padding-left:6mm; margin-bottom:1.8mm; break-inside:avoid; }
+.check li::before{
+  content:""; position:absolute; left:0; top:1.2mm; width:3.2mm; height:3.2mm;
+  border:.4mm solid var(--vinho); border-radius:.8mm;
+}
+
+footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9mm; font-size:8pt; color:var(--cinza); }
+.quebra{ break-before:page; }
+
+@media print{
+  body{ background:#fff; }
+  .barra{ display:none !important; }
+  .folha{ width:auto; min-height:0; margin:0; padding:0 16mm; box-shadow:none; }
+  .topo{ margin-top:-14mm; }
+}
+</style>
+</head>
+<body>
+
+<div class="barra">
+  <button class="btn" onclick="window.print()">Imprimir / salvar em PDF</button>
+  <span>Na caixa de impressão: papel A4, margens padrão e &ldquo;Gráficos de fundo&rdquo; ligado.</span>
+</div>
+
+<article class="folha">
+  <div class="topo"></div>
+
+  <header class="capa">
+    <p class="eyebrow">Ponzoni &middot; Ferramenta de vendas</p>
+    <h1>Manual do administrador</h1>
+    <p class="sub">Contratos, correção pelo INCC, cobrança do mês e gestão de acessos.</p>
+  </header>
+
+  <p>
+    O administrador enxerga tudo o que a ferramenta guarda e é o único que
+    mexe no que vale para a casa inteira: espelho, tabela de preços, índices e
+    contas de usuário. Este manual cobre o que só você faz. O uso comercial do
+    dia a dia está no <strong>Manual do corretor</strong>.
+  </p>
+
+  <h2><span class="n">1</span> A rotina do mês</h2>
+  <p>
+    Uma sequência por mês, sempre nesta ordem. O passo 1 é o que faz o resto
+    sair certo.
+  </p>
+  <ul class="check">
+    <li><strong>Atualizar os índices</strong> (Índices &rarr; Atualizar INCC-M), depois que a FGV publica o mês fechado.</li>
+    <li><strong>Conferir A receber</strong> na competência do mês: nenhuma linha pode estar marcada como estimada.</li>
+    <li><strong>Exportar o XLSX</strong> e emitir os boletos no banco.</li>
+    <li><strong>Dar baixa</strong> nos pagamentos recebidos.</li>
+    <li><strong>Sincronizar o espelho</strong> com o Google Sheets, se houve venda nova.</li>
+  </ul>
+
+  <h2><span class="n">2</span> Índices mensais</h2>
+  <p>
+    É daqui que sai a correção das parcelas de contrato. A tela guarda a
+    <strong>série histórica</strong>: um número por índice por mês. Não confunda
+    com a taxa que aparece nas propostas, que é só projeção.
+  </p>
+  <table class="t">
+    <thead><tr><th>Onde</th><th>O que é</th><th>Serve para</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Série mensal (a grade ano &times; mês)</td>
+        <td>o INCC que a FGV publicou em cada mês</td>
+        <td><strong>cobrar</strong> — é o valor do boleto</td>
+      </tr>
+      <tr>
+        <td>Taxa mensal de projeção</td>
+        <td>derivada do acumulado em 12 meses da série</td>
+        <td><strong>simular</strong> — projeta a proposta</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>O botão do Banco Central</h3>
+  <p>
+    <strong>Atualizar INCC-M</strong> busca a série no sistema do Banco Central,
+    que espelha o número publicado pela FGV. <strong>Atualizar todos os
+    índices</strong> faz o mesmo para IGP-M, IPCA, INPC, IGP-DI, Selic e CDI. O
+    campo &ldquo;buscar desde&rdquo; controla o quanto de histórico vem junto.
+  </p>
+  <ul>
+    <li>
+      Por padrão o botão <strong>só preenche o que falta</strong>: mês já
+      lançado fica como está. Se você corrigiu um número à mão, ele não é
+      desfeito.
+    </li>
+    <li>
+      Marque <strong>Substituir os meses já lançados</strong> só quando quiser
+      que o número do Banco Central prevaleça sobre o que está gravado.
+    </li>
+    <li>
+      <strong>O mês corrente nunca entra.</strong> Índices acumulados no mês
+      trazem o parcial até hoje, que não é a variação do mês fechado. O INCC de
+      setembro entra na atualização que você fizer em outubro, que é quando o
+      boleto de outubro sai.
+    </li>
+  </ul>
+  <p>
+    A TR e o CUB-RS não têm série mensal utilizável no Banco Central e
+    continuam sendo lançados à mão, no formulário abaixo da grade. Lançar de
+    novo a mesma competência substitui o número, que é como a prévia do INCC
+    vira o índice fechado.
+  </p>
+  <div class="caixa">
+    <span class="rot">Acumulado de 12 meses</span>
+    <p>
+      A taxa de projeção só se recalcula quando há 12 meses seguidos lançados,
+      sem buraco. Enquanto faltar mês, o cartão diz quantos faltam e a taxa
+      antiga continua valendo. É proposital: um acumulado de três meses
+      anualizado seria pior que o número da fonte.
+    </p>
+  </div>
+
+  <h2><span class="n">3</span> A receber e a emissão dos boletos</h2>
+  <p>
+    A tela mostra, para a competência escolhida, <strong>o que vence no mês
+    mais o que ficou em atraso</strong> — quem emite boleto precisa das duas
+    coisas juntas. Cada linha traz o valor original, o fator de correção, os
+    encargos e o valor final.
+  </p>
+  <p>
+    <strong>Exportar XLSX</strong> gera a planilha para o banco: sacado,
+    CPF/CNPJ, vencimento e valor, mais as colunas de origem do número, e uma
+    aba com as premissas de correção de cada contrato.
+  </p>
+  <div class="caixa aviso">
+    <span class="rot">Nunca emita boleto de linha estimada</span>
+    <p>
+      Parcela marcada com <code>~</code> na tela, ou com <strong>índice
+      estimado = SIM</strong> no XLSX, depende de um mês que ainda não foi
+      publicado: o valor foi calculado pela taxa de projeção e <strong>vai
+      mudar</strong>. Volte em Índices, lance o mês que falta e confira de novo.
+    </p>
+  </div>
+
+  <h2><span class="n">4</span> Contratos</h2>
+  <p>Um contrato entra de dois jeitos.</p>
+  <ol class="passos">
+    <li>
+      <strong>De uma proposta.</strong> Na proposta salva, o botão
+      <em>Gerar contrato</em> copia o cronograma da opção aberta, já com os
+      valores nominais e a mesma convenção de correção que foi vendida.
+    </li>
+    <li>
+      <strong>Cadastro manual</strong> (Contratos &rarr; Novo contrato), para as
+      vendas antigas: entrada, mensais e reforços, do jeito que está escrito no
+      papel. A prévia mostra o cronograma antes de gravar, com a data de cada
+      grupo.
+    </li>
+  </ol>
+
+  <h3>Os campos que mudam o valor do boleto</h3>
+  <table class="t">
+    <thead><tr><th>Campo</th><th>O que faz</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Data-base</strong></td>
+        <td>marco zero da correção: o índice acumulado conta a partir dela</td>
+      </tr>
+      <tr>
+        <td><strong>Defasagem</strong></td>
+        <td>
+          quais índices entram. <strong>1</strong> é o usual: a parcela usa os
+          índices até o mês anterior ao vencimento, todos já publicados quando o
+          boleto sai. Com <strong>0</strong> a régua anda um mês para frente e
+          exige o índice do próprio mês do vencimento.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>Primeira parcela</strong></td>
+        <td>
+          se ela já vem corrigida ou sai sem correção. Contrato gerado de
+          proposta herda o que foi vendido; não mexa sem conferir o papel.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>1ª mensal (meses da data-base)</strong></td>
+        <td>
+          no cadastro manual: <strong>0</strong> coloca a primeira mensal no
+          mesmo mês da entrada, <strong>1</strong> no mês seguinte. O campo
+          mostra a data que produz — confira antes de criar.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="caixa aviso">
+    <span class="rot">Mexer nesses campos muda todos os boletos</span>
+    <p>
+      Alterar data-base, defasagem ou a convenção da primeira parcela recalcula
+      o contrato inteiro. Antes de salvar um ajuste, olhe a coluna
+      <strong>Fator</strong> no cronograma: embaixo dela está o intervalo de
+      índices usados, e passar o mouse abre a conta mês a mês. Se o intervalo
+      não bate com o contrato, o ajuste está errado.
+    </p>
+  </div>
+
+  <h3>Cronograma e baixa de pagamento</h3>
+  <p>
+    Cada parcela mostra o valor original, o fator, o corrigido e o que cobrar
+    hoje. Parcela vencida entra com multa e juros de mora, calculados até a
+    data. O botão <strong>Baixar</strong> registra o pagamento; o lápis numa
+    parcela já paga reabre a baixa para corrigir data, valor ou forma.
+  </p>
+  <p>
+    Para contrato antigo com muitas parcelas quitadas, marque as caixas (ou use
+    <em>Selecionar as N vencidas</em>) e dê baixa em lote. Há dois modos:
+  </p>
+  <ul>
+    <li>
+      <strong>Cada uma no seu vencimento</strong> — o certo para venda antiga.
+      Datar tudo com hoje marcaria como paga hoje uma parcela quitada há dois
+      anos, e o contrato exibiria encargos de atraso que nunca existiram.
+    </li>
+    <li><strong>Uma data para todas</strong> — quando o cliente quitou um bloco de uma vez.</li>
+  </ul>
+  <p>
+    O valor gravado é o que a parcela valia na data do pagamento. Quando o
+    contrato quita, ele passa sozinho para <em>Quitado</em>; desfazer uma baixa
+    o traz de volta para <em>Ativo</em>.
+  </p>
+
+  <h3>Demonstrativo e extrato</h3>
+  <p>
+    <strong>Demonstrativo</strong> é a folha A4 para o cliente: posição atual e
+    cronograma com o fator de cada parcela, para responder à pergunta de por que
+    a parcela subiu. <strong>XLSX</strong> é o extrato interno completo.
+  </p>
+
+  <h2><span class="n">5</span> Espelho de vendas</h2>
+  <p>
+    A fonte de verdade de situação e comprador é o <strong>Google Sheets</strong>
+    de cada empreendimento, que também alimenta o mapa público. A ferramenta lê
+    dele; não escreve.
+  </p>
+  <p>
+    <strong>Sincronizar com o Sheets</strong> traz situação, comprador, área e
+    tipo, e cria os lotes que não existirem. O preço só é sobrescrito quando a
+    planilha traz um: lote vendido costuma vir com a célula de valor vazia e não
+    pode zerar o preço. O espelho do Florescer não tem coluna de valor, e ali a
+    sincronização não mexe em preço nenhum.
+  </p>
+  <p>
+    A coluna <strong>Observação</strong> é campo livre da ferramenta e a
+    sincronização não encosta nela. Ela aparece só no espelho, nunca na
+    proposta do cliente.
+  </p>
+
+  <h2><span class="n">6</span> Usuários e acessos</h2>
+  <table class="t">
+    <thead><tr><th>Papel</th><th>Enxerga</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>corretor</strong><br><span style="color:var(--cinza)">padrão de toda conta nova</span></td>
+        <td>
+          o catálogo inteiro (lotes, mapa, preços, condições) e as propostas,
+          clientes e contratos que ele mesmo criou. Não vê o nome do comprador,
+          o VGV nem o preço de lote vendido ou não disponível
+        </td>
+      </tr>
+      <tr>
+        <td><strong>admin</strong></td>
+        <td>tudo, e é o único que edita espelho, tabela de preços, índices e contas</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>O cadastro por conta própria fica fechado.</strong> As contas são
+    criadas no painel do Supabase, em Authentication &rarr; Users &rarr; Add
+    user. Mantenha o provedor de e-mail ligado e apenas o
+    <em>Allow new users to sign up</em> desligado: são interruptores diferentes
+    na mesma tela, e desligar o errado derruba o login de todo mundo.
+  </p>
+  <p>
+    Toda conta nova nasce como corretor. Para promover alguém a administrador,
+    peça ao responsável técnico — é uma alteração no banco, não uma tela da
+    ferramenta.
+  </p>
+  <div class="caixa ok">
+    <span class="rot">Quem cadastrou o quê</span>
+    <p>
+      As listagens de propostas e contratos trazem a coluna com o nome de quem
+      criou, e o mesmo nome aparece no topo do simulador e do contrato. É por
+      ali que se acompanha a carteira de cada corretor.
+    </p>
+  </div>
+
+  <h2><span class="n">7</span> Tabela de preços e condições</h2>
+  <p>
+    Cada empreendimento tem uma tabela vigente e uma condição por coluna dela.
+    O <strong>preço de tabela</strong> do lote é sempre o número que o vendedor
+    abre com o cliente, e as demais condições se contam a partir dele — para
+    mais ou para menos, conforme o empreendimento.
+  </p>
+  <p>
+    As condições aparecem em duas listas na criação da proposta:
+    <strong>Da tabela</strong>, que é política comercial e só administrador
+    altera, e <strong>Favoritas do time</strong>, que qualquer um salva a partir
+    de uma estrutura que deu certo. Favorita nunca vira condição oficial.
+  </p>
+  <p>
+    Ao revisar a tabela de preços, revise também as taxas de referência dos
+    índices.
+  </p>
+
+  <h2><span class="n">8</span> Quando algo dá errado</h2>
+  <table class="t">
+    <thead><tr><th>Sintoma</th><th>Causa provável</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Parcelas aparecem com <code>~</code> e valor estranho</td>
+        <td>falta lançar o índice de algum mês do intervalo. Índices &rarr; Atualizar</td>
+      </tr>
+      <tr>
+        <td>O fator usa um mês que você não esperava</td>
+        <td>a defasagem do contrato está diferente de 1. Confira em Ajustes</td>
+      </tr>
+      <tr>
+        <td>Aviso de que a soma das parcelas não fecha o valor do contrato</td>
+        <td>ajuste uma parcela ou o valor total em Ajustes</td>
+      </tr>
+      <tr>
+        <td>Sincronização diz que não pode sincronizar</td>
+        <td>a conta usada não é administrador</td>
+      </tr>
+      <tr>
+        <td>&ldquo;O servidor não respondeu e nada foi gravado&rdquo;</td>
+        <td>nada foi gravado pela metade; tente de novo</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <footer>
+    <p>
+      <strong>Ponzoni &middot; Ferramenta de vendas.</strong> Uso interno.
+      Este manual acompanha a ferramenta: quando o comportamento mudar, ele é
+      atualizado junto.
+    </p>
+  </footer>
+</article>
+
+</body>
+</html>

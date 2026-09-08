@@ -74,6 +74,19 @@ export default async function Cabecalho() {
         </nav>
 
         <div className="ml-auto flex items-center gap-3 shrink-0">
+          {/* o manual acompanha o papel de quem está logado */}
+          <a
+            href={
+              perfil?.papel === "admin"
+                ? "/manual-admin.html"
+                : "/manual-corretor.html"
+            }
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-tinta-suave px-3 py-1.5 rounded-md hover:bg-papel-alt whitespace-nowrap hidden sm:inline"
+          >
+            Manual
+          </a>
           <span className="text-sm text-cinza hidden md:inline">
             {perfil?.nome ?? user?.email}
             {perfil?.papel === "admin" && (
