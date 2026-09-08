@@ -4,12 +4,20 @@ import SairBotao from "./SairBotao";
 
 const MARCA = "industrial-ponzoni";
 
+/**
+ * `soAdmin` esconde do corretor o que ele não administra. A RLS é quem de
+ * fato barra o acesso (migration 26) — isto evita oferecer uma tela que
+ * responderia vazia.
+ */
 const LINKS = [
   { href: "/", rotulo: "Início" },
   { href: "/mapa", rotulo: "Mapa de lotes" },
   { href: "/espelho", rotulo: "Espelho de vendas" },
   { href: "/propostas", rotulo: "Propostas" },
+  { href: "/contratos", rotulo: "Contratos" },
+  { href: "/cobranca", rotulo: "A receber" },
   { href: "/clientes", rotulo: "Clientes" },
+  { href: "/indices", rotulo: "Índices", soAdmin: true },
 ];
 
 export default async function Cabecalho() {
@@ -20,7 +28,7 @@ export default async function Cabecalho() {
 
   const [{ data: perfil }, { data: marca }] = await Promise.all([
     user
-      ? supabase.from("perfis").select("nome, papel").eq("id", user.id).single()
+      ? supabase.from("perfis").select("nome, papel").eq("id", user.id).maybeSingle()
       : Promise.resolve({ data: null }),
     // A ferramenta é da casa e atende vários empreendimentos, então o topo
     // carrega sempre a marca Ponzoni — o logo do empreendimento aparece nas
@@ -54,7 +62,7 @@ export default async function Cabecalho() {
         </Link>
 
         <nav className="flex items-center gap-1 overflow-x-auto">
-          {LINKS.map((l) => (
+          {LINKS.filter((l) => !l.soAdmin || perfil?.papel === "admin").map((l) => (
             <Link
               key={l.href}
               href={l.href}
@@ -68,6 +76,9 @@ export default async function Cabecalho() {
         <div className="ml-auto flex items-center gap-3 shrink-0">
           <span className="text-sm text-cinza hidden md:inline">
             {perfil?.nome ?? user?.email}
+            {perfil?.papel === "admin" && (
+              <span className="selo selo-marca ml-2 align-middle">admin</span>
+            )}
           </span>
           <SairBotao />
         </div>

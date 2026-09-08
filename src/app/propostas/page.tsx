@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import Cabecalho from "@/components/Cabecalho";
 import { SeloProposta } from "@/components/SeloStatus";
 import { createClient } from "@/lib/supabase/server";
+import { mapaDePerfis, nomeCurto } from "@/lib/supabase/perfil";
 import { dataBR, moeda, pct } from "@/lib/formato";
 import { compararLote } from "@/lib/ordenacao";
 
@@ -14,6 +15,7 @@ interface Linha {
   titulo: string | null;
   status: string;
   criado_em: string;
+  criado_por: string | null;
   resultado: {
     valorTabela?: number;
     valorNegociado?: number;
@@ -33,11 +35,13 @@ export default async function PropostasPage() {
   const { data } = await supabase
     .from("propostas")
     .select(
-      "id, codigo, titulo, status, criado_em, resultado, clientes(nome), empreendimentos(nome), proposta_lotes(quadra, numero), proposta_cenarios(id)"
+      "id, codigo, titulo, status, criado_em, criado_por, resultado, clientes(nome), empreendimentos(nome), proposta_lotes(quadra, numero), proposta_cenarios(id)"
     )
     .order("criado_em", { ascending: false });
 
   const propostas = (data ?? []) as unknown as Linha[];
+  // a RLS já filtra: corretor recebe só as próprias
+  const autores = await mapaDePerfis();
 
   return (
     <>
@@ -67,6 +71,7 @@ export default async function PropostasPage() {
                 <th className="num">Prazo</th>
                 <th className="num">Opções</th>
                 <th>Status</th>
+                <th>Criada por</th>
                 <th>Criada</th>
               </tr>
             </thead>
@@ -104,12 +109,15 @@ export default async function PropostasPage() {
                   <td>
                     <SeloProposta status={p.status} />
                   </td>
+                  <td className="text-cinza whitespace-nowrap">
+                    {nomeCurto(autores.get(p.criado_por ?? ""))}
+                  </td>
                   <td className="text-cinza whitespace-nowrap">{dataBR(p.criado_em)}</td>
                 </tr>
               ))}
               {propostas.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="text-center text-cinza py-8">
+                  <td colSpan={12} className="text-center text-cinza py-8">
                     Nenhuma proposta ainda.
                   </td>
                 </tr>

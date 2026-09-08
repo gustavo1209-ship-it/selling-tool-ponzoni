@@ -19,7 +19,7 @@ export default async function NovaPropostaPage() {
     await Promise.all([
       supabase.from("empreendimentos").select("*").eq("ativo", true).order("nome"),
       supabase
-        .from("lotes")
+        .from("lotes_visiveis")
         .select("*")
         .in("status", ["livre", "reservado"]),
       supabase.from("tabelas_preco").select("*").eq("ativa", true),

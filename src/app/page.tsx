@@ -3,6 +3,7 @@ import { ArrowRight, FileText, Map, Plus } from "lucide-react";
 import Cabecalho from "@/components/Cabecalho";
 import { SeloProposta } from "@/components/SeloStatus";
 import { createClient } from "@/lib/supabase/server";
+import { perfilAtual } from "@/lib/supabase/perfil";
 import { dataBR, moeda, moedaCurta, num } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
@@ -20,11 +21,15 @@ interface LinhaProposta {
 
 export default async function Inicio() {
   const supabase = await createClient();
+  // VGV é número da casa, não do corretor
+  const perfil = await perfilAtual();
 
   const [{ data: empreendimentos }, { data: lotes }, { data: propostas }] =
     await Promise.all([
       supabase.from("empreendimentos").select("*").eq("ativo", true).order("nome"),
-      supabase.from("lotes").select("status, preco_tabela, area_m2, empreendimento_id"),
+      supabase
+        .from("lotes_visiveis")
+        .select("status, preco_tabela, area_m2, empreendimento_id"),
       supabase
         .from("propostas")
         .select(
@@ -79,10 +84,12 @@ export default async function Inicio() {
                   </div>
                 </dl>
 
-                <div className="bg-vinho-fraco rounded-md px-3 py-2">
-                  <p className="eyebrow">VGV disponível (tabela)</p>
-                  <p className="serif text-xl text-vinho tabular">{moedaCurta(vgv)}</p>
-                </div>
+                {perfil?.ehAdmin && (
+                  <div className="bg-vinho-fraco rounded-md px-3 py-2">
+                    <p className="eyebrow">VGV disponível (tabela)</p>
+                    <p className="serif text-xl text-vinho tabular">{moedaCurta(vgv)}</p>
+                  </div>
+                )}
 
                 <div className="flex gap-2 mt-auto">
                   <Link href="/espelho" className="btn btn-secundario flex-1">

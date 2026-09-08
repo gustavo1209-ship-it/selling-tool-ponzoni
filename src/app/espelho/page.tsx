@@ -1,6 +1,7 @@
 import Cabecalho from "@/components/Cabecalho";
 import EspelhoTabela from "@/components/EspelhoTabela";
 import { createClient } from "@/lib/supabase/server";
+import { perfilAtual } from "@/lib/supabase/perfil";
 import { ordenarLotes } from "@/lib/ordenacao";
 import type { Empreendimento, Lote, TabelaPreco } from "@/lib/db/tipos";
 import type { CondicaoPagamento } from "@/lib/db/tipos";
@@ -14,6 +15,7 @@ export default async function EspelhoPage({
 }) {
   const { e: slug } = await searchParams;
   const supabase = await createClient();
+  const perfil = await perfilAtual();
 
   const { data: empreendimentos } = await supabase
     .from("empreendimentos")
@@ -37,7 +39,7 @@ export default async function EspelhoPage({
 
   const [{ data: lotes }, { data: tabela }] = await Promise.all([
     supabase
-      .from("lotes")
+      .from("lotes_visiveis")
       .select("*")
       .eq("empreendimento_id", atual.id),
     supabase
@@ -69,6 +71,7 @@ export default async function EspelhoPage({
           lotes={ordenarLotes((lotes ?? []) as Lote[])}
           tabela={(tabela ?? null) as TabelaPreco | null}
           condicoes={(condicoes ?? []) as unknown as CondicaoPagamento[]}
+          ehAdmin={perfil?.ehAdmin ?? false}
         />
       </main>
     </>

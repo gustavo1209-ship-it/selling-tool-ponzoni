@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Cabecalho from "@/components/Cabecalho";
 import Simulador from "@/components/Simulador";
+import { mapaDePerfis } from "@/lib/supabase/perfil";
 import { createClient } from "@/lib/supabase/server";
 import { compararLote } from "@/lib/ordenacao";
 import type {
@@ -36,6 +37,8 @@ export default async function PropostaPage({
 
   if (!data) notFound();
 
+  const autores = await mapaDePerfis();
+
   const {
     empreendimentos: empreendimento,
     clientes: cliente,
@@ -56,7 +59,7 @@ export default async function PropostaPage({
     { data: indexadores },
   ] = await Promise.all([
       supabase
-        .from("lotes")
+        .from("lotes_visiveis")
         .select("*")
         .eq("empreendimento_id", proposta.empreendimento_id),
       proposta.tabela_preco_id
@@ -83,6 +86,7 @@ export default async function PropostaPage({
       <Cabecalho />
       <main className="max-w-[1500px] mx-auto px-5 py-8">
         <Simulador
+          autor={autores.get(proposta.criado_por ?? "") ?? null}
           proposta={proposta}
           empreendimento={empreendimento}
           cliente={cliente}

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { SeloLote } from "./SeloStatus";
 import { RefreshCw, Table2 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
@@ -43,12 +44,23 @@ export default function EspelhoTabela({
   lotes,
   tabela,
   condicoes,
+  ehAdmin,
 }: {
   empreendimentos: Empreendimento[];
   empreendimento: Empreendimento;
   lotes: Lote[];
   tabela: TabelaPreco | null;
   condicoes: CondicaoPagamento[];
+  /**
+   * Para o corretor o espelho é o catálogo de venda, em leitura, e sem duas
+   * informações que são da casa: o nome do comprador e o VGV.
+   *
+   * A tela não é o que protege — o comprador já vem nulo da view
+   * `lotes_visiveis` e a RLS recusa a escrita (migrations 26 e 28). O que se
+   * evita aqui é oferecer um campo que falharia ao gravar e uma coluna que
+   * só mostraria travessões.
+   */
+  ehAdmin: boolean;
 }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
@@ -169,11 +181,13 @@ export default function EspelhoTabela({
           <button
             className="btn btn-secundario"
             onClick={sincronizar}
-            disabled={sincronizando || !empreendimento.espelho_csv_url}
+            disabled={!ehAdmin || sincronizando || !empreendimento.espelho_csv_url}
             title={
-              empreendimento.espelho_csv_url
-                ? "Puxa status, comprador e preço da planilha publicada"
-                : "Sem URL de planilha configurada"
+              !ehAdmin
+                ? "Só a administração sincroniza o espelho"
+                : empreendimento.espelho_csv_url
+                  ? "Puxa status, comprador e preço da planilha publicada"
+                  : "Sem URL de planilha configurada"
             }
           >
             <RefreshCw size={15} className={sincronizando ? "animate-spin" : ""} />
@@ -217,16 +231,20 @@ export default function EspelhoTabela({
             <span className={`selo ${classe} mt-2`}>{lotes.length} no total</span>
           </div>
         ))}
-        <div className="cartao p-4">
-          <p className="eyebrow">VGV disponível</p>
-          <p className="serif text-2xl text-vinho tabular mt-1">{moedaCurta(resumo.vgv)}</p>
-          <p className="text-xs text-cinza mt-1">a preço de tabela</p>
-        </div>
+        {ehAdmin && (
+          <div className="cartao p-4">
+            <p className="eyebrow">VGV disponível</p>
+            <p className="serif text-2xl text-vinho tabular mt-1">{moedaCurta(resumo.vgv)}</p>
+            <p className="text-xs text-cinza mt-1">a preço de tabela</p>
+          </div>
+        )}
         <div className="cartao p-4">
           <p className="eyebrow">Área livre</p>
           <p className="serif text-2xl tabular mt-1">{num(resumo.areaLivre)}</p>
           <p className="text-xs text-cinza mt-1">
-            m² · média {precoM2(resumo.areaLivre ? resumo.vgv / resumo.areaLivre : 0)}
+            m²
+            {ehAdmin &&
+              ` · média ${precoM2(resumo.areaLivre ? resumo.vgv / resumo.areaLivre : 0)}`}
           </p>
         </div>
       </div>
@@ -288,7 +306,7 @@ export default function EspelhoTabela({
           <div className="flex items-center gap-2 flex-wrap">
             <input
               className="campo w-44"
-              placeholder="Buscar lote ou comprador"
+              placeholder={ehAdmin ? "Buscar lote ou comprador" : "Buscar lote"}
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
             />
@@ -317,7 +335,7 @@ export default function EspelhoTabela({
                 <th className="num">Preço de tabela</th>
                 <th className="num">R$/m²</th>
                 <th>Status</th>
-                <th>Comprador</th>
+                {ehAdmin && <th>Comprador</th>}
                 <th className="w-56">Observação</th>
               </tr>
             </thead>
@@ -338,41 +356,52 @@ export default function EspelhoTabela({
                       : "—"}
                   </td>
                   <td>
-                    <select
-                      className="campo w-auto py-1 text-xs"
-                      value={l.status}
-                      onChange={(e) =>
-                        alterar(l, { status: e.target.value as LoteStatus })
-                      }
-                    >
-                      {STATUS.map((s) => (
-                        <option key={s} value={s}>
-                          {ROTULO_STATUS_LOTE[s]}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="text-cinza">{l.comprador ?? "—"}</td>
-                  <td>
-                    {/* grava ao sair do campo, não a cada tecla */}
-                    <input
-                      key={`${l.id}-${l.observacao ?? ""}`}
-                      className="campo py-1 text-xs"
-                      defaultValue={l.observacao ?? ""}
-                      placeholder="—"
-                      onBlur={(e) => {
-                        const novo = e.target.value.trim() || null;
-                        if (novo !== (l.observacao ?? null)) {
-                          alterar(l, { observacao: novo });
+                    {ehAdmin ? (
+                      <select
+                        className="campo w-auto py-1 text-xs"
+                        value={l.status}
+                        onChange={(e) =>
+                          alterar(l, { status: e.target.value as LoteStatus })
                         }
-                      }}
-                    />
+                      >
+                        {STATUS.map((s) => (
+                          <option key={s} value={s}>
+                            {ROTULO_STATUS_LOTE[s]}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <SeloLote status={l.status} />
+                    )}
+                  </td>
+                  {ehAdmin && <td className="text-cinza">{l.comprador ?? "—"}</td>}
+                  <td>
+                    {ehAdmin ? (
+                      /* grava ao sair do campo, não a cada tecla */
+                      <input
+                        key={`${l.id}-${l.observacao ?? ""}`}
+                        className="campo py-1 text-xs"
+                        defaultValue={l.observacao ?? ""}
+                        placeholder="—"
+                        onBlur={(e) => {
+                          const novo = e.target.value.trim() || null;
+                          if (novo !== (l.observacao ?? null)) {
+                            alterar(l, { observacao: novo });
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span className="text-cinza text-xs">{l.observacao ?? "—"}</span>
+                    )}
                   </td>
                 </tr>
               ))}
               {visiveis.length === 0 && (
                 <tr>
-                  <td colSpan={temTipo ? 8 : 7} className="text-center text-cinza py-6">
+                  <td
+                    colSpan={6 + (temTipo ? 1 : 0) + (ehAdmin ? 1 : 0)}
+                    className="text-center text-cinza py-6"
+                  >
                     Nenhum lote com esse filtro.
                   </td>
                 </tr>

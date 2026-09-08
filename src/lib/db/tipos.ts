@@ -7,6 +7,7 @@ import type {
   PropostaStatus,
   Resultado,
 } from "@/lib/calc/tipos";
+import type { ContratoStatus } from "@/lib/contratos/tipos";
 
 export interface Perfil {
   id: string;
@@ -200,4 +201,71 @@ export interface PropostaCompleta extends Proposta {
   cliente: Cliente | null;
   lotes: PropostaLote[];
   cenarios: CenarioComBlocos[];
+}
+
+// ------------------------------------------------------------ contratos
+
+export interface Contrato {
+  id: string;
+  codigo: string;
+  empreendimento_id: string;
+  cliente_id: string | null;
+  /** De onde veio, quando veio de uma proposta aceita. */
+  proposta_id: string | null;
+  cenario_origem: string | null;
+  titulo: string | null;
+  status: ContratoStatus;
+  data_contrato: string;
+  /** Marco zero da correção monetária. */
+  data_base: string;
+  valor_total: number;
+  indexador: Indexador;
+  /** Meses que o contrato anda para trás ao buscar o índice. */
+  defasagem_indice_meses: number;
+  /** Mesma convenção de `propostas.correcao_primeira_parcela`. */
+  corrige_primeira_parcela: boolean;
+  dia_vencimento: number;
+  juros_mora_mensal: number;
+  multa_atraso_pct: number;
+  observacoes: string | null;
+  criado_por: string | null;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+export interface ContratoLote {
+  id: string;
+  contrato_id: string;
+  lote_id: string | null;
+  quadra: string;
+  numero: string;
+  area_m2: number;
+  valor: number;
+  ordem: number;
+}
+
+export interface ContratoParcela {
+  id: string;
+  contrato_id: string;
+  numero: number;
+  rotulo: string;
+  tipo: BlocoTipo;
+  indice: number;
+  total_no_grupo: number;
+  vencimento: string;
+  valor_original: number;
+  indexada: boolean;
+  pago_em: string | null;
+  valor_pago: number | null;
+  forma_pagamento: string | null;
+  boleto_numero: string | null;
+  observacao: string | null;
+}
+
+/** Contrato com tudo que a tela de acompanhamento precisa. */
+export interface ContratoCompleto extends Contrato {
+  empreendimento: Empreendimento;
+  cliente: Cliente | null;
+  lotes: ContratoLote[];
+  parcelas: ContratoParcela[];
 }

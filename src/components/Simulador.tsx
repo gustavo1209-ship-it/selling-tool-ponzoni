@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   BookmarkPlus,
@@ -9,6 +10,7 @@ import {
   ChevronRight,
   Copy,
   Download,
+  FileSignature,
   Plus,
   Printer,
   Save,
@@ -27,6 +29,7 @@ import {
   salvarProposta,
   type CenarioPayload,
 } from "@/app/propostas/acoes";
+import { gerarContratoDaProposta } from "@/app/contratos/acoes";
 import { calcular, valorDaMetrica } from "@/lib/calc";
 import type {
   Bloco,
@@ -103,6 +106,7 @@ export default function Simulador({
   lotesDisponiveis,
   condicoes,
   indexadores,
+  autor,
 }: {
   proposta: Proposta;
   empreendimento: Empreendimento;
@@ -113,6 +117,8 @@ export default function Simulador({
   lotesDisponiveis: Lote[];
   condicoes: CondicaoPagamento[];
   indexadores: IndexadorRef[];
+  /** Quem criou a proposta — com corretores, deixa de ser óbvio. */
+  autor: string | null;
 }) {
   const [titulo, setTitulo] = useState(proposta.titulo ?? "");
   const [status, setStatus] = useState<PropostaStatus>(proposta.status);
@@ -146,6 +152,7 @@ export default function Simulador({
   const [salvando, iniciarSalvar] = useTransition();
   const [favoritando, setFavoritando] = useState<string | null>(null);
   const [recado, setRecado] = useState<string | null>(null);
+  const router = useRouter();
   const [sujo, setSujo] = useState(false);
 
   const marcar = () => setSujo(true);
@@ -465,6 +472,32 @@ export default function Simulador({
     });
   }
 
+  /**
+   * Fecha a venda: a opção aberta vira o cronograma de um contrato.
+   *
+   * Só depois de salvo — o contrato copia o cálculo gravado do cenário, e
+   * não o que está na tela. Mesma trava do PDF e do XLSX, pelo mesmo motivo.
+   */
+  function virarContrato() {
+    if (!ativo) return;
+    if (
+      !confirm(
+        `Gerar contrato a partir da opção "${ativo.nome}"? O cronograma será copiado e passará a ser acompanhado em Contratos.`
+      )
+    ) {
+      return;
+    }
+    setRecado(null);
+    iniciarSalvar(async () => {
+      try {
+        const { id } = await gerarContratoDaProposta(proposta.id, ativo.id);
+        router.push(`/contratos/${id}`);
+      } catch (e) {
+        setRecado(mensagemDeFalha(e));
+      }
+    });
+  }
+
   const validadeAte = useMemo(() => {
     const d = new Date(`${dataBase}T12:00:00`);
     d.setDate(d.getDate() + validade);
@@ -480,6 +513,7 @@ export default function Simulador({
         <div>
           <p className="eyebrow">
             {empreendimento.nome} · {proposta.codigo}
+            {autor ? ` · ${autor}` : ""}
           </p>
           <h1 className="serif text-3xl mt-1">
             {dadosCliente.nome || titulo || "Proposta sem cliente"}
@@ -517,6 +551,14 @@ export default function Simulador({
               >
                 <Download size={15} /> XLSX
               </a>
+              <button
+                className="btn btn-secundario"
+                title="Vendeu? O cronograma desta opção vira um contrato para acompanhar os pagamentos."
+                disabled={salvando}
+                onClick={virarContrato}
+              >
+                <FileSignature size={15} /> Gerar contrato
+              </button>
             </>
           )}
           <button

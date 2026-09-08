@@ -1,0 +1,57 @@
+import { notFound } from "next/navigation";
+import FolhaDemonstrativo from "@/components/FolhaDemonstrativo";
+import { createClient } from "@/lib/supabase/server";
+import { calcularContrato } from "@/lib/contratos/correcao";
+import { carregarIndices, serieDe } from "@/lib/contratos/servidor";
+import type { ContratoCompleto } from "@/lib/db/tipos";
+
+export const dynamic = "force-dynamic";
+
+export default async function DemonstrativoPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const supabase = await createClient();
+
+  const [{ data }, indices] = await Promise.all([
+    supabase
+      .from("contratos")
+      .select(
+        "*, empreendimento:empreendimentos(*), cliente:clientes(*), lotes:contrato_lotes(*), parcelas:contrato_parcelas(*)"
+      )
+      .eq("id", id)
+      .maybeSingle(),
+    carregarIndices(),
+  ]);
+
+  if (!data) notFound();
+  const contrato = data as unknown as ContratoCompleto;
+
+  const { serie, taxa } = serieDe(indices, contrato.indexador);
+  const calculo = calcularContrato(
+    {
+      data_base: contrato.data_base,
+      indexador: contrato.indexador,
+      defasagem_indice_meses: contrato.defasagem_indice_meses,
+      corrige_primeira_parcela: contrato.corrige_primeira_parcela,
+      juros_mora_mensal: Number(contrato.juros_mora_mensal),
+      multa_atraso_pct: Number(contrato.multa_atraso_pct),
+      valor_total: Number(contrato.valor_total),
+    },
+    contrato.parcelas,
+    serie,
+    taxa
+  );
+
+  return (
+    <FolhaDemonstrativo
+      contrato={contrato}
+      empreendimento={contrato.empreendimento}
+      cliente={contrato.cliente}
+      lotes={[...contrato.lotes].sort((a, b) => a.ordem - b.ordem)}
+      calculo={calculo}
+    />
+  );
+}

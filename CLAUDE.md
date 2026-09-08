@@ -27,6 +27,12 @@ escada de desconto do espelho, as identidades fechadas do SAC e do Price) e
 falha com exit 1 se o motor divergir. **Rodar depois de qualquer mexida em
 `src/lib/calc/`.**
 
+São dois arquivos: `src/lib/calc/verificar.ts` (o motor de proposta) e
+`src/lib/contratos/verificar.ts` (a correção de contrato, os encargos de
+atraso e a conferência que liga as duas metades — um contrato gerado de
+proposta tem de reproduzir os valores do simulador no centavo). **Rodar
+também depois de mexer em `src/lib/contratos/`.**
+
 Ele roda via `tsx`, e não via `node --experimental-strip-types`. A diferença
 importa: o `--experimental-strip-types` exige extensão nos imports
 (`from "./tipos.ts"`), e essas extensões quebram o resolvedor do Turbopack —
@@ -187,20 +193,18 @@ false`). Criar a conta em `/login` → "Criar uma conta" e clicar no link que
 chega por e-mail. Para dispensar isso num time interno: Supabase → Auth →
 Providers → Email → desligar "Confirm email".
 
-O primeiro usuário nasce como `vendedor`. Para promover:
+O usuário nasce como `corretor` e vê só o que ele mesmo criar. Para
+promover (ver "Quem vê o quê"):
 
 ```sql
 update perfis set papel = 'admin' where email = 'gustavo1209@gmail.com';
 ```
 
-Só `admin` edita empreendimentos, tabelas de preço e condições. Qualquer
-vendedor lê tudo, edita status de lote e **clientes**, e cria/edita as
-próprias propostas (RLS em `supabase/migrations/*_02_rls.sql`).
-
-Cliente é dado compartilhado de propósito: prender a edição a quem cadastrou
-só gerava cliente duplicado quando outra pessoa atendia. Apagar continua
-restrito ao autor ou a um admin, e um cliente com proposta não pode ser
-apagado.
+Só `admin` edita empreendimentos, tabelas de preço, condições, espelho e
+índices. O corretor lê o catálogo inteiro e cria as próprias propostas,
+clientes e contratos — e enxerga só esses. Ver **"Quem vê o quê
+(corretores)"**, que substitui o arranjo de "leitura do time" da migration
+02. Um cliente com proposta continua não podendo ser apagado.
 
 ## Como a tabela de preços funciona de verdade
 
@@ -718,6 +722,276 @@ assumiam correção pelo INCC ("valor nominal, já com correção projetada", a
 nota do cronograma, o parágrafo legal do rodapé). Todas passaram a depender de
 `temCorrecao()`; se aparecer outra promessa de reajuste num empreendimento sem
 indexador, é do mesmo tipo.
+
+## Quem vê o quê (corretores)
+
+Dois papéis, e a regra é uma só: **vê quem criou; admin vê tudo.**
+
+| Papel | Enxerga |
+|---|---|
+| `corretor` (padrão de todo cadastro novo) | as propostas, os clientes e os contratos que ele mesmo criou. No espelho, tudo menos o nome do comprador e o VGV |
+| `admin` | tudo, e é o único que edita tabela de preço, espelho e índices |
+
+Hoje os admins são Gustavo e Gelson. Para promover alguém:
+
+```sql
+update perfis set papel = 'admin' where email = 'fulano@exemplo.com';
+```
+
+**A RLS é quem separa** (migration 26); a interface só evita oferecer o que
+o banco recusaria. Menu, botões do espelho e a página `/indices` olham
+`perfilAtual()` de `src/lib/supabase/perfil.ts` — isso é cortesia, não
+controle de acesso. Ao escrever tela nova, a pergunta certa continua sendo
+"a policy deixa?".
+
+### O que continua compartilhado
+
+O catálogo, porque é dele que se vende: empreendimentos, lotes, tabelas de
+preço e condições — inclusive as favoritas do time. Um corretor lê o
+espelho inteiro e o mapa; só não altera.
+
+**E a série de índices, que é a pegadinha.** `indices_mensais` continua
+legível por qualquer autenticado de propósito: a correção das parcelas é
+calculada no servidor com o cliente Supabase **do usuário**, e um corretor
+que não pudesse ler a série veria o próprio contrato com fator 1 em toda
+parcela — sem erro, sem aviso, só com o valor errado. Não é dado sensível: é
+o número que a FGV publica. O que se restringe é escrever, e a tela some do
+menu de quem não é admin.
+
+### O comprador e o VGV são da casa
+
+Duas informações somem para o corretor no espelho e na página inicial: o
+**nome do comprador** de cada lote e o **VGV**.
+
+O comprador é mascarado no banco, não na tela — a mesma chave que a página
+usa serve para chamar a API REST, e `select=comprador` devolveria a lista
+inteira. Como Postgres não tem RLS por coluna, a migration 28 faz o
+seguinte:
+
+1. `authenticated` perde o SELECT na coluna `comprador` de `lotes`. Não
+   adianta revogar só a coluna: o Supabase concede SELECT na tabela toda por
+   padrão, então é preciso derrubar e devolver coluna a coluna, sem essa;
+2. a view **`lotes_visiveis`** devolve todas as colunas, com o comprador
+   preenchido só quando `is_admin()`.
+
+**Toda leitura de lote na aplicação passa por `lotes_visiveis`; a escrita
+continua em `lotes`.** Um `select("*")` na tabela agora estoura "permission
+denied for table lotes" — se aparecer esse erro, é isto. Escrever continua
+funcionando porque UPDATE não exige SELECT na coluna; o que não funciona
+mais é ler a coluna dentro do próprio UPDATE (`set comprador = comprador`),
+nem para admin.
+
+A view é SECURITY DEFINER, e precisa ser: com `security_invoker = on` ela
+rodaria com os privilégios de quem chama — justamente quem não pode ler a
+coluna. Em troca ela não aplica a RLS de `lotes`, o que hoje dá no mesmo
+(a policy de leitura é `using (true)`). **Se um dia a leitura de lotes for
+restringida, a view precisa repetir o filtro.**
+
+O VGV é só interface: `ehAdmin` esconde o cartão no espelho e na home. Preço
+de tabela por lote continua visível para todos — é o que o corretor vende.
+
+### O cliente deixou de ser do time
+
+A migration 09 abriu `clientes` para todo mundo porque prender a edição ao
+autor gerava cadastro duplicado quando outra pessoa atendia o mesmo
+comprador. A 26 reverte isso: com corretores, a carteira de contatos de um
+não pode aparecer para o outro. **O duplicado volta a ser possível, e é o
+preço combinado** — se um dia a casa voltar a ser uma equipe só, é a
+primeira policy a revisitar.
+
+### Autoria na tela
+
+As listagens de propostas e contratos trazem a coluna "Criada por" /
+"Cadastrado por", e o mesmo nome aparece no topo do simulador e do contrato.
+`criado_por` referencia `auth.users`, não `perfis`, então o PostgREST não faz
+o join sozinho: `mapaDePerfis()` carrega os poucos usuários de uma vez e
+resolve em memória.
+
+### Contas
+
+O cadastro aberto foi fechado — as contas dos corretores são criadas pelo
+painel do Supabase (Authentication → Users → Add user). Manter o **provedor
+Email ligado** e desligar só o *Allow new users to sign up*: são dois
+interruptores na mesma tela, e trocar um pelo outro derruba o login de todo
+mundo (ver "O que fica exposto").
+
+## Depois da venda: contratos, índices e cobrança
+
+A ferramenta ia até a proposta. `contratos` é a outra metade: o que já foi
+vendido, o que já foi pago e quanto cobrar neste mês.
+
+A diferença entre as duas metades é o que explica quase todas as decisões
+daqui. **A proposta é projeção** — o motor monta o fluxo a partir de blocos e
+de uma taxa estimada. **O contrato é fato** — o cronograma está fechado, cada
+parcela tem data e valor de origem, e a correção que vale é a que os índices
+publicados mandarem. Por isso as parcelas do contrato são LINHAS
+(`contrato_parcelas`) e não blocos: cronograma de contrato se edita parcela a
+parcela — o cliente antecipa, renegocia um vencimento, paga um valor
+diferente — e nada disso cabe num template.
+
+### `valor_corrigido` não é coluna
+
+É derivado, em `src/lib/contratos/correcao.ts`, e muda toda vez que um índice
+novo é lançado. Gravar seria congelar um número que ainda vai mudar. O que se
+grava é o que aconteceu de fato: `valor_pago` e `pago_em`.
+
+O único número que não se recalcula é o `valor_pago`: o corrigido de hoje
+muda quando entra índice novo, e o que o cliente pagou naquele dia não muda
+mais.
+
+### A série mensal dos índices
+
+`indexadores` guarda a taxa de **referência** — um número só, derivado do
+acumulado em 12 meses, para projetar proposta. Não serve para cobrar.
+`indices_mensais` guarda a **série**: uma linha por índice por mês, com a
+variação do mês em fração (`0.0085` = 0,85%). A correção acumulada é o
+produto dos `(1 + variacao)`, nunca a soma.
+
+Lançada em `/indices`, na grade ano × mês. Lançar de novo o mesmo mês
+substitui o número — é assim que a prévia do INCC-M vira o índice fechado, e
+por isso a ação é `upsert`.
+
+Ao lançar, `recalcularReferencia()` refaz sozinha a taxa de projeção em
+`indexadores` a partir dos últimos 12 meses — **só quando há 12 meses
+seguidos, sem buraco**. Um acumulado de três meses anualizado é pior que o
+número que veio da fonte.
+
+Índices sem série lançada continuam funcionando: a parcela é estimada pela
+taxa de referência e sai marcada `estimado`. A tela mostra `~`, e a tela de
+cobrança avisa em barra âmbar — **não emitir boleto de linha estimada**, o
+valor ainda vai mudar.
+
+### O botão que puxa os índices (`src/lib/indices/bcb.ts`)
+
+"Atualizar pelo Banco Central" busca a série no SGS — API aberta, sem chave,
+que espelha o número publicado pela FGV.
+
+**Os códigos foram conferidos contra o seed da migration 11, não são chute.**
+O acumulado em 12 meses até ago/2026 calculado da série 7456 dá 6,5542%
+contra os 6,56% do INCC-M cadastrado; a 189 dá 2,1782% contra os 2,16% do
+IGP-M; a 433 dá 4,4430% contra os 4,44% do IPCA.
+
+| Índice | Série SGS |
+|---|---|
+| INCC-M | 7456 — **é esta**, não a 192 |
+| IGP-M / IPCA / INPC / IGP-DI | 189 / 433 / 188 / 190 |
+| Selic / CDI (acumulados no mês) | 4390 / 4391 |
+| TR, CUB-RS | não têm série mensal utilizável |
+
+A 192 é o **INCC-DI**, irmão do M com outra janela de coleta: em ago/2026 deu
+0,66% contra os 0,85% do INCC-M. Trocar um pelo outro erra o boleto sem
+avisar. A **TR** existe no SGS (série 226), mas é **diária** — uma linha por
+dia, com `dataFim` —, e importá-la produziria competências repetidas. O
+**CUB-RS** é do Sinduscon e não está no SGS. Os dois continuam manuais.
+
+**O mês corrente nunca entra.** As séries acumuladas no mês trazem o parcial
+até hoje: em 08/09/2026 a Selic de setembro aparecia como 0,21% enquanto
+agosto, fechado, tinha 1,09%. Gravar isso como "a variação de setembro"
+corrigiria parcela com um número que ainda vai crescer. Nos índices de
+inflação o corte não custa nada — o INCC de setembro entra na primeira
+atualização feita em outubro, que é quando o boleto de outubro sai.
+
+Por padrão o botão **só completa lacunas**: mês já lançado fica como está.
+Quem lançou à mão pode ter corrigido um número contra o comunicado da FGV, e
+sobrescrever calado desfaria a correção. O checkbox "substituir os meses já
+lançados" liga o outro modo.
+
+### Como a parcela é corrigida
+
+`fatorAcumulado()`, e são três parâmetros que precisam andar juntos:
+
+- **quantos índices entram** — um por mês decorrido desde `data_base`;
+- **`defasagem_indice_meses`** — quais índices, não quantos. Com defasagem 1,
+  a parcela do mês M usa de (base − 1 + 1) até (M − 1): o mesmo número de
+  meses, todos já publicados quando o boleto sai. O INCC-M de outubro é
+  divulgado no fim de outubro, e o boleto que vence no dia 10 saiu antes;
+- **`corrige_primeira_parcela`** — a mesma convenção de
+  `propostas.correcao_primeira_parcela`. Desligada, a parcela do mês M
+  acumula M − 1 índices, que é o fator `(1+i)^(m−1)` das planilhas
+  "Propostas de Parcelamento".
+
+**O terceiro não é detalhe.** Sem ele, um contrato gerado de uma proposta
+cobraria um mês de INCC a mais do que foi vendido — diferença que só
+apareceria no boleto, contra o papel que o cliente assinou. `gerarContratoDaProposta`
+copia a convenção da proposta; o cadastro manual nasce com `true`, que é o
+que o contrato de loteamento diz.
+
+`npm run verificar` cobre isso: a última seção monta uma proposta no motor,
+gera o contrato dela, alimenta uma série com o mesmo INCC que a projeção usou
+e confere que a 1ª e a 36ª parcela batem **no centavo** com o simulador.
+
+### O principal gravado é o nominal
+
+`cronogramaDeResultado` grava `valor − correcao`, e não o valor que o
+simulador mostra: guardar o número projetado embutiria a estimativa no
+principal e corrigiria duas vezes o mesmo mês. Bloco com SAC ou Price é a
+exceção — ali o indexador entrou como juro dentro da parcela, o valor já é
+final e a linha nasce sem indexação.
+
+Tirar a correção parcela a parcela deixa alguns centavos de sobra contra o
+valor negociado. O rateio é **de um centavo por parcela, a partir da
+primeira**, e não uma sobra jogada na última: a última parcela é a que o
+cliente confere contra o papel da proposta.
+
+### Encargos de atraso
+
+Multa percentual fixa sobre o corrigido, mais juros de mora pro rata die na
+convenção de 30 dias. Só no que já venceu e não foi pago. A baixa sugere o
+valor com encargos, mas o campo é editável — quando houve acordo, o que vale
+é o que entrou.
+
+### Baixa em lote
+
+Um contrato antigo entra na ferramenta com anos de parcelas já quitadas, e
+dar baixa em trinta delas uma a uma não é trabalho de gente. A tabela do
+cronograma tem seleção múltipla, um atalho "selecionar as N vencidas" e uma
+barra de ação com dois modos de datar:
+
+- **cada uma no seu vencimento** (o padrão) — é o certo para o contrato
+  antigo. Datar tudo com hoje marcaria como paga hoje uma parcela quitada em
+  2024, e o contrato passaria a exibir encargos de atraso que nunca
+  existiram;
+- **uma data para todas** — quando o cliente quitou um bloco de uma vez.
+
+O valor gravado é o que a parcela valia **na data do pagamento**: o cálculo
+roda uma vez por data, com `hoje` fixado nela, então quem pagou em dia tem o
+corrigido do vencimento e quem pagou depois tem o corrigido com multa e
+juros. A exceção é a parcela cuja correção depende de mês sem índice
+lançado — ali o valor fica `null` em vez de gravar uma estimativa como se
+fosse dinheiro que entrou.
+
+O lápis numa parcela **já paga** reabre a baixa preenchida, para corrigir
+data, valor ou forma sem ter de desfazer e refazer.
+
+### As telas
+
+| Rota | Para quê |
+|---|---|
+| `/contratos` | carteira: saldo corrigido, recebido, em atraso |
+| `/contratos/novo` | venda antiga, montada como o papel: entrada + mensais + reforços |
+| `/contratos/[id]` | cronograma, correção parcela a parcela e baixa de pagamento |
+| `/contratos/[id]/demonstrativo` | folha A4 para o cliente, com o fator de cada parcela |
+| `/cobranca` | **o que cobrar no mês** — a lista dos boletos |
+| `/indices` | a série mensal, grade ano × mês |
+
+A lista de lotes em `/contratos/novo` traz **todos os status**, inclusive
+vendido: é justamente onde estão as vendas antigas. E o cadastro **não mexe
+em `lotes.status` nem em `lotes.comprador`** — a fonte de verdade desses dois
+continua sendo o Google Sheets, e a próxima sincronização sobrescreveria.
+
+`/cobranca` mostra os vencimentos do mês **mais o que ficou em atraso antes**
+— quem emite boleto precisa das duas coisas na mesma tela. O filtro que tira
+as atrasadas é `so_mes=1`, e não um `atrasadas=0`, porque checkbox de GET não
+manda nada quando é desmarcado: a informação tem de viajar na exceção.
+
+O XLSX de `/cobranca` é a planilha que vai para o banco: uma linha por
+boleto, com sacado, documento, vencimento e valor, mais as colunas de origem
+do número. A coluna **"índice estimado"** é a que impede o erro caro.
+
+### Contrato é dado do escritório
+
+A RLS segue `clientes`, não `propostas`: o time lê e escreve, e só o autor ou
+um admin apaga. Quem dá baixa num pagamento raramente é quem fechou a venda.
 
 ## Fontes de dados
 

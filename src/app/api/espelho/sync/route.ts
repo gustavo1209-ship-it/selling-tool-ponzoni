@@ -14,6 +14,21 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ erro: "Não autenticado" }, { status: 401 });
 
+  // O espelho vale para a casa inteira e a RLS só deixa admin escrever em
+  // `lotes` (migration 26). Sem esta checagem a sincronização rodaria, não
+  // gravaria nada e ainda relataria sucesso com zero alterações.
+  const { data: perfil } = await supabase
+    .from("perfis")
+    .select("papel")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (perfil?.papel !== "admin") {
+    return NextResponse.json(
+      { erro: "Só a administração sincroniza o espelho de vendas." },
+      { status: 403 }
+    );
+  }
+
   const { empreendimentoId } = (await request.json().catch(() => ({}))) as {
     empreendimentoId?: string;
   };
@@ -54,8 +69,10 @@ export async function POST(request: Request) {
     );
   }
 
+  // lê da view e grava na tabela: é admin que sincroniza, então o
+  // comprador vem preenchido e a comparação com a planilha continua válida
   const { data: atuais } = await supabase
-    .from("lotes")
+    .from("lotes_visiveis")
     .select("id, quadra, numero, area_m2, preco_tabela, status, comprador, tipo")
     .eq("empreendimento_id", empreendimentoId);
 

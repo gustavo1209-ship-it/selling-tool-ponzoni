@@ -164,3 +164,39 @@ export const ROTULO_TIPO_BLOCO: Record<string, string> = {
   balao: "Balão",
   financiamento: "Financiamento",
 };
+
+export const ROTULO_STATUS_CONTRATO: Record<string, string> = {
+  ativo: "Ativo",
+  quitado: "Quitado",
+  distratado: "Distratado",
+  suspenso: "Suspenso",
+};
+
+export const ROTULO_SITUACAO_PARCELA: Record<string, string> = {
+  paga: "Paga",
+  a_vencer: "A vencer",
+  vence_hoje: "Vence hoje",
+  vencida: "Vencida",
+};
+
+/**
+ * Índice do mês com quatro casas: 0.0085 → "0,8500%". A variação mensal do
+ * INCC anda na terceira casa, e arredondar para duas apaga a diferença
+ * entre 0,85% e 0,849% ao longo de 36 parcelas.
+ */
+export function indiceMes(v: number | null | undefined): string {
+  if (v === null || v === undefined) return "—";
+  const s = (v * 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
+  return `${s}%`;
+}
+
+/** Fator de correção com cinco casas: 1.05327 → "1,05327". */
+export function fator(v: number | null | undefined): string {
+  return (v ?? 1).toLocaleString("pt-BR", {
+    minimumFractionDigits: 5,
+    maximumFractionDigits: 5,
+  });
+}

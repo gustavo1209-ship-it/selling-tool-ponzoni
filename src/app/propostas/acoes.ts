@@ -91,7 +91,7 @@ export async function criarProposta(formData: FormData) {
   }
 
   const [{ data: lotes }, { data: condicoes }, { data: tabela }] = await Promise.all([
-    supabase.from("lotes").select("*").in("id", loteIds),
+    supabase.from("lotes_visiveis").select("*").in("id", loteIds),
     condicaoIds.length
       ? supabase.from("condicoes_pagamento").select("*").in("id", condicaoIds)
       : Promise.resolve({ data: [] }),
