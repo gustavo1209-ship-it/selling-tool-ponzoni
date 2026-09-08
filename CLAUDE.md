@@ -787,8 +787,15 @@ coluna. Em troca ela não aplica a RLS de `lotes`, o que hoje dá no mesmo
 (a policy de leitura é `using (true)`). **Se um dia a leitura de lotes for
 restringida, a view precisa repetir o filtro.**
 
-O VGV é só interface: `ehAdmin` esconde o cartão no espelho e na home. Preço
-de tabela por lote continua visível para todos — é o que o corretor vende.
+A mesma view esconde o **preço de lote vendido ou indisponível** (migration
+29), nos dois empreendimentos: o que o corretor precisa saber é o preço do
+que ele pode vender, e num lote vendido aquele número é o que alguém pagou.
+Livre, reservado e em projeto continuam com preço — é o catálogo. Efeito
+colateral aceito: ao cadastrar contrato de venda antiga, o rateio entre
+lotes perde a base de preço de tabela e divide igual; o valor total do
+contrato é digitado de qualquer forma.
+
+O VGV é só interface: `ehAdmin` esconde o cartão no espelho e na home.
 
 ### O cliente deixou de ser do time
 
