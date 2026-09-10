@@ -1,9 +1,11 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Printer } from "lucide-react";
 import { clarear, escurecer } from "@/lib/cores";
+import { colunasAtivas } from "@/lib/contratos/colunas";
 import { rotuloCompetencia } from "@/lib/contratos/mes";
-import type { ContratoCalculado } from "@/lib/contratos/tipos";
+import type { ContratoCalculado, ParcelaCalculada } from "@/lib/contratos/tipos";
 import type {
   Cliente,
   Contrato,
@@ -29,6 +31,11 @@ import {
  * quanto falta, e — parcela a parcela — de onde veio a correção. Um extrato
  * que esconde o fator de correção não resolve a ligação de quem quer saber
  * por que a parcela subiu.
+ *
+ * Quais colunas do cronograma saem é escolha do contrato
+ * (`colunas_documento`, ver `@/lib/contratos/colunas`) — o caso que motivou
+ * isso é o contrário do parágrafo acima: quando o cliente só quer o número
+ * que paga, mostrar valor de origem e corrigido lado a lado gera dúvida.
  */
 export default function FolhaDemonstrativo({
   contrato,
@@ -46,6 +53,14 @@ export default function FolhaDemonstrativo({
   const hoje = new Date().toLocaleDateString("pt-BR");
   const semCorrecao = contrato.indexador === "nenhum";
   const areaTotal = lotes.reduce((s, l) => s + Number(l.area_m2), 0);
+
+  // `rotulo` e `grupo` são duas chaves do catálogo mas uma coluna só na
+  // folha: "Mensais 3/36" cabe numa célula e economiza largura que o A4 não
+  // tem sobrando.
+  const ativas = colunasAtivas(contrato.colunas_documento, "pdf", !semCorrecao);
+  const colunas = montarColunas(ativas, calculo);
+  const primeiroTotal = colunas.findIndex((c) => c.total !== undefined);
+  const larguraRotulo = primeiroTotal < 0 ? colunas.length : primeiroTotal;
 
   return (
     <>
@@ -205,67 +220,52 @@ export default function FolhaDemonstrativo({
               As parcelas são corrigidas pelo {ROTULO_INDEXADOR[contrato.indexador]},
               acumulado desde {dataBR(contrato.data_base)}, com defasagem de{" "}
               {contrato.defasagem_indice_meses}{" "}
-              {contrato.defasagem_indice_meses === 1 ? "mês" : "meses"}. A coluna
-              &ldquo;fator&rdquo; é o índice acumulado aplicado sobre o valor de
-              origem de cada parcela.
+              {contrato.defasagem_indice_meses === 1 ? "mês" : "meses"}.
+              {ativas.has("fator") && ativas.has("valor_original") && (
+                <>
+                  {" "}
+                  A coluna &ldquo;fator&rdquo; é o índice acumulado aplicado sobre
+                  o valor de origem de cada parcela.
+                </>
+              )}
             </p>
           )}
 
           <table className="t t-mini">
             <thead>
               <tr>
-                <th>#</th>
-                <th>Parcela</th>
-                <th>Vencimento</th>
-                <th className="d">Valor de origem</th>
-                {!semCorrecao && <th className="d">Fator</th>}
-                <th className="d">Valor corrigido</th>
-                <th>Situação</th>
-                <th className="d">Pago em</th>
+                {colunas.map((c) => (
+                  <th key={c.chave} className={c.numerica ? "d" : undefined}>
+                    {c.cabecalho}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {calculo.parcelas.map((p) => (
                 <tr key={p.id} className={p.situacao === "vencida" ? "vencida" : ""}>
-                  <td>{p.numero}</td>
-                  <td>
-                    {p.rotulo}
-                    {p.total_no_grupo > 1 && (
-                      <span className="indice">
-                        {" "}
-                        {p.indice}/{p.total_no_grupo}
-                      </span>
-                    )}
-                  </td>
-                  <td>{dataBR(p.vencimento)}</td>
-                  <td className="d">{moeda(p.valor_original)}</td>
-                  {!semCorrecao && (
-                    <td className="d">{p.indexada ? fator(p.correcao.fator) : "—"}</td>
-                  )}
-                  <td className="d">
-                    <strong>{moeda(p.valorCorrigido)}</strong>
-                  </td>
-                  <td>{ROTULO_SITUACAO_PARCELA[p.situacao]}</td>
-                  <td className="d">
-                    {p.pago_em ? dataBR(p.pago_em) : "—"}
-                  </td>
+                  {colunas.map((c) => (
+                    <td key={c.chave} className={c.numerica ? "d" : undefined}>
+                      {c.celula(p)}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={semCorrecao ? 3 : 4}>Total do cronograma</td>
-                <td className="d">{moeda(calculo.totalOriginal)}</td>
-                {!semCorrecao && <td className="d"></td>}
-                <td className="d">
-                  {moeda(calculo.totalPago + calculo.saldoCorrigido)}
-                </td>
-                <td colSpan={2}></td>
+                <td colSpan={larguraRotulo}>Total do cronograma</td>
+                {colunas.slice(larguraRotulo).map((c) => (
+                  <td key={c.chave} className={c.numerica ? "d" : undefined}>
+                    {c.total ?? ""}
+                  </td>
+                ))}
               </tr>
             </tfoot>
           </table>
 
-          {!semCorrecao && calculo.parcelas.some((p) => p.correcao.competencias.length) && (
+          {!semCorrecao && ativas.has("fator") &&
+            calculo.parcelas.some((p) => p.correcao.competencias.length) && (
             <p className="nota">
               A última parcela corrigida usa índices de{" "}
               {(() => {
@@ -309,6 +309,119 @@ export default function FolhaDemonstrativo({
       </article>
     </>
   );
+}
+
+/** Uma coluna do cronograma, já resolvida para esta folha. */
+interface ColunaFolha {
+  chave: string;
+  cabecalho: string;
+  numerica: boolean;
+  celula: (p: ParcelaCalculada) => ReactNode;
+  /** Preenchido só nas colunas que fecham no rodapé. */
+  total?: ReactNode;
+}
+
+/**
+ * Traduz o conjunto de chaves ativas na lista de colunas da folha.
+ *
+ * A ordem é a do catálogo, não a da escolha: o cronograma sempre lê da
+ * esquerda para a direita na mesma sequência, tenha o contrato quatro
+ * colunas ou oito.
+ */
+function montarColunas(
+  ativas: Set<string>,
+  calculo: ContratoCalculado
+): ColunaFolha[] {
+  const colunas: ColunaFolha[] = [];
+
+  if (ativas.has("numero")) {
+    colunas.push({
+      chave: "numero",
+      cabecalho: "#",
+      numerica: false,
+      celula: (p) => p.numero,
+    });
+  }
+
+  // as duas chaves dividem uma célula só — ver o comentário na montagem
+  const comRotulo = ativas.has("rotulo");
+  const comGrupo = ativas.has("grupo");
+  if (comRotulo || comGrupo) {
+    colunas.push({
+      chave: "rotulo",
+      cabecalho: comRotulo ? "Parcela" : "Posição",
+      numerica: false,
+      celula: (p) => (
+        <>
+          {comRotulo && p.rotulo}
+          {comGrupo && p.total_no_grupo > 1 && (
+            <span className="indice">
+              {comRotulo ? " " : ""}
+              {p.indice}/{p.total_no_grupo}
+            </span>
+          )}
+        </>
+      ),
+    });
+  }
+
+  if (ativas.has("vencimento")) {
+    colunas.push({
+      chave: "vencimento",
+      cabecalho: "Vencimento",
+      numerica: false,
+      celula: (p) => dataBR(p.vencimento),
+    });
+  }
+
+  if (ativas.has("valor_original")) {
+    colunas.push({
+      chave: "valor_original",
+      cabecalho: "Valor de origem",
+      numerica: true,
+      celula: (p) => moeda(p.valor_original),
+      total: moeda(calculo.totalOriginal),
+    });
+  }
+
+  if (ativas.has("fator")) {
+    colunas.push({
+      chave: "fator",
+      cabecalho: "Fator",
+      numerica: true,
+      celula: (p) => (p.indexada ? fator(p.correcao.fator) : "—"),
+    });
+  }
+
+  if (ativas.has("valor_corrigido")) {
+    colunas.push({
+      chave: "valor_corrigido",
+      cabecalho: "Valor corrigido",
+      numerica: true,
+      celula: (p) => <strong>{moeda(p.valorCorrigido)}</strong>,
+      total: moeda(calculo.totalPago + calculo.saldoCorrigido),
+    });
+  }
+
+  if (ativas.has("situacao")) {
+    colunas.push({
+      chave: "situacao",
+      cabecalho: "Situação",
+      numerica: false,
+      celula: (p) => ROTULO_SITUACAO_PARCELA[p.situacao],
+    });
+  }
+
+  if (ativas.has("pago_em")) {
+    colunas.push({
+      chave: "pago_em",
+      cabecalho: "Pago em",
+      numerica: true,
+      celula: (p) => (p.pago_em ? dataBR(p.pago_em) : "—"),
+    });
+  }
+
+  return colunas;
 }
 
 const estilo = (e: Empreendimento) => `

@@ -109,9 +109,15 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
 
   <p>
     O administrador enxerga tudo o que a ferramenta guarda e é o único que
-    mexe no que vale para a casa inteira: espelho, tabela de preços, índices e
-    contas de usuário. Este manual cobre o que só você faz. O uso comercial do
-    dia a dia está no <strong>Manual do corretor</strong>.
+    mexe no que vale para a casa inteira: espelho, empreendimentos, tabela de
+    preços, índices, etapas do funil e contas de usuário. Este manual cobre o
+    que só você faz. O uso comercial do dia a dia está no
+    <strong>Manual do corretor</strong>.
+  </p>
+  <p>
+    A aba <strong>Admin</strong> reúne as três telas de configuração —
+    Empreendimentos, Corretores e Etapas do funil. Os índices continuam na aba
+    própria, porque são rotina de todo mês e não configuração.
   </p>
 
   <h2><span class="n">1</span> A rotina do mês</h2>
@@ -304,6 +310,29 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     a parcela subiu. <strong>XLSX</strong> é o extrato interno completo.
   </p>
 
+  <h3>Colunas do documento</h3>
+  <p>
+    O botão <strong>Colunas do documento</strong>, no topo do contrato, escolhe
+    quais colunas do cronograma saem — e vale para as duas saídas, a folha e a
+    planilha. Cada coluna diz onde aparece: algumas são das duas, outras só do
+    XLSX (encargos, a cobrar, forma de pagamento, número do boleto).
+  </p>
+  <p>
+    O caso que motivou isso é o contrário do que a folha assumia. Ela mostra
+    valor de origem e valor corrigido lado a lado para explicar a correção, e o
+    cliente que só quer saber quanto paga liga perguntando qual dos dois vale.
+    <strong>Desmarcar &ldquo;Valor de origem&rdquo;</strong> deixa um número por
+    parcela e encerra a dúvida.
+  </p>
+  <div class="caixa">
+    <span class="rot">A escolha é do contrato, não da impressão</span>
+    <p>
+      Fica gravada, e por isso a segunda via sai igual à primeira. Contrato
+      nunca configurado sai com todas as colunas, como sempre saiu — e
+      <em>Marcar todas</em> volta a esse padrão.
+    </p>
+  </div>
+
   <h2><span class="n">5</span> Espelho de vendas</h2>
   <p>
     A fonte de verdade de situação e comprador é o <strong>Google Sheets</strong>
@@ -311,8 +340,9 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     dele; não escreve.
   </p>
   <p>
-    <strong>Sincronizar com o Sheets</strong> traz situação, comprador, área e
-    tipo, e cria os lotes que não existirem. O preço só é sobrescrito quando a
+    <strong>Sincronizar com o Sheets</strong> — o botão está no espelho e
+    também na ficha do empreendimento, em Admin — traz situação, comprador,
+    área e tipo, e cria os lotes que não existirem. O preço só é sobrescrito quando a
     planilha traz um: lote vendido costuma vir com a célula de valor vazia e não
     pode zerar o preço. O espelho do Florescer não tem coluna de valor, e ali a
     sincronização não mexe em preço nenhum.
@@ -323,51 +353,94 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     proposta do cliente.
   </p>
 
-  <h2><span class="n">6</span> Usuários e acessos</h2>
+  <h2><span class="n">6</span> Empreendimentos</h2>
+  <p>
+    <strong>Admin &rarr; Empreendimentos</strong> cadastra um loteamento novo e
+    edita os que já existem. Cada linha da lista abre com o cadastro, a tabela
+    de preço vigente e as condições de pagamento — na ordem em que precisam ser
+    preenchidos.
+  </p>
+
+  <h3>O cadastro</h3>
   <table class="t">
-    <thead><tr><th>Papel</th><th>Enxerga</th></tr></thead>
+    <thead><tr><th>Campo</th><th>Para quê</th></tr></thead>
     <tbody>
       <tr>
-        <td><strong>corretor</strong><br><span style="color:var(--cinza)">padrão de toda conta nova</span></td>
+        <td><strong>Espelho &mdash; CSV do Google Sheets</strong></td>
         <td>
-          o catálogo inteiro (lotes, mapa, preços, condições) e as propostas,
-          clientes e contratos que ele mesmo criou. Não vê o nome do comprador,
-          o VGV nem o preço de lote vendido ou não disponível
+          é o endereço que o botão Sincronizar lê. Na planilha:
+          <em>Arquivo &rarr; Compartilhar &rarr; Publicar na web</em>, e depois
+          troque o final por <code>/gviz/tq?tqx=out:csv</code>. É o mesmo
+          endereço que alimenta o mapa público
         </td>
       </tr>
       <tr>
-        <td><strong>admin</strong></td>
-        <td>tudo, e é o único que edita espelho, tabela de preços, índices e contas</td>
+        <td><strong>Mapa &mdash; HTML do mapa interativo</strong></td>
+        <td>o mapa puro, que a aba Mapa embute</td>
+      </tr>
+      <tr>
+        <td><strong>Mapa &mdash; página pública</strong></td>
+        <td>a página do site com o mapa, para mandar ao cliente</td>
+      </tr>
+      <tr>
+        <td><strong>Logo</strong> e <strong>foto aérea</strong></td>
+        <td>
+          caminho dos arquivos, não upload: eles vivem no código, e quem os põe
+          lá é o responsável técnico. Peça os dois antes de cadastrar
+        </td>
+      </tr>
+      <tr>
+        <td><strong>Cores</strong></td>
+        <td>vestem a folha da proposta e a planilha daquele empreendimento</td>
+      </tr>
+      <tr>
+        <td><strong>Ativo</strong></td>
+        <td>desmarcado, o empreendimento some do painel e do espelho sem perder o histórico</td>
       </tr>
     </tbody>
   </table>
   <p>
-    <strong>O cadastro por conta própria fica fechado.</strong> As contas são
-    criadas no painel do Supabase, em Authentication &rarr; Users &rarr; Add
-    user. Mantenha o provedor de e-mail ligado e apenas o
-    <em>Allow new users to sign up</em> desligado: são interruptores diferentes
-    na mesma tela, e desligar o errado derruba o login de todo mundo.
+    O <strong>endereço na URL sai do nome e não muda depois</strong>. Renomear
+    o empreendimento é seguro; o endereço fica como nasceu, para não quebrar
+    link que alguém salvou.
   </p>
-  <p>
-    Toda conta nova nasce como corretor. Para promover alguém a administrador,
-    peça ao responsável técnico — é uma alteração no banco, não uma tela da
-    ferramenta.
-  </p>
-  <div class="caixa ok">
-    <span class="rot">Quem cadastrou o quê</span>
+
+  <h3>A ordem que funciona</h3>
+  <ol class="passos">
+    <li><strong>Cadastrar</strong> o empreendimento com o CSV do espelho preenchido.</li>
+    <li><strong>Criar a tabela de preço</strong> vigente, com a condição base e as taxas.</li>
+    <li><strong>Montar as condições</strong> de pagamento &mdash; uma por coluna da sua tabela de preços.</li>
+    <li><strong>Sincronizar lotes com o Sheets</strong>, que cria os lotes que ainda não existem.</li>
+  </ol>
+  <div class="caixa aviso">
+    <span class="rot">Sem tabela e condição, não se vende</span>
     <p>
-      As listagens de propostas e contratos trazem a coluna com o nome de quem
-      criou, e o mesmo nome aparece no topo do simulador e do contrato. É por
-      ali que se acompanha a carteira de cada corretor.
+      Um empreendimento cadastrado mas sem tabela de preço vigente aparece no
+      espelho e não gera proposta: a tela de nova proposta não tem o que
+      oferecer. Faça os quatro passos na mesma sessão.
     </p>
   </div>
+  <p>
+    Quando os preços não vêm da planilha &mdash; o caso do Florescer, cujo
+    espelho não tem coluna de valor &mdash;, os lotes entram por carga do
+    responsável técnico. Sincronizar continua valendo para situação, comprador,
+    área e tipo.
+  </p>
 
   <h2><span class="n">7</span> Tabela de preços e condições</h2>
   <p>
     Cada empreendimento tem uma tabela vigente e uma condição por coluna dela.
     O <strong>preço de tabela</strong> do lote é sempre o número que o vendedor
-    abre com o cliente, e as demais condições se contam a partir dele — para
-    mais ou para menos, conforme o empreendimento.
+    abre com o cliente, e as demais condições se contam a partir dele &mdash;
+    para mais ou para menos, conforme o empreendimento. A
+    <strong>condição base</strong> é o que diz de qual dessas condições o preço
+    do lote fala, e sai no subtítulo do espelho.
+  </p>
+  <p>
+    <strong>Montar condição</strong> cria uma nova pelo mesmo formulário que os
+    corretores usam no simulador: entrada em percentual, número de mensais e
+    reforços periódicos. Depois de criada, dá para ajustar nome, descrição,
+    desconto sobre a tabela e a ordem em que aparece.
   </p>
   <p>
     As condições aparecem em duas listas na criação da proposta:
@@ -380,7 +453,112 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     índices.
   </p>
 
-  <h2><span class="n">8</span> Quando algo dá errado</h2>
+  <h2><span class="n">8</span> Usuários e acessos</h2>
+  <table class="t">
+    <thead><tr><th>Papel</th><th>Enxerga</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>corretor</strong><br><span style="color:var(--cinza)">padrão de toda conta nova</span></td>
+        <td>
+          o catálogo (lotes, mapa, preços, condições) e as negociações,
+          propostas, clientes e contratos que ele mesmo criou. Não vê o nome do
+          comprador, o VGV nem o preço de lote vendido ou não disponível
+        </td>
+      </tr>
+      <tr>
+        <td><strong>admin</strong></td>
+        <td>
+          tudo, e é o único que edita espelho, empreendimentos, tabela de
+          preços, índices, etapas do funil e papéis
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    <strong>O cadastro por conta própria fica fechado.</strong> As contas são
+    criadas no painel do Supabase, em Authentication &rarr; Users &rarr; Add
+    user. Mantenha o provedor de e-mail ligado e apenas o
+    <em>Allow new users to sign up</em> desligado: são interruptores diferentes
+    na mesma tela, e desligar o errado derruba o login de todo mundo.
+  </p>
+
+  <h3>Promover e rebaixar</h3>
+  <p>
+    Em <strong>Admin &rarr; Corretores</strong>, cada pessoa tem o botão
+    <em>Promover a admin</em> ou <em>Rebaixar a corretor</em>. Ninguém muda o
+    próprio papel &mdash; um administrador que se rebaixasse por engano ficaria
+    sem quem o promovesse de volta sem passar pelo banco.
+  </p>
+
+  <h3>Restringir empreendimentos</h3>
+  <p>
+    <strong>Por padrão, todo corretor vê todos os empreendimentos</strong>, e
+    isso continua valendo enquanto ninguém mexer. Para limitar alguém, marque
+    <em>Restringir a empreendimentos específicos</em> na ficha da pessoa e
+    escolha quais.
+  </p>
+  <p>
+    O que fica de fora some por inteiro para ela: seletor do espelho, mapa,
+    lista de nova proposta, tudo. São dois controles em vez de um justamente
+    para que desmarcar o último empreendimento não seja confundido com
+    &ldquo;voltou a ver tudo&rdquo; &mdash; desligar a chave é que devolve o
+    acesso completo, e a lista marcada fica guardada para quando você religar.
+  </p>
+  <div class="caixa aviso">
+    <span class="rot">Restringir quem já tem histórico</span>
+    <p>
+      A carteira antiga continua com a pessoa, mas propostas e contratos de um
+      empreendimento que ela deixou de ver aparecem sem o nome dele. Restrinja
+      preferencialmente contas novas, ou avise antes.
+    </p>
+  </div>
+  <div class="caixa ok">
+    <span class="rot">Quem cadastrou o quê</span>
+    <p>
+      As listagens de propostas e contratos trazem a coluna com o nome de quem
+      criou, e o mesmo nome aparece no topo do simulador, do contrato e nos
+      cartões do funil. É por ali que se acompanha a carteira de cada corretor.
+    </p>
+  </div>
+
+  <h2><span class="n">9</span> Etapas do funil</h2>
+  <p>
+    As colunas do quadro de negociações são configuráveis em
+    <strong>Admin &rarr; Etapas do funil</strong>: nome, cor, ordem e o que cada
+    uma significa. O funil nasce com sete etapas prontas; renomeie e reordene à
+    vontade.
+  </p>
+  <table class="t">
+    <thead><tr><th>O que a etapa significa</th><th>Efeito</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Em andamento</strong></td>
+        <td>negociação viva. É o caso da maioria das colunas</td>
+      </tr>
+      <tr>
+        <td><strong>Fechou</strong> / <strong>Perdeu</strong></td>
+        <td>
+          coluna terminal: o cartão que chega ali registra a data de fechamento
+          e sai da contagem de negociações em andamento
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Renomear uma coluna não muda nada além do rótulo. <strong>Trocar o que ela
+    significa, sim</strong> &mdash; é daí que sai a contagem do quadro.
+  </p>
+  <div class="caixa">
+    <span class="rot">Arquivar em vez de apagar</span>
+    <p>
+      Coluna com cartão dentro não se apaga, e a ferramenta diz quantos são.
+      Desmarque <em>Aparece no quadro</em>: a etapa sai da visão dos corretores
+      assim que o último cartão for movido para outra coluna, e o histórico de
+      quem passou por ela fica preservado.
+    </p>
+  </div>
+
+  <h2><span class="n">10</span> Quando algo dá errado</h2>
   <table class="t">
     <thead><tr><th>Sintoma</th><th>Causa provável</th></tr></thead>
     <tbody>
@@ -399,6 +577,26 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
       <tr>
         <td>Sincronização diz que não pode sincronizar</td>
         <td>a conta usada não é administrador</td>
+      </tr>
+      <tr>
+        <td>Sincronizar não traz lote nenhum</td>
+        <td>
+          o CSV do espelho está vazio, sem a coluna Quadra, ou a planilha não
+          está publicada na web. Confira o endereço no cadastro do
+          empreendimento
+        </td>
+      </tr>
+      <tr>
+        <td>Um empreendimento novo não aparece na nova proposta</td>
+        <td>falta a tabela de preço vigente, ou as condições de pagamento</td>
+      </tr>
+      <tr>
+        <td>Um corretor diz que sumiu um empreendimento</td>
+        <td>a conta dele está restrita. Admin &rarr; Corretores</td>
+      </tr>
+      <tr>
+        <td>Não consigo apagar uma etapa do funil</td>
+        <td>há cartões nela. Mova-os, ou desmarque <em>Aparece no quadro</em></td>
       </tr>
       <tr>
         <td>&ldquo;O servidor não respondeu e nada foi gravado&rdquo;</td>

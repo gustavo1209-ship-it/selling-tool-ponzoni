@@ -693,9 +693,100 @@ parcela a parcela). Nome de aba do Excel não aceita `/ \ ? * [ ] :` e corta
 em 31 caracteres — `nomeDeAba` cuida disso e desambigua repetidos.
 `exceljs` está em `serverExternalPackages` no `next.config.ts`.
 
+## Funil de vendas (`/funil`)
+
+O que existe **antes** da proposta. A ferramenta começava quando o cliente já
+tinha escolhido lote e condição; o que vinha antes — o lead que ligou, a
+visita marcada, o "ele ficou de responder na segunda" — vivia no WhatsApp de
+cada corretor.
+
+Duas tabelas (migration 30):
+
+- **`funil_etapas`** são as colunas do quadro, e são **dados**: o admin
+  renomeia, recolore, reordena e arquiva em `/admin/funil`, sem versão nova.
+  O campo que não é decoração é `desfecho` (`aberta` / `ganha` / `perdida`) —
+  é dele que sai a contagem de negociações em andamento, e é ele que faz o
+  cartão carimbar `fechada_em` ao chegar numa coluna terminal.
+- **`negociacoes`** são os cartões. Um por oportunidade, **não** um por
+  cliente: o mesmo comprador pode estar negociando dois lotes em momentos
+  diferentes. Por isso não é uma coluna em `clientes`.
+
+O cartão **nasce solto** — um nome e um telefone, que é o que se tem depois
+de uma ligação — e vai ganhando vínculo: cliente cadastrado, empreendimento,
+lote, proposta, contrato. Nenhum é obrigatório de propósito: se exigisse
+cliente cadastrado, ninguém registraria a ligação de quinta-feira. O botão
+"Cadastrar como cliente" no cartão fecha o caminho de volta, que senão seria
+cadastrar em `/clientes` e lembrar de voltar ao quadro para vincular.
+
+`fechada_em` é **derivado da coluna, nunca digitado** — quem arrasta para
+"Fechado" não vai carimbar a data, e quem arrasta de volta deixaria a data
+velha lá, com o cartão contando como fechado para sempre.
+
+### O quadro cabe na tela
+
+Sem rolagem lateral: o quadro é uma grade de **N colunas iguais**, com N vindo
+do número de etapas no quadro (`--colunas`, uma variável CSS inline, porque o
+Tailwind não gera classe a partir de valor dinâmico). `minmax(0, 1fr)` é a
+peça que importa — é ela que faz a coluna encolher em vez de empurrar a
+vizinha para fora. Com largura fixa, acrescentar etapa escondia a última,
+justamente onde a negociação fecha.
+
+Dez colunas cabem em ~135px cada num monitor de 1512px, e a essa largura um
+nome de uma palavra só não cabe inteiro: por isso o título da coluna tem
+`hyphens-auto`, que parte na sílaba (o documento é `lang="pt-BR"`) em vez de
+cortar no meio da letra.
+
+Abaixo de `md` vira coluna única, empilhada. Sete faixas de 40px não seriam um
+quadro.
+
+### Arrastar
+
+Drag-and-drop do próprio navegador, sem biblioteca: é uma dependência a menos
+numa ferramenta que tem cinco, e a lista de um corretor cabe na tela — o que
+faz as bibliotecas ganharem (virtualização, listas de milhares) não se
+aplica aqui.
+
+`negociacoes.ordem` é `numeric` por causa disso: soltar um cartão entre dois
+outros grava o **ponto médio** das duas ordens e não reescreve mais nada.
+Soltar sobre um cartão insere antes dele; soltar no vazio da coluna manda
+para o fim.
+
+O cartão se move na tela antes da resposta do servidor via `useOptimistic` —
+e volta sozinho ao que o banco disser se a gravação falhar. **Não trocar por
+um `useState` sincronizado por `useEffect`**: além de ser o padrão que o
+React desaconselha, o lint da casa (`react-hooks/set-state-in-effect`)
+recusa.
+
+Uma coluna arquivada some do quadro, mas **só quando esvazia** — senão os
+cartões que ficaram nela sumiriam junto. Pelo mesmo motivo `apagarEtapa`
+conta os cartões antes e sugere arquivar; o banco impede com
+`on delete restrict`, mas a mensagem dele é a de chave estrangeira.
+
+## Administração pela tela (`/admin`)
+
+Três telas, todas atrás de `perfilAtual()?.ehAdmin` **e** da RLS:
+
+| Rota | Para quê |
+|---|---|
+| `/admin/empreendimentos` | cadastrar loteamento, apontar o espelho do Sheets, montar tabela de preço e condições, sincronizar lotes |
+| `/admin/corretores` | promover a admin e restringir empreendimentos |
+| `/admin/funil` | as colunas do kanban |
+
+O `redirect("/")` nas páginas e o `exigirAdmin()` das ações são cortesia: as
+policies já recusariam. O que `exigirAdmin()` acrescenta é a frase em
+português no lugar de "new row violates row-level security policy" — e evitar
+que um update que a policy simplesmente não alcança (zero linhas, sem erro)
+seja relatado como sucesso.
+
 ## Adicionar um empreendimento (o caminho do Florescer)
 
-Quase tudo é dado, não código. A ordem que funciona:
+Quase tudo é dado, não código. Desde a migration 31 os passos 1, 2 e 3 têm
+tela: **`/admin/empreendimentos`** faz o cadastro, a tabela de preço, as
+condições e o Sincronizar, na ordem abaixo. O SQL continua valendo para
+quando a origem dos preços não é o Sheets — foi o caso do Florescer, cuja
+migration 19 cruza planilha e PDF.
+
+A ordem que funciona:
 
 **1. A linha em `empreendimentos`.** Além de `slug`, `nome` e cidade, são
 cinco URLs, e cada uma serve a uma coisa diferente:
@@ -742,7 +833,9 @@ npm run mapa:extrair -- "C:/.../site-florescer/mapa-lotes-florescer.html"   src/
 ```
 
 e registrar o módulo em `src/lib/mapa/index.ts`. É o único ponto que pede
-código.
+código — junto dos dois arquivos de `public/`, que são arquivo no
+repositório e não linha no banco. É por isso que a tela de administração
+pede o **caminho** do logo e da foto aérea em vez de aceitar upload.
 
 **6. Conferir.** `npm run verificar` continua passando (o motor não depende do
 empreendimento) — e vale acrescentar ali um punhado de conferências contra a
@@ -775,6 +868,28 @@ o banco recusaria. Menu, botões do espelho e a página `/indices` olham
 `perfilAtual()` de `src/lib/supabase/perfil.ts` — isso é cortesia, não
 controle de acesso. Ao escrever tela nova, a pergunta certa continua sendo
 "a policy deixa?".
+
+### Quais empreendimentos cada corretor vê
+
+**O padrão continua sendo ver todos** — a restrição é opt-in, pessoa a
+pessoa, em `/admin/corretores`. São duas peças (migration 31):
+`perfis.empreendimentos_restritos` liga a trava e `corretor_empreendimentos`
+diz o que fica visível. Duas em vez de uma porque "lista vazia" seria
+ambíguo: desmarcar o último empreendimento não pode significar "vê tudo de
+novo".
+
+Quem separa é a RLS. `pode_ver_empreendimento()` entra nas policies de
+leitura de `empreendimentos`, `lotes`, `tabelas_preco` e
+`condicoes_pagamento` — e **também no `where` da view `lotes_visiveis`**,
+porque ela é SECURITY DEFINER e não aplica a RLS da tabela. É exatamente o
+caso que o comentário da migration 28 antecipou ("se um dia a leitura de
+lotes for restringida, a view precisa repetir o filtro"); ao mexer nessa
+view, repetir o filtro de novo.
+
+Efeito colateral conhecido: uma proposta ou contrato antigo de um
+empreendimento que o corretor deixou de ver continua na carteira dele, mas o
+join com `empreendimentos` volta nulo. Restringir quem já tem histórico é
+decisão da casa, não acidente.
 
 ### O que continua compartilhado
 
@@ -1027,10 +1142,71 @@ O XLSX de `/cobranca` é a planilha que vai para o banco: uma linha por
 boleto, com sacado, documento, vencimento e valor, mais as colunas de origem
 do número. A coluna **"índice estimado"** é a que impede o erro caro.
 
+### Quais colunas saem no documento
+
+`contratos.colunas_documento` (migration 32) escolhe as colunas do
+cronograma, e vale para as duas saídas — o demonstrativo em PDF e o XLSX. O
+catálogo é um só, em `src/lib/contratos/colunas.ts`; cada coluna declara em
+qual das duas sabe se desenhar, e as que só existem na planilha (`encargos`,
+`a cobrar`, `forma`, `boleto`) a folha ignora.
+
+**`null` é "todas"**, e é o que todo contrato antigo é: sem configurar nada, o
+documento sai como sempre saiu. Marcar todas grava `null` de novo, e uma
+lista que zerou também vira "todas" — um cronograma sem coluna nenhuma seria
+uma folha em branco, não um documento. O efeito é que contrato configurado no
+padrão e contrato nunca tocado são a mesma linha no banco.
+
+O caso que pediu isso é o inverso do que a folha assumia: ela mostrava valor
+de origem e valor corrigido lado a lado para explicar a correção, e o cliente
+que só quer saber quanto paga liga perguntando qual dos dois vale. Desmarcar
+"Valor de origem" resolve.
+
+A escolha fica **gravada no contrato**, não é feita na hora de imprimir: quem
+entrega o documento entrega mais de uma vez, e a segunda via tem de sair
+igual à primeira. Configura-se em `/contratos/[id]`, no botão "Colunas do
+documento".
+
+Ao acrescentar coluna nova, o lugar é o catálogo — a folha
+(`montarColunas` em `FolhaDemonstrativo`) e a rota do XLSX (`COLUNAS_XLSX`)
+leem dele, e o rodapé "Total do cronograma" calcula o `colSpan` a partir da
+primeira coluna que tem total. Não voltar a escrever `colSpan` na mão.
+
 ### Contrato é dado do escritório
 
 A RLS segue `clientes`, não `propostas`: o time lê e escreve, e só o autor ou
 um admin apaga. Quem dá baixa num pagamento raramente é quem fechou a venda.
+
+## Cabeçalho
+
+Dez abas no menu do admin, e a barra **não rola na horizontal**: `flex-wrap`
+no `<nav>`, e a barra cresce em altura quando precisa. Rolagem lateral
+escondia justamente as últimas abas (Índices e Admin) sem dar sinal de que
+existiam.
+
+Abaixo de `lg` o `<nav>` toma a linha inteira (`order-3 w-full`). Disputando
+largura com o logo e com os botões da direita, ele chegava a um link por
+linha no celular — e o cabeçalho é fixo, então comia meia tela.
+
+Os rótulos são curtos pelo mesmo motivo: "Mapa" e "Espelho", não "Mapa de
+lotes" e "Espelho de vendas". Ao acrescentar aba nova, conferir que os dez
+itens ainda cabem numa linha por volta de 1170px — é aí que o menu do admin
+está no limite.
+
+## Manuais
+
+`public/manual-corretor.html` e `public/manual-admin.html` — HTML autocontido,
+mesmo padrão da folha da proposta, servidos estaticamente e linkados no
+cabeçalho conforme o papel de quem está logado.
+
+**A fonte é o HTML; os PDFs em `manuais/` são impressos à mão** pelo botão
+"Imprimir / salvar em PDF" da própria página (A4, margens padrão, gráficos de
+fundo ligados). Não há script que os gere. Depois de mexer num manual, os PDFs
+ficam velhos até alguém reimprimir — e é `npm run replicar` que os copia para
+a pasta do OneDrive.
+
+As seções são numeradas à mão (`<h2><span class="n">4</span>`). Ao inserir uma
+seção no meio, renumerar as seguintes de trás para frente, senão a nova colide
+com a que já tinha aquele número.
 
 ## Fontes de dados
 

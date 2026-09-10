@@ -8,16 +8,22 @@ const MARCA = "industrial-ponzoni";
  * `soAdmin` esconde do corretor o que ele não administra. A RLS é quem de
  * fato barra o acesso (migration 26) — isto evita oferecer uma tela que
  * responderia vazia.
+ *
+ * Os rótulos são curtos de propósito: o menu do admin tem dez itens e
+ * precisa caber sem rolagem. "Mapa" e "Espelho" já dizem o que são dentro da
+ * própria ferramenta — o "de lotes" e o "de vendas" só ocupavam largura.
  */
 const LINKS = [
   { href: "/", rotulo: "Início" },
-  { href: "/mapa", rotulo: "Mapa de lotes" },
-  { href: "/espelho", rotulo: "Espelho de vendas" },
+  { href: "/mapa", rotulo: "Mapa" },
+  { href: "/espelho", rotulo: "Espelho" },
+  { href: "/funil", rotulo: "Funil" },
   { href: "/propostas", rotulo: "Propostas" },
   { href: "/contratos", rotulo: "Contratos" },
   { href: "/cobranca", rotulo: "A receber" },
   { href: "/clientes", rotulo: "Clientes" },
   { href: "/indices", rotulo: "Índices", soAdmin: true },
+  { href: "/admin", rotulo: "Admin", soAdmin: true },
 ];
 
 export default async function Cabecalho() {
@@ -43,7 +49,19 @@ export default async function Cabecalho() {
   return (
     <header className="bg-superficie border-b border-linha sticky top-0 z-30">
       <div className="faixa-topo" />
-      <div className="max-w-[1400px] mx-auto px-5 h-14 flex items-center gap-6">
+      {/*
+        A barra cresce em altura em vez de rolar na horizontal: o menu do
+        admin tem dez itens e, em tela estreita, rolagem lateral esconde
+        justamente as abas do fim (Índices e Admin) sem dar sinal de que
+        existem. `flex-wrap` no <nav> quebra entre os links — cada um
+        continua inteiro, com `whitespace-nowrap`.
+
+        Abaixo de `lg` o menu desce para uma linha só dele (`order-3 w-full`).
+        Disputando largura com o logo e com os botões da direita, ele chegava
+        a um link por linha no celular e o cabeçalho, que é fixo, comia meia
+        tela. Com a faixa inteira cabem três ou quatro por linha.
+      */}
+      <div className="max-w-[1400px] mx-auto px-5 min-h-14 py-2 flex flex-wrap items-center gap-x-4 gap-y-1">
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
           {marca?.logo_url && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -61,19 +79,19 @@ export default async function Cabecalho() {
           </span>
         </Link>
 
-        <nav className="flex items-center gap-1 overflow-x-auto">
+        <nav className="order-3 w-full lg:order-none lg:w-auto lg:flex-1 flex flex-wrap items-center gap-x-0.5 gap-y-1">
           {LINKS.filter((l) => !l.soAdmin || perfil?.papel === "admin").map((l) => (
             <Link
               key={l.href}
               href={l.href}
-              className="text-sm text-tinta-suave px-3 py-1.5 rounded-md hover:bg-papel-alt whitespace-nowrap"
+              className="text-sm text-tinta-suave px-2.5 py-1.5 rounded-md hover:bg-papel-alt whitespace-nowrap"
             >
               {l.rotulo}
             </Link>
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-3 shrink-0">
+        <div className="ml-auto flex items-center gap-2 shrink-0">
           {/* o manual acompanha o papel de quem está logado */}
           <a
             href={
@@ -83,16 +101,21 @@ export default async function Cabecalho() {
             }
             target="_blank"
             rel="noreferrer"
-            className="text-sm text-tinta-suave px-3 py-1.5 rounded-md hover:bg-papel-alt whitespace-nowrap hidden sm:inline"
+            className="text-sm text-tinta-suave px-2.5 py-1.5 rounded-md hover:bg-papel-alt whitespace-nowrap hidden sm:inline"
           >
             Manual
           </a>
-          <span className="text-sm text-cinza hidden md:inline">
+          {/*
+            O nome sai antes do selo quando a tela aperta: quem está logado é
+            uma conferência ocasional, mas o selo de admin muda o que a tela
+            oferece e vale a largura que ocupa.
+          */}
+          <span className="text-sm text-cinza hidden xl:inline">
             {perfil?.nome ?? user?.email}
-            {perfil?.papel === "admin" && (
-              <span className="selo selo-marca ml-2 align-middle">admin</span>
-            )}
           </span>
+          {perfil?.papel === "admin" && (
+            <span className="selo selo-marca">admin</span>
+          )}
           <SairBotao />
         </div>
       </div>

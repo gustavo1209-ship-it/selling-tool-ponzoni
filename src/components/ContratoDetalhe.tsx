@@ -11,6 +11,7 @@ import {
   Printer,
   RotateCcw,
   Settings2,
+  Table2,
   Trash2,
   X,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import {
   atualizarParcela,
   darBaixa,
   darBaixaEmLote,
+  definirColunasDoDocumento,
   desfazerBaixa,
   desfazerBaixaEmLote,
   type ModoBaixa,
@@ -27,6 +29,7 @@ import {
 import CampoNumero from "./CampoNumero";
 import { SeloContrato, SeloParcela } from "./SeloStatus";
 import type { Indexador } from "@/lib/calc/tipos";
+import { COLUNAS_DOC, TODAS_AS_COLUNAS } from "@/lib/contratos/colunas";
 import { hojeISO, rotuloCompetencia } from "@/lib/contratos/mes";
 import type { ContratoCalculado, ParcelaCalculada } from "@/lib/contratos/tipos";
 import type {
@@ -91,6 +94,15 @@ export default function ContratoDetalhe({
     rotulo: string;
     observacao: string;
   } | null>(null);
+
+  // `null` no banco significa "todas" — a tela abre com tudo marcado, que é
+  // o que o documento mostra hoje.
+  const [colunas, setColunas] = useState(false);
+  const [colunasEscolhidas, setColunasEscolhidas] = useState<string[]>(
+    contrato.colunas_documento?.length
+      ? contrato.colunas_documento
+      : [...TODAS_AS_COLUNAS]
+  );
 
   const [ajustes, setAjustes] = useState(false);
   const [cfg, setCfg] = useState({
@@ -285,6 +297,12 @@ export default function ContratoDetalhe({
           >
             <Settings2 size={15} /> Editar contrato
           </button>
+          <button
+            className="btn btn-secundario"
+            onClick={() => setColunas((c) => !c)}
+          >
+            <Table2 size={15} /> Colunas do documento
+          </button>
           <a
             className="btn btn-secundario"
             href={`/api/contratos/${contrato.id}/xlsx`}
@@ -381,6 +399,86 @@ export default function ContratoDetalhe({
           </p>
         </div>
       </section>
+
+      {/* ------------------------------------------- colunas do documento */}
+      {colunas && (
+        <section className="cartao p-5 flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="serif text-lg">Colunas do documento</h2>
+              <p className="text-sm text-cinza mt-1">
+                Vale para o demonstrativo em PDF e para o XLSX. Fica gravado no
+                contrato, então a reimpressão sai igual à via que o cliente já
+                recebeu.
+              </p>
+            </div>
+            <button className="btn btn-fantasma" onClick={() => setColunas(false)}>
+              <X size={15} />
+            </button>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {COLUNAS_DOC.filter((c) => !c.soComCorrecao || !semCorrecao).map((c) => {
+              const marcada = colunasEscolhidas.includes(c.chave);
+              return (
+                <label
+                  key={c.chave}
+                  className="flex gap-2.5 items-start rounded-md border border-linha px-3 py-2 cursor-pointer hover:bg-papel-alt"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={marcada}
+                    onChange={() =>
+                      setColunasEscolhidas((atual) =>
+                        marcada
+                          ? atual.filter((x) => x !== c.chave)
+                          : [...atual, c.chave]
+                      )
+                    }
+                  />
+                  <span>
+                    <span className="text-sm font-semibold block">
+                      {c.rotulo}
+                      <span className="text-cinza font-normal">
+                        {" "}
+                        · {c.pdf && c.xlsx ? "PDF e XLSX" : c.pdf ? "só PDF" : "só XLSX"}
+                      </span>
+                    </span>
+                    <span className="text-xs text-cinza">{c.ajuda}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className="btn btn-primario"
+              disabled={pendente}
+              onClick={() =>
+                agir(async () => {
+                  await definirColunasDoDocumento(contrato.id, colunasEscolhidas);
+                  setColunas(false);
+                })
+              }
+            >
+              <Check size={15} /> Salvar
+            </button>
+            <button
+              className="btn btn-secundario"
+              onClick={() => setColunasEscolhidas([...TODAS_AS_COLUNAS])}
+            >
+              <RotateCcw size={15} /> Marcar todas
+            </button>
+            <span className="text-xs text-cinza">
+              {colunasEscolhidas.length === 0
+                ? "Nenhuma marcada — o documento sai com todas as colunas."
+                : `${colunasEscolhidas.length} de ${TODAS_AS_COLUNAS.length} marcadas.`}
+            </span>
+          </div>
+        </section>
+      )}
 
       {/* -------------------------------------------------------- ajustes */}
       {ajustes && (

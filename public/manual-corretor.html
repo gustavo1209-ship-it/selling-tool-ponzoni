@@ -130,7 +130,7 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     <tbody>
       <tr>
         <td>Empreendimentos, lotes, mapa, tabela de preços e condições de pagamento</td>
-        <td>Propostas, clientes e contratos que você criou</td>
+        <td>Negociações do funil, propostas, clientes e contratos que você criou</td>
       </tr>
     </tbody>
   </table>
@@ -140,6 +140,16 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     <strong>preço de lotes vendidos ou não disponíveis</strong>. Os lotes que
     você pode vender mostram o preço normalmente.
   </p>
+  <div class="caixa">
+    <span class="rot">Quais empreendimentos você vê</span>
+    <p>
+      Por padrão, todos. A administração pode restringir uma conta a
+      empreendimentos específicos — nesse caso, os outros somem inteiros para
+      você: do seletor do espelho, do mapa, da lista de nova proposta. Se um
+      empreendimento que você esperava não aparece em lugar nenhum, é isso, e
+      quem resolve é a administração.
+    </p>
+  </div>
 
   <h2><span class="n">3</span> Espelho de vendas</h2>
   <p>
@@ -168,12 +178,87 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
 
   <h3>Mapa de lotes</h3>
   <p>
-    A aba <strong>Mapa de lotes</strong> abre o mesmo mapa interativo que está
+    A aba <strong>Mapa</strong> abre o mesmo mapa interativo que está
     no site do empreendimento, com as cores por situação. É a forma mais rápida
     de mostrar ao cliente onde fica o terreno e o que há em volta.
   </p>
 
-  <h2><span class="n">4</span> Montar uma proposta</h2>
+  <h2><span class="n">4</span> Funil de vendas</h2>
+  <p>
+    A aba <strong>Funil</strong> é um quadro com uma coluna por etapa da
+    negociação e um cartão por oportunidade. É onde fica o que ainda não virou
+    proposta: quem ligou, quem visitou, quem ficou de responder na segunda.
+  </p>
+  <p>
+    O cartão é <strong>por negociação, não por cliente</strong>. O mesmo
+    comprador pode ter dois cartões abertos, em dois lotes e em momentos
+    diferentes, e cada um anda no seu ritmo.
+  </p>
+
+  <h3>Criar um cartão</h3>
+  <p>
+    <strong>Novo prospecto</strong>, ou o <strong>+</strong> no topo da coluna
+    em que ele deve entrar. O mínimo é um nome — <strong>não é preciso
+    cadastrar o cliente antes</strong>, e isso é de propósito: se exigisse
+    cadastro completo, a ligação de quinta-feira não seria registrada.
+    Telefone, empreendimento, lote de interesse, valor estimado, origem e a
+    data do próximo contato entram quando você souber.
+  </p>
+
+  <h3>Mover pelo funil</h3>
+  <p>
+    <strong>Arraste o cartão</strong> para a coluna seguinte. Soltando sobre
+    outro cartão, ele entra acima daquele; soltando no vazio da coluna, vai
+    para o fim. Também dá para abrir o cartão e trocar a etapa pelo seletor,
+    que é o jeito mais confortável no celular.
+  </p>
+  <p>
+    As colunas são definidas pela administração e podem mudar. As do fim
+    normalmente encerram a negociação — ao chegar numa delas, o cartão registra
+    sozinho a data de fechamento e sai da contagem de negociações em andamento.
+    Arrastar de volta desfaz.
+  </p>
+
+  <h3>Do cartão para a venda</h3>
+  <table class="t">
+    <thead><tr><th>Botão / campo</th><th>Para quê</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Cadastrar como cliente</strong></td>
+        <td>
+          transforma o prospecto em cliente de verdade, levando nome, telefone
+          e observação, e já vincula os dois. Aparece quando o cartão ainda não
+          tem cliente. Evita cadastrar em Clientes e ter de voltar aqui para
+          amarrar.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>Proposta vinculada</strong></td>
+        <td>
+          amarra o cartão a uma proposta sua já montada. O código passa a
+          aparecer no cartão e leva direto ao documento. A proposta continua
+          sendo criada na aba Propostas.
+        </td>
+      </tr>
+      <tr>
+        <td><strong>Próximo contato</strong></td>
+        <td>
+          a data em que você combinou de voltar a falar. Quando ela passa, o
+          cartão mostra a data em vermelho — é a sua lista de retorno atrasado.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="caixa">
+    <span class="rot">O quadro é seu</span>
+    <p>
+      Você vê os seus cartões, e não os dos colegas — mesma regra das
+      propostas. O topo da tela conta quantas negociações estão em andamento e
+      soma o valor estimado delas.
+    </p>
+  </div>
+
+  <h2><span class="n">5</span> Montar uma proposta</h2>
   <ol class="passos">
     <li><strong>Propostas &rarr; Nova proposta.</strong> Escolha o empreendimento.</li>
     <li>
@@ -200,7 +285,7 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     <li><strong>Criar proposta.</strong> Você cai direto no simulador.</li>
   </ol>
 
-  <h2><span class="n">5</span> O simulador</h2>
+  <h2><span class="n">6</span> O simulador</h2>
   <p>
     É onde a proposta é ajustada com o cliente na frente. Cada aba é uma opção
     de parcelamento; o <strong>comparativo</strong> no topo põe todas lado a
@@ -245,7 +330,7 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     &ldquo;Salve para gerar PDF/XLSX&rdquo;. Salve e eles voltam.
   </p>
 
-  <h2><span class="n">6</span> Entregar ao cliente</h2>
+  <h2><span class="n">7</span> Entregar ao cliente</h2>
   <table class="t">
     <thead><tr><th>Botão</th><th>Para quê</th></tr></thead>
     <tbody>
@@ -277,7 +362,7 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     </p>
   </div>
 
-  <h2><span class="n">7</span> Clientes</h2>
+  <h2><span class="n">8</span> Clientes</h2>
   <p>
     A aba <strong>Clientes</strong> lista os seus, com as propostas de cada um.
     O lápis edita em linha. Os mesmos dados também podem ser ajustados de
@@ -289,7 +374,7 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     reatribua as propostas antes.
   </p>
 
-  <h2><span class="n">8</span> Contratos e o que há a receber</h2>
+  <h2><span class="n">9</span> Contratos e o que há a receber</h2>
   <p>
     Quando a venda fecha, ela vira um <strong>contrato</strong>, que acompanha
     os pagamentos. Você vê os contratos que cadastrou e, em
@@ -300,8 +385,21 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     copia o cronograma da opção aberta. A emissão dos boletos e a baixa dos
     pagamentos são feitas pela administração.
   </p>
+  <p>
+    Dentro do contrato, <strong>Demonstrativo</strong> é a folha A4 que o
+    cliente pede quando quer conferir o que já pagou e o que falta.
+    <strong>Colunas do documento</strong> escolhe o que sai nessa folha e no
+    XLSX. O uso mais comum é <strong>desmarcar &ldquo;Valor de origem&rdquo;</strong>:
+    sem ela, o cliente vê um número só por parcela — o que ele paga — em vez do
+    valor antigo e do corrigido lado a lado, que é o que costuma gerar a
+    ligação perguntando qual dos dois vale.
+  </p>
+  <p>
+    A escolha fica guardada no contrato, então reimprimir meses depois sai
+    igual à via que o cliente já tem na mão.
+  </p>
 
-  <h2><span class="n">9</span> Quando algo dá errado</h2>
+  <h2><span class="n">10</span> Quando algo dá errado</h2>
   <table class="t">
     <thead><tr><th>O que aparece</th><th>O que fazer</th></tr></thead>
     <tbody>
@@ -325,6 +423,14 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
         <td>
           A lista de nova proposta traz só lotes livres e reservados. Se mudou
           de situação, confirme com a administração.
+        </td>
+      </tr>
+      <tr>
+        <td>Um cartão do funil não deixa mudar de coluna</td>
+        <td>
+          A coluna precisa estar no quadro. Se a administração arquivou uma
+          etapa, ela some assim que o último cartão sai dela — mova os que
+          ficaram para outra coluna.
         </td>
       </tr>
       <tr>

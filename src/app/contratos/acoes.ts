@@ -9,6 +9,7 @@ import {
   cronogramaManual,
   type NovaParcela,
 } from "@/lib/contratos/cronograma";
+import { TODAS_AS_COLUNAS } from "@/lib/contratos/colunas";
 import { calcularContrato, type ParcelaBruta } from "@/lib/contratos/correcao";
 import { hojeISO } from "@/lib/contratos/mes";
 import { carregarIndices, serieDe } from "@/lib/contratos/servidor";
@@ -325,6 +326,35 @@ export async function atualizarContrato(id: string, dados: DadosContrato) {
   revalidatePath("/contratos");
   revalidatePath(`/contratos/${id}`);
   revalidatePath("/cobranca");
+  return { ok: true };
+}
+
+/**
+ * Quais colunas do cronograma saem no demonstrativo e no XLSX.
+ *
+ * Fica gravado no contrato, e não escolhido na hora de imprimir, porque
+ * quem entrega o documento entrega mais de uma vez: reimprimir tem de sair
+ * igual ao que o cliente já recebeu.
+ *
+ * Lista vazia **e lista completa** são gravadas como `null` — as duas
+ * significam "todas", e guardar o padrão como `null` é o que faz um contrato
+ * configurado e um nunca tocado serem a mesma coisa no banco.
+ */
+export async function definirColunasDoDocumento(id: string, colunas: string[]) {
+  const supabase = await createClient();
+  const validas = colunas.filter((c) =>
+    (TODAS_AS_COLUNAS as readonly string[]).includes(c)
+  );
+  const ehPadrao = validas.length === 0 || validas.length === TODAS_AS_COLUNAS.length;
+
+  const { error } = await supabase
+    .from("contratos")
+    .update({ colunas_documento: ehPadrao ? null : validas })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/contratos/${id}`);
+  revalidatePath(`/contratos/${id}/demonstrativo`);
   return { ok: true };
 }
 

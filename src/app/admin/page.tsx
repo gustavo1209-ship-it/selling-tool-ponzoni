@@ -1,0 +1,80 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { ArrowRight, Building2, KanbanSquare, Users } from "lucide-react";
+import Cabecalho from "@/components/Cabecalho";
+import { createClient } from "@/lib/supabase/server";
+import { perfilAtual } from "@/lib/supabase/perfil";
+
+export const dynamic = "force-dynamic";
+
+const TELAS = [
+  {
+    href: "/admin/empreendimentos",
+    icone: Building2,
+    titulo: "Empreendimentos",
+    texto:
+      "Cadastrar loteamento novo, apontar o espelho do Google Sheets, montar a tabela de preço e as condições de pagamento.",
+  },
+  {
+    href: "/admin/corretores",
+    icone: Users,
+    titulo: "Corretores",
+    texto:
+      "Quem é admin, e quais empreendimentos cada corretor enxerga. Por padrão todos veem todos.",
+  },
+  {
+    href: "/admin/funil",
+    icone: KanbanSquare,
+    titulo: "Etapas do funil",
+    texto:
+      "As colunas do quadro de negociações: nome, cor, ordem e o que cada uma significa para o negócio.",
+  },
+];
+
+export default async function AdminPage() {
+  const perfil = await perfilAtual();
+  if (!perfil?.ehAdmin) redirect("/");
+
+  const supabase = await createClient();
+  const [{ count: empreendimentos }, { count: pessoas }, { count: etapas }] =
+    await Promise.all([
+      supabase.from("empreendimentos").select("id", { count: "exact", head: true }),
+      supabase.from("perfis").select("id", { count: "exact", head: true }),
+      supabase
+        .from("funil_etapas")
+        .select("id", { count: "exact", head: true })
+        .eq("ativa", true),
+    ]);
+
+  const contagens = [empreendimentos, pessoas, etapas];
+
+  return (
+    <>
+      <Cabecalho />
+      <main className="max-w-[1000px] mx-auto px-5 py-8 flex flex-col gap-6">
+        <div>
+          <p className="eyebrow">Administração</p>
+          <h1 className="serif text-3xl mt-1">Configuração da ferramenta</h1>
+          <p className="text-sm text-cinza mt-1">
+            O que muda para a casa inteira. Índices mensais ficam na aba própria.
+          </p>
+        </div>
+
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {TELAS.map((t, i) => (
+            <Link key={t.href} href={t.href} className="cartao p-5 flex flex-col gap-3 hover:border-vinho">
+              <t.icone size={22} className="text-vinho" />
+              <div>
+                <h2 className="serif text-lg">{t.titulo}</h2>
+                <p className="text-sm text-cinza mt-1">{t.texto}</p>
+              </div>
+              <p className="text-sm text-vinho font-semibold mt-auto flex items-center gap-1.5">
+                {contagens[i] ?? 0} cadastrado(s) <ArrowRight size={14} />
+              </p>
+            </Link>
+          ))}
+        </section>
+      </main>
+    </>
+  );
+}

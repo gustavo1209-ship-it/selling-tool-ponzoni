@@ -13,7 +13,9 @@ export interface Perfil {
   id: string;
   nome: string;
   email: string;
-  papel: "vendedor" | "admin";
+  papel: "corretor" | "admin";
+  /** true = vê só os empreendimentos de `corretor_empreendimentos`. */
+  empreendimentos_restritos: boolean;
 }
 
 export interface Empreendimento {
@@ -228,6 +230,8 @@ export interface Contrato {
   juros_mora_mensal: number;
   multa_atraso_pct: number;
   observacoes: string | null;
+  /** Colunas do cronograma que saem no demonstrativo e no XLSX. null = todas. */
+  colunas_documento: string[] | null;
   criado_por: string | null;
   criado_em: string;
   atualizado_em: string;
@@ -268,4 +272,55 @@ export interface ContratoCompleto extends Contrato {
   cliente: Cliente | null;
   lotes: ContratoLote[];
   parcelas: ContratoParcela[];
+}
+
+// -------------------------------------------------------------- funil
+
+/** Uma coluna do kanban. O admin renomeia, recolore e reordena. */
+export interface FunilEtapa {
+  id: string;
+  nome: string;
+  cor: string;
+  ordem: number;
+  /** `ganha`/`perdida` fecham a negociação e carimbam `fechada_em`. */
+  desfecho: "aberta" | "ganha" | "perdida";
+  ativa: boolean;
+}
+
+/**
+ * Uma oportunidade no funil — o que existe antes da proposta.
+ *
+ * Nasce solta (nome e telefone) e vai ganhando vínculo: cliente, lote,
+ * proposta, contrato. Nenhum deles é obrigatório, senão o lead frio não
+ * entraria no quadro.
+ */
+export interface Negociacao {
+  id: string;
+  codigo: string;
+  etapa_id: string;
+  cliente_id: string | null;
+  titulo: string | null;
+  telefone: string | null;
+  empreendimento_id: string | null;
+  lote_id: string | null;
+  proposta_id: string | null;
+  contrato_id: string | null;
+  valor_estimado: number | null;
+  origem: string | null;
+  proximo_contato: string | null;
+  observacao: string | null;
+  ordem: number;
+  fechada_em: string | null;
+  criado_por: string | null;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+/** Negociação com o que o cartão do kanban mostra sem consulta extra. */
+export interface NegociacaoNoQuadro extends Negociacao {
+  cliente: { id: string; nome: string; telefone: string | null } | null;
+  empreendimento: { id: string; nome: string } | null;
+  lote: { id: string; quadra: string; numero: string } | null;
+  proposta: { id: string; codigo: string } | null;
+  contrato: { id: string; codigo: string } | null;
 }

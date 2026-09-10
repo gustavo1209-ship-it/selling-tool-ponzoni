@@ -2,8 +2,10 @@ import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { calcularContrato } from "@/lib/contratos/correcao";
+import { colunasAtivas, type ChaveColuna } from "@/lib/contratos/colunas";
 import { rotuloCompetencia } from "@/lib/contratos/mes";
 import { carregarIndices, serieDe } from "@/lib/contratos/servidor";
+import type { ParcelaCalculada } from "@/lib/contratos/tipos";
 import type { ContratoCompleto } from "@/lib/db/tipos";
 import {
   ROTULO_INDEXADOR,
@@ -18,6 +20,118 @@ const DATA = "dd/mm/yyyy";
 /** "#5B2166" → "FF5B2166", que é como o ExcelJS quer a cor. */
 const argb = (hex: string | null | undefined) =>
   hex ? "FF" + hex.replace("#", "").toUpperCase().padStart(6, "0") : "FF7C2A28";
+
+/**
+ * As colunas do cronograma na planilha, na ordem em que saem.
+ *
+ * Cabeçalho, valor, formato e largura moram juntos porque saem juntos: com
+ * as colunas escolhidas pelo contrato, uma lista de larguras à parte
+ * desalinharia na primeira coluna escondida.
+ */
+interface ColunaXlsx {
+  chave: ChaveColuna;
+  cabecalho: string;
+  valor: (p: ParcelaCalculada) => string | number | Date;
+  formato?: string;
+  largura: number;
+}
+
+const COLUNAS_XLSX: ColunaXlsx[] = [
+  { chave: "numero", cabecalho: "#", valor: (p) => p.numero, largura: 5 },
+  { chave: "rotulo", cabecalho: "Grupo", valor: (p) => p.rotulo, largura: 22 },
+  {
+    chave: "grupo",
+    cabecalho: "Parcela",
+    valor: (p) => (p.total_no_grupo > 1 ? `${p.indice}/${p.total_no_grupo}` : ""),
+    largura: 10,
+  },
+  {
+    chave: "vencimento",
+    cabecalho: "Vencimento",
+    valor: (p) => new Date(`${p.vencimento}T12:00:00`),
+    formato: DATA,
+    largura: 12,
+  },
+  {
+    chave: "valor_original",
+    cabecalho: "Valor original",
+    valor: (p) => p.valor_original,
+    formato: MOEDA,
+    largura: 15,
+  },
+  {
+    chave: "correcao_de",
+    cabecalho: "Correção de",
+    valor: (p) => {
+      const comps = p.correcao.competencias;
+      if (!comps.length) return "—";
+      return `${rotuloCompetencia(comps[0])} a ${rotuloCompetencia(
+        comps[comps.length - 1]
+      )}${p.correcao.estimado ? " (parcial)" : ""}`;
+    },
+    largura: 20,
+  },
+  {
+    chave: "fator",
+    cabecalho: "Fator",
+    valor: (p) => (p.indexada ? p.correcao.fator : 1),
+    formato: "0.00000",
+    largura: 12,
+  },
+  {
+    chave: "valor_corrigido",
+    cabecalho: "Valor corrigido",
+    valor: (p) => p.valorCorrigido,
+    formato: MOEDA,
+    largura: 15,
+  },
+  {
+    chave: "encargos",
+    cabecalho: "Encargos",
+    valor: (p) => (p.encargos ? p.encargos.multa + p.encargos.juros : 0),
+    formato: MOEDA,
+    largura: 13,
+  },
+  {
+    chave: "a_cobrar",
+    cabecalho: "A cobrar",
+    valor: (p) => (p.situacao === "paga" ? 0 : p.valorACobrar),
+    formato: MOEDA,
+    largura: 15,
+  },
+  {
+    chave: "situacao",
+    cabecalho: "Situação",
+    valor: (p) => ROTULO_SITUACAO_PARCELA[p.situacao] ?? p.situacao,
+    largura: 12,
+  },
+  {
+    chave: "pago_em",
+    cabecalho: "Pago em",
+    valor: (p) => (p.pago_em ? new Date(`${p.pago_em}T12:00:00`) : ""),
+    formato: DATA,
+    largura: 12,
+  },
+  {
+    chave: "valor_pago",
+    cabecalho: "Valor pago",
+    valor: (p) => p.valor_pago ?? "",
+    formato: MOEDA,
+    largura: 14,
+  },
+  {
+    chave: "forma",
+    cabecalho: "Forma",
+    valor: (p) => p.forma_pagamento ?? "",
+    largura: 14,
+  },
+  {
+    chave: "boleto",
+    cabecalho: "Nº do boleto",
+    valor: (p) => p.boleto_numero ?? "",
+    largura: 16,
+  },
+];
 
 /** Extrato do contrato: posição de hoje e o cronograma parcela a parcela. */
 export async function GET(
@@ -61,6 +175,16 @@ export async function GET(
     taxa
   );
 
+  // O contrato escolhe quais colunas do cronograma saem (migration 32); o
+  // padrão continua sendo todas. Cabeçalho, células e largura vêm da mesma
+  // lista, senão uma coluna escondida desalinha o resto.
+  const ativas = colunasAtivas(
+    contrato.colunas_documento,
+    "xlsx",
+    contrato.indexador !== "nenhum"
+  );
+  const colunas = COLUNAS_XLSX.filter((c) => ativas.has(c.chave));
+
   const cor = argb(contrato.empreendimento.cor_primaria);
   const wb = new ExcelJS.Workbook();
   wb.creator = "Ponzoni — ferramenta de vendas";
@@ -69,7 +193,7 @@ export async function GET(
   const titulo = ws.addRow([
     `${contrato.codigo} — ${contrato.cliente?.nome ?? contrato.titulo ?? "sem comprador"}`,
   ]);
-  ws.mergeCells(titulo.number, 1, titulo.number, 11);
+  ws.mergeCells(titulo.number, 1, titulo.number, Math.max(2, colunas.length));
   titulo.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" }, name: "Arial" };
   titulo.fill = { type: "pattern", pattern: "solid", fgColor: { argb: cor } };
   titulo.height = 22;
@@ -111,23 +235,7 @@ export async function GET(
 
   ws.addRow([]);
 
-  const cab = ws.addRow([
-    "#",
-    "Grupo",
-    "Parcela",
-    "Vencimento",
-    "Valor original",
-    "Correção de",
-    "Fator",
-    "Valor corrigido",
-    "Encargos",
-    "A cobrar",
-    "Situação",
-    "Pago em",
-    "Valor pago",
-    "Forma",
-    "Nº do boleto",
-  ]);
+  const cab = ws.addRow(colunas.map((c) => c.cabecalho));
   cab.font = { bold: true, size: 9, name: "Arial" };
   cab.fill = { type: "pattern", pattern: "solid", fgColor: { argb: PAPEL } };
   cab.eachCell((c) => {
@@ -135,37 +243,21 @@ export async function GET(
   });
 
   for (const p of calculo.parcelas) {
-    const comps = p.correcao.competencias;
-    const linha = ws.addRow([
-      p.numero,
-      p.rotulo,
-      p.total_no_grupo > 1 ? `${p.indice}/${p.total_no_grupo}` : "",
-      new Date(`${p.vencimento}T12:00:00`),
-      p.valor_original,
-      comps.length
-        ? `${rotuloCompetencia(comps[0])} a ${rotuloCompetencia(comps[comps.length - 1])}${p.correcao.estimado ? " (parcial)" : ""}`
-        : "—",
-      p.indexada ? p.correcao.fator : 1,
-      p.valorCorrigido,
-      p.encargos ? p.encargos.multa + p.encargos.juros : 0,
-      p.situacao === "paga" ? 0 : p.valorACobrar,
-      ROTULO_SITUACAO_PARCELA[p.situacao] ?? p.situacao,
-      p.pago_em ? new Date(`${p.pago_em}T12:00:00`) : "",
-      p.valor_pago ?? "",
-      p.forma_pagamento ?? "",
-      p.boleto_numero ?? "",
-    ]);
-    linha.getCell(4).numFmt = DATA;
-    linha.getCell(7).numFmt = "0.00000";
-    linha.getCell(12).numFmt = DATA;
-    for (const col of [5, 8, 9, 10, 13]) linha.getCell(col).numFmt = MOEDA;
-    if (p.situacao === "vencida") {
-      linha.getCell(11).font = { bold: true, color: { argb: "FF96262C" }, name: "Arial" };
-    }
+    const linha = ws.addRow(colunas.map((c) => c.valor(p)));
+    colunas.forEach((c, i) => {
+      if (c.formato) linha.getCell(i + 1).numFmt = c.formato;
+      if (c.chave === "situacao" && p.situacao === "vencida") {
+        linha.getCell(i + 1).font = {
+          bold: true,
+          color: { argb: "FF96262C" },
+          name: "Arial",
+        };
+      }
+    });
   }
 
   ws.columns.forEach((coluna, i) => {
-    coluna.width = [5, 22, 10, 12, 15, 20, 12, 15, 13, 15, 12, 12, 14, 14, 16][i] ?? 14;
+    coluna.width = colunas[i]?.largura ?? 14;
   });
 
   const buffer = await wb.xlsx.writeBuffer();
