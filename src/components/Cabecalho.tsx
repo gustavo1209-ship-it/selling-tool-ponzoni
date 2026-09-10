@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { COOKIE_TEMA, lerTema } from "@/lib/tema";
 import SairBotao from "./SairBotao";
+import TemaBotao from "./TemaBotao";
 
 const MARCA = "industrial-ponzoni";
 
@@ -31,6 +34,8 @@ export default async function Cabecalho() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const tema = lerTema((await cookies()).get(COOKIE_TEMA)?.value);
 
   const [{ data: perfil }, { data: marca }] = await Promise.all([
     user
@@ -116,6 +121,7 @@ export default async function Cabecalho() {
           {perfil?.papel === "admin" && (
             <span className="selo selo-marca">admin</span>
           )}
+          <TemaBotao inicial={tema} />
           <SairBotao />
         </div>
       </div>

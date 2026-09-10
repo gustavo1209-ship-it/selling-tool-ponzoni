@@ -176,7 +176,7 @@ export default function IndicesPainel({
               onClick={() => setCodigo(i.codigo)}
               className={`px-3 py-1.5 rounded-md text-sm font-semibold border ${
                 ativo
-                  ? "bg-vinho text-white border-vinho"
+                  ? "bg-vinho text-sobre-vinho border-vinho"
                   : "bg-superficie text-tinta-suave border-linha-forte hover:bg-papel-alt"
               }`}
             >

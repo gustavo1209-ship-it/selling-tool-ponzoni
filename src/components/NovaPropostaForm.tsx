@@ -111,7 +111,7 @@ export default function NovaPropostaForm({
         <span className="flex items-start justify-between gap-2">
           <span className="font-semibold text-sm">
             {marcado && (
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-vinho text-white text-[11px] mr-1.5 align-middle">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-vinho text-sobre-vinho text-[11px] mr-1.5 align-middle">
                 {posicao + 1}
               </span>
             )}

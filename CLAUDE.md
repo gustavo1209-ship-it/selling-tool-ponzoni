@@ -1176,6 +1176,43 @@ primeira coluna que tem total. Não voltar a escrever `colSpan` na mão.
 A RLS segue `clientes`, não `propostas`: o time lê e escreve, e só o autor ou
 um admin apaga. Quem dá baixa num pagamento raramente é quem fechou a venda.
 
+## Tema escuro
+
+Uma segunda pele sobre os mesmos tokens: `globals.css` redefine os
+`--color-*` de `@theme` e pronto. O Tailwind v4 gera os utilitários como
+`var(--color-…)`, então trocar o valor troca `bg-papel`, `text-cinza`,
+`.cartao` e o resto de uma vez. **Nenhum componente ganhou variante `dark:`**,
+e ao escrever tela nova a regra continua sendo usar os tokens da casa — quem
+escreve `bg-white` no meio do caminho é quem quebra o escuro.
+
+O tema mora em `data-tema` no `<html>`, com três valores: `claro`, `escuro` e
+`sistema` (o padrão). O `sistema` não é um terceiro visual — é "não escolhi",
+e aí decide o `prefers-color-scheme`. É o único que precisa de media query.
+
+**O cookie existe para o servidor mandar a página já pintada.** Com o tema só
+no `localStorage`, toda navegação abriria clara e viraria escura no primeiro
+frame de JavaScript. O layout raiz lê o cookie e estampa o atributo; o botão
+do cabeçalho (`TemaBotao`) troca o atributo na hora e grava o cookie para a
+próxima visita — sem server action e sem `router.refresh()`, porque tema é
+preferência de quem olha, não dado da aplicação. O preço é que `/login`
+deixou de ser estática.
+
+### `--color-sobre-vinho`
+
+O vinho da marca (#7c2a28) é escuro demais para ser lido sobre fundo escuro,
+então no escuro ele clareia — e, clareado, deixa de aceitar texto branco em
+cima. Daí o token: é a cor do texto **sobre** fundo vinho, `#fff` no claro e
+quase preto no escuro. `.btn-primario` usa ele; se aparecer `text-white` em
+cima de `bg-vinho`, é bug.
+
+### O papel impresso não tem tema
+
+A folha da proposta, o demonstrativo e os manuais trazem a própria paleta num
+`<style>` **fora de camada**, que por isso vence o `@layer base` do
+`globals.css`. Continuam pretos sobre branco em qualquer tema — é o que sai na
+impressora e o que o cliente recebe. Ao mexer nessas folhas, não trocar as
+cores literais por tokens da aplicação: seria justamente perder isso.
+
 ## Cabeçalho
 
 Dez abas no menu do admin, e a barra **não rola na horizontal**: `flex-wrap`

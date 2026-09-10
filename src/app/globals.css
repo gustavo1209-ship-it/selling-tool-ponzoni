@@ -3,14 +3,24 @@
 /*
   Identidade da casa — a mesma do deck de lançamento e do memorando de
   negociação: vinho como marca, dourado como destaque, fundo de papel.
-  Serifa nos títulos, sans no corpo. Claro por decisão: a ferramenta é
-  usada em reunião e o material impresso sai desta mesma paleta.
+  Serifa nos títulos, sans no corpo.
+
+  O claro continua sendo o tema de origem: a ferramenta é usada em reunião e
+  o material impresso sai desta mesma paleta. O escuro é uma segunda pele
+  sobre os mesmos tokens (ver "Tema escuro", mais abaixo) — nenhum componente
+  sabe qual está valendo.
 */
 @theme {
   --color-vinho: #7c2a28;
   --color-vinho-escuro: #5e1f1e;
   --color-vinho-claro: #a24a45;
   --color-vinho-fraco: #f4e7e5;
+  /*
+    Texto sobre fundo vinho. É token, e não `#fff` no botão, porque no tema
+    escuro o vinho clareia para poder ser lido como texto — e aí quem tem de
+    escurecer é o que fica em cima dele.
+  */
+  --color-sobre-vinho: #ffffff;
 
   --color-dourado: #e0a221;
   --color-dourado-escuro: #a3730f;
@@ -129,7 +139,7 @@ body {
 }
 .btn-primario {
   background: var(--color-vinho);
-  color: #fff;
+  color: var(--color-sobre-vinho);
 }
 .btn-primario:hover:not(:disabled) {
   background: var(--color-vinho-escuro);
@@ -239,6 +249,133 @@ input[type="number"]::-webkit-inner-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
 }
+}
+
+/* ============================================================
+   Tema escuro
+
+   Redefine os mesmos tokens de `@theme`, e só isso: o Tailwind v4 gera os
+   utilitários como `var(--color-…)`, então trocar o valor troca `bg-papel`,
+   `text-cinza`, `.cartao` e o resto de uma vez. Nenhum componente precisa
+   saber qual tema está valendo, e nenhum ganha uma variante `dark:`.
+
+   O tema mora em `data-tema` no <html>, com três valores: `claro`, `escuro`
+   e `sistema` (o padrão). O `sistema` existe porque a escolha certa para
+   quase todo mundo é a do aparelho, e é o único que precisa de media query.
+   O atributo é gravado em cookie e lido no servidor, para a página já nascer
+   pintada — com localStorage haveria um piscar branco antes do JS rodar.
+
+   **O papel impresso não entra aqui.** A folha da proposta, o demonstrativo
+   e os manuais trazem a própria paleta em `<style>` fora de camada, que
+   vence estas regras: continuam pretos sobre branco em qualquer tema, que é
+   o que sai na impressora e o que o cliente recebe.
+
+   Sobre as escolhas de cor: o vinho da marca (#7c2a28) é escuro demais para
+   ser lido sobre fundo escuro, então no escuro ele clareia — e, clareado,
+   deixa de aceitar texto branco em cima. É para isso que existe
+   `--color-sobre-vinho`. As cores de status seguem a mesma lógica: o tom
+   forte vira o texto e o "fraco" vira o fundo, com os dois invertidos.
+   ============================================================ */
+
+@layer base {
+  :root[data-tema="escuro"],
+  :root[data-tema="sistema"] {
+    --escuro-vinho: #e0918b;
+    --escuro-vinho-escuro: #eda9a3;
+    --escuro-vinho-claro: #f0b5b0;
+    --escuro-vinho-fraco: #3d2220;
+    --escuro-sobre-vinho: #2a1211;
+
+    --escuro-dourado: #e0a221;
+    --escuro-dourado-escuro: #eab74e;
+    --escuro-dourado-fraco: #3b2d10;
+
+    --escuro-tinta: #ece7e1;
+    --escuro-tinta-suave: #c6bfb7;
+    --escuro-cinza: #968e86;
+    --escuro-linha: #332e2a;
+    --escuro-linha-forte: #47403a;
+    --escuro-papel: #131211;
+    --escuro-papel-alt: #23201d;
+    --escuro-superficie: #1c1a18;
+
+    --escuro-verde: #7ec8a0;
+    --escuro-verde-fraco: #16301f;
+    --escuro-ambar: #e8b64a;
+    --escuro-ambar-fraco: #3a2c11;
+    --escuro-roxo: #c79ad4;
+    --escuro-roxo-fraco: #2e1c34;
+    --escuro-vermelho: #ef8b8b;
+    --escuro-vermelho-fraco: #3b1a1c;
+  }
+
+  /* a escolha explícita vale sempre */
+  :root[data-tema="escuro"] {
+    color-scheme: dark;
+
+    --color-vinho: var(--escuro-vinho);
+    --color-vinho-escuro: var(--escuro-vinho-escuro);
+    --color-vinho-claro: var(--escuro-vinho-claro);
+    --color-vinho-fraco: var(--escuro-vinho-fraco);
+    --color-sobre-vinho: var(--escuro-sobre-vinho);
+
+    --color-dourado: var(--escuro-dourado);
+    --color-dourado-escuro: var(--escuro-dourado-escuro);
+    --color-dourado-fraco: var(--escuro-dourado-fraco);
+
+    --color-tinta: var(--escuro-tinta);
+    --color-tinta-suave: var(--escuro-tinta-suave);
+    --color-cinza: var(--escuro-cinza);
+    --color-linha: var(--escuro-linha);
+    --color-linha-forte: var(--escuro-linha-forte);
+    --color-papel: var(--escuro-papel);
+    --color-papel-alt: var(--escuro-papel-alt);
+    --color-superficie: var(--escuro-superficie);
+
+    --color-verde: var(--escuro-verde);
+    --color-verde-fraco: var(--escuro-verde-fraco);
+    --color-ambar: var(--escuro-ambar);
+    --color-ambar-fraco: var(--escuro-ambar-fraco);
+    --color-roxo: var(--escuro-roxo);
+    --color-roxo-fraco: var(--escuro-roxo-fraco);
+    --color-vermelho: var(--escuro-vermelho);
+    --color-vermelho-fraco: var(--escuro-vermelho-fraco);
+  }
+
+  /* e o `sistema` só quando o aparelho pede escuro */
+  @media (prefers-color-scheme: dark) {
+    :root[data-tema="sistema"] {
+      color-scheme: dark;
+
+      --color-vinho: var(--escuro-vinho);
+      --color-vinho-escuro: var(--escuro-vinho-escuro);
+      --color-vinho-claro: var(--escuro-vinho-claro);
+      --color-vinho-fraco: var(--escuro-vinho-fraco);
+      --color-sobre-vinho: var(--escuro-sobre-vinho);
+
+      --color-dourado: var(--escuro-dourado);
+      --color-dourado-escuro: var(--escuro-dourado-escuro);
+      --color-dourado-fraco: var(--escuro-dourado-fraco);
+
+      --color-tinta: var(--escuro-tinta);
+      --color-tinta-suave: var(--escuro-tinta-suave);
+      --color-cinza: var(--escuro-cinza);
+      --color-linha: var(--escuro-linha);
+      --color-linha-forte: var(--escuro-linha-forte);
+      --color-papel: var(--escuro-papel);
+      --color-papel-alt: var(--escuro-papel-alt);
+      --color-superficie: var(--escuro-superficie);
+
+      --color-verde: var(--escuro-verde);
+      --color-verde-fraco: var(--escuro-verde-fraco);
+      --color-ambar: var(--escuro-ambar);
+      --color-ambar-fraco: var(--escuro-ambar-fraco);
+      --color-roxo: var(--escuro-roxo);
+      --color-roxo-fraco: var(--escuro-roxo-fraco);
+      --color-vermelho: var(--escuro-vermelho);
+      --color-vermelho-fraco: var(--escuro-vermelho-fraco);
+    }
+  }
 }
 
 @media print {

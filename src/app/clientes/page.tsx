@@ -2,17 +2,26 @@ import Cabecalho from "@/components/Cabecalho";
 import ClientesTabela, {
   type ClienteComPropostas,
 } from "@/components/ClientesTabela";
+import NovoClienteForm from "@/components/NovoClienteForm";
 import { createClient } from "@/lib/supabase/server";
-import { criarCliente } from "./acoes";
+import type { Empreendimento, FunilEtapa, Lote } from "@/lib/db/tipos";
+import { ordenarLotes } from "@/lib/ordenacao";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClientesPage() {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("clientes")
-    .select("*, propostas(id, codigo)")
-    .order("nome");
+  const [
+    { data },
+    { data: etapas },
+    { data: empreendimentos },
+    { data: lotes },
+  ] = await Promise.all([
+    supabase.from("clientes").select("*, propostas(id, codigo)").order("nome"),
+    supabase.from("funil_etapas").select("*").eq("ativa", true).order("ordem"),
+    supabase.from("empreendimentos").select("*").eq("ativo", true).order("nome"),
+    supabase.from("lotes_visiveis").select("*"),
+  ]);
 
   const clientes = (data ?? []) as unknown as ClienteComPropostas[];
 
@@ -29,28 +38,11 @@ export default async function ClientesPage() {
           </p>
         </div>
 
-        <form
-          action={criarCliente}
-          className="cartao p-4 grid gap-3 md:grid-cols-6 items-end"
-        >
-          <div className="md:col-span-2">
-            <label className="rotulo">Nome</label>
-            <input name="nome" className="campo" required />
-          </div>
-          <div>
-            <label className="rotulo">Empresa</label>
-            <input name="empresa" className="campo" />
-          </div>
-          <div>
-            <label className="rotulo">CPF / CNPJ</label>
-            <input name="documento" className="campo" />
-          </div>
-          <div>
-            <label className="rotulo">Telefone</label>
-            <input name="telefone" className="campo" />
-          </div>
-          <button className="btn btn-primario">Adicionar</button>
-        </form>
+        <NovoClienteForm
+          etapas={(etapas ?? []) as FunilEtapa[]}
+          empreendimentos={(empreendimentos ?? []) as Empreendimento[]}
+          lotes={ordenarLotes((lotes ?? []) as Lote[])}
+        />
 
         <ClientesTabela clientes={clientes} />
       </main>

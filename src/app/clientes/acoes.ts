@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { criarNegociacao } from "@/app/funil/acoes";
 
 export interface DadosCliente {
   nome: string;
@@ -27,15 +28,43 @@ export async function criarCliente(formData: FormData) {
   const nome = limpo(formData.get("nome"));
   if (!nome) return;
 
-  const { error } = await supabase.from("clientes").insert({
-    nome,
-    empresa: limpo(formData.get("empresa")),
-    documento: limpo(formData.get("documento")),
-    email: limpo(formData.get("email")),
-    telefone: limpo(formData.get("telefone")),
-    criado_por: user.id,
-  });
+  const telefone = limpo(formData.get("telefone"));
+
+  const { data: cliente, error } = await supabase
+    .from("clientes")
+    .insert({
+      nome,
+      empresa: limpo(formData.get("empresa")),
+      documento: limpo(formData.get("documento")),
+      email: limpo(formData.get("email")),
+      telefone,
+      criado_por: user.id,
+    })
+    .select("id")
+    .single();
   if (error) throw new Error(error.message);
+
+  // O cliente nasce dentro do funil de vendas. A tela sempre manda uma
+  // etapa (padrão a primeira coluna ativa); sem etapa — funil vazio, sem
+  // colunas — o cadastro segue sem cartão, porque não há onde colocá-lo.
+  const etapaId = limpo(formData.get("etapa_id"));
+  if (etapaId) {
+    await criarNegociacao({
+      etapa_id: etapaId,
+      cliente_id: cliente.id,
+      titulo: null,
+      telefone,
+      empreendimento_id: limpo(formData.get("empreendimento_id")),
+      lote_id: limpo(formData.get("lote_id")),
+      proposta_id: null,
+      contrato_id: null,
+      valor_estimado: null,
+      origem: null,
+      proximo_contato: null,
+      observacao: null,
+    });
+  }
+
   revalidatePath("/clientes");
 }
 
