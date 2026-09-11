@@ -25,7 +25,7 @@ const LINKS = [
   { href: "/contratos", rotulo: "Contratos" },
   { href: "/cobranca", rotulo: "A receber" },
   { href: "/clientes", rotulo: "Clientes" },
-  { href: "/indices", rotulo: "Índices", soAdmin: true },
+  { href: "/indices", rotulo: "Índices" },
   { href: "/admin", rotulo: "Admin", soAdmin: true },
 ];
 

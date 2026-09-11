@@ -9,24 +9,11 @@ export const dynamic = "force-dynamic";
 
 export default async function IndicesPage() {
   // A série alimenta a correção de todo contrato da casa: quem lança um mês
-  // errado muda o boleto de todo mundo. Só admin entra.
+  // errado muda o boleto de todo mundo, por isso só admin lança e edita. Mas
+  // a leitura é aberta — um corretor sem acesso aqui veria o próprio
+  // contrato com fator 1 em toda parcela, sem erro e sem aviso (migration 26).
   const perfil = await perfilAtual();
-  if (!perfil?.ehAdmin) {
-    return (
-      <>
-        <Cabecalho />
-        <main className="max-w-[1400px] mx-auto px-5 py-8">
-          <p className="eyebrow">Financeiro</p>
-          <h1 className="serif text-3xl mt-1">Índices mensais</h1>
-          <p className="text-sm text-cinza mt-2 max-w-xl">
-            Esta tela é da administração: os índices lançados aqui corrigem as
-            parcelas de todos os contratos. Fale com o Gustavo ou o Gelson se
-            algum número precisar ser revisto.
-          </p>
-        </main>
-      </>
-    );
-  }
+  const ehAdmin = perfil?.ehAdmin ?? false;
 
   const supabase = await createClient();
 
@@ -51,12 +38,14 @@ export default async function IndicesPage() {
             estiver em branco, as parcelas que dependem dele saem marcadas como
             estimativa, calculadas pela taxa de projeção. O INCC-M costuma ser
             divulgado pela FGV no fim do próprio mês.
+            {!ehAdmin && " Só a administração lança e corrige os números aqui."}
           </p>
         </div>
 
         <IndicesPainel
           indexadores={(indexadores ?? []) as IndexadorRef[]}
           series={(series ?? []) as IndiceMensal[]}
+          ehAdmin={ehAdmin}
         />
       </main>
     </>

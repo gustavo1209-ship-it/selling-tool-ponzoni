@@ -304,11 +304,55 @@ export async function criarProposta(formData: FormData) {
   if (erroBlocos) throw new Error(erroBlocos.message);
 
   const recomendado = aCriar.find((c) => c.recomendado) ?? aCriar[0];
+  const resultadoRecomendado = recomendado
+    ? (resultadosPorOrdem.get(recomendado.ordem) ?? null)
+    : null;
   const { error: erroResultado } = await supabase
     .from("propostas")
-    .update({ resultado: recomendado ? resultadosPorOrdem.get(recomendado.ordem) ?? null : null })
+    .update({ resultado: resultadoRecomendado })
     .eq("id", proposta.id);
   if (erroResultado) throw new Error(erroResultado.message);
+
+  // Se o cliente já tem um cartão aberto no funil, a proposta nova entra nele
+  // — sem isso o vendedor cadastra em dois lugares e o quadro fica atrasado
+  // em relação ao que já foi enviado. Só mexe em cartão ainda "aberta": um
+  // "Fechado" ou "Perdido" não deve reabrir sozinho por causa de uma
+  // proposta nova (pode ser reincidência do cliente, tratada à parte).
+  if (clienteId) {
+    const { data: negociacoes } = await supabase
+      .from("negociacoes")
+      .select(
+        "id, proposta_id, empreendimento_id, lote_id, valor_estimado, funil_etapas(desfecho)"
+      )
+      .eq("cliente_id", clienteId)
+      .order("criado_em", { ascending: false });
+
+    const aberta = (
+      negociacoes as unknown as
+        | {
+            id: string;
+            proposta_id: string | null;
+            empreendimento_id: string | null;
+            lote_id: string | null;
+            valor_estimado: number | null;
+            funil_etapas: { desfecho: string } | null;
+          }[]
+        | null
+    )?.find((n) => n.funil_etapas?.desfecho === "aberta");
+
+    if (aberta) {
+      await supabase
+        .from("negociacoes")
+        .update({
+          proposta_id: proposta.id,
+          empreendimento_id: aberta.empreendimento_id ?? empreendimentoId,
+          lote_id: aberta.lote_id ?? ordenados[0]?.id ?? null,
+          valor_estimado: aberta.valor_estimado ?? resultadoRecomendado?.valorNegociado ?? null,
+        })
+        .eq("id", aberta.id);
+      revalidatePath("/funil");
+    }
+  }
 
   revalidatePath("/propostas");
   redirect(`/propostas/${proposta.id}`);

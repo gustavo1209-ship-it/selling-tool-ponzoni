@@ -2,8 +2,9 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { SeloLote } from "./SeloStatus";
-import { RefreshCw, Table2 } from "lucide-react";
+import { Printer, RefreshCw, Table2 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
 import type {
@@ -178,6 +179,13 @@ export default function EspelhoTabela({
               ))}
             </select>
           )}
+          <Link
+            href={`/espelho/imprimir?e=${empreendimento.slug}`}
+            target="_blank"
+            className="btn btn-secundario"
+          >
+            <Printer size={15} /> Imprimir / gerar PDF
+          </Link>
           <button
             className="btn btn-secundario"
             onClick={sincronizar}
