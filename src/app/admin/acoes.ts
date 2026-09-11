@@ -320,6 +320,30 @@ export async function definirAcessoEmpreendimentos(
 }
 
 /**
+ * Corrige o nome de exibição de um corretor. A conta nasce com o nome
+ * digitado na hora de criar o usuário no painel do Supabase — errar ou
+ * digitar um apelido ali não deveria exigir voltar lá para corrigir.
+ */
+export async function renomearCorretor(perfilId: string, nome: string) {
+  const { supabase } = await exigirAdmin();
+
+  const nomeLimpo = nome.trim();
+  if (!nomeLimpo) throw new Error("O nome não pode ficar vazio.");
+
+  const { error } = await supabase
+    .from("perfis")
+    .update({ nome: nomeLimpo })
+    .eq("id", perfilId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/corretores");
+  revalidatePath("/admin/desempenho");
+  revalidatePath("/propostas");
+  revalidatePath("/contratos");
+  return { ok: true };
+}
+
+/**
  * Promove ou rebaixa. Ninguém muda o próprio papel: um admin que se
  * rebaixasse por engano ficaria sem quem o promovesse de volta sem passar
  * pelo SQL do painel do Supabase.

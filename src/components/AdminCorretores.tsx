@@ -2,8 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ShieldCheck, User } from "lucide-react";
-import { definirAcessoEmpreendimentos, definirPapel } from "@/app/admin/acoes";
+import { Check, Pencil, ShieldCheck, User, X } from "lucide-react";
+import {
+  definirAcessoEmpreendimentos,
+  definirPapel,
+  renomearCorretor,
+} from "@/app/admin/acoes";
 import type { Empreendimento, Perfil } from "@/lib/db/tipos";
 import { mensagemDeFalha } from "@/lib/erros";
 
@@ -105,7 +109,16 @@ function LinhaPerfil({
 }) {
   const [restrito, setRestrito] = useState(perfil.empreendimentos_restritos);
   const [escolhidos, setEscolhidos] = useState<string[]>(marcados);
+  const [editandoNome, setEditandoNome] = useState(false);
+  const [nomeRascunho, setNomeRascunho] = useState(perfil.nome);
   const ehAdmin = perfil.papel === "admin";
+
+  function salvarNome() {
+    agir(async () => {
+      await renomearCorretor(perfil.id, nomeRascunho);
+      setEditandoNome(false);
+    });
+  }
 
   const alternar = (id: string) =>
     setEscolhidos((atual) =>
@@ -121,10 +134,48 @@ function LinhaPerfil({
           <User size={20} className="text-cinza" />
         )}
         <div className="flex-1">
-          <h2 className="serif text-lg">
-            {perfil.nome}
-            {ehAdmin && <span className="selo selo-marca ml-2 align-middle">admin</span>}
-          </h2>
+          {editandoNome ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                className="campo py-1 text-sm w-56"
+                value={nomeRascunho}
+                onChange={(e) => setNomeRascunho(e.target.value)}
+                disabled={pendente}
+                autoFocus
+              />
+              <button
+                className="btn btn-fantasma px-2 text-verde"
+                disabled={pendente}
+                onClick={salvarNome}
+                title="Salvar"
+              >
+                <Check size={15} />
+              </button>
+              <button
+                className="btn btn-fantasma px-2"
+                disabled={pendente}
+                onClick={() => {
+                  setEditandoNome(false);
+                  setNomeRascunho(perfil.nome);
+                }}
+                title="Cancelar"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          ) : (
+            <h2 className="serif text-lg flex items-center gap-1.5">
+              {perfil.nome}
+              {ehAdmin && <span className="selo selo-marca align-middle">admin</span>}
+              <button
+                className="btn btn-fantasma px-1.5 py-0.5"
+                onClick={() => setEditandoNome(true)}
+                title="Renomear"
+              >
+                <Pencil size={13} className="text-cinza" />
+              </button>
+            </h2>
+          )}
           <p className="text-xs text-cinza">{perfil.email}</p>
         </div>
 
