@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Printer } from "lucide-react";
 import type { Empreendimento, Lote } from "@/lib/db/tipos";
 import { clarear, escurecer } from "@/lib/cores";
@@ -15,6 +16,15 @@ const CLASSE_STATUS: Record<string, string> = {
   indisponivel: "indisponivel",
 };
 
+type ColunaOpcional =
+  | "tipo"
+  | "area"
+  | "precoTabela"
+  | "precoM2"
+  | "status"
+  | "comprador"
+  | "observacao";
+
 export default function FolhaEspelho({
   empreendimento,
   lotes,
@@ -25,6 +35,31 @@ export default function FolhaEspelho({
   ehAdmin: boolean;
 }) {
   const temTipo = lotes.some((l) => l.tipo);
+
+  const colunasDisponiveis: { chave: ColunaOpcional; rotulo: string }[] = [
+    ...(temTipo ? ([{ chave: "tipo", rotulo: "Tipo" }] as const) : []),
+    { chave: "area", rotulo: "Área" },
+    { chave: "precoTabela", rotulo: "Preço de tabela" },
+    { chave: "precoM2", rotulo: "R$/m²" },
+    { chave: "status", rotulo: "Status" },
+    // comprador é dado da casa — quem não é admin nem escolhe, porque a
+    // view já devolve null para essa coluna (migration 28)
+    ...(ehAdmin ? ([{ chave: "comprador", rotulo: "Comprador" }] as const) : []),
+    { chave: "observacao", rotulo: "Observação" },
+  ];
+
+  const [colunas, setColunas] = useState<Record<ColunaOpcional, boolean>>({
+    tipo: true,
+    area: true,
+    precoTabela: true,
+    precoM2: true,
+    status: true,
+    comprador: true,
+    observacao: true,
+  });
+
+  const mostrar = (c: ColunaOpcional) =>
+    colunas[c] && (c !== "comprador" || ehAdmin) && (c !== "tipo" || temTipo);
   const livres = lotes.filter((l) => l.status === "livre");
   const resumo = {
     livre: livres.length,
@@ -50,6 +85,22 @@ export default function FolhaEspelho({
           Na caixa de impressão: papel A4, margens padrão e &ldquo;Gráficos de
           fundo&rdquo; ligado.
         </span>
+      </div>
+
+      <div className="colunas sem-impressao">
+        <span className="colunas-titulo">Colunas na impressão:</span>
+        {colunasDisponiveis.map((c) => (
+          <label key={c.chave} className="colunas-item">
+            <input
+              type="checkbox"
+              checked={colunas[c.chave]}
+              onChange={(e) =>
+                setColunas((atual) => ({ ...atual, [c.chave]: e.target.checked }))
+              }
+            />
+            {c.rotulo}
+          </label>
+        ))}
       </div>
 
       <article className="folha">
@@ -100,13 +151,13 @@ export default function FolhaEspelho({
           <thead>
             <tr>
               <th>Lote</th>
-              {temTipo && <th>Tipo</th>}
-              <th className="d">Área</th>
-              <th className="d">Preço de tabela</th>
-              <th className="d">R$/m²</th>
-              <th>Status</th>
-              {ehAdmin && <th>Comprador</th>}
-              <th>Observação</th>
+              {mostrar("tipo") && <th>Tipo</th>}
+              {mostrar("area") && <th className="d">Área</th>}
+              {mostrar("precoTabela") && <th className="d">Preço de tabela</th>}
+              {mostrar("precoM2") && <th className="d">R$/m²</th>}
+              {mostrar("status") && <th>Status</th>}
+              {mostrar("comprador") && <th>Comprador</th>}
+              {mostrar("observacao") && <th>Observação</th>}
             </tr>
           </thead>
           <tbody>
@@ -115,23 +166,33 @@ export default function FolhaEspelho({
                 <td className="forte">
                   {l.quadra}-{l.numero}
                 </td>
-                {temTipo && <td className="fraco">{l.tipo ?? "—"}</td>}
-                <td className="d">{area(Number(l.area_m2))}</td>
-                <td className="d">
-                  {l.preco_tabela ? moeda(Number(l.preco_tabela)) : "—"}
-                </td>
-                <td className="d fraco">
-                  {l.preco_tabela
-                    ? precoM2(Number(l.preco_tabela) / Number(l.area_m2))
-                    : "—"}
-                </td>
-                <td>
-                  <span className={`selo-status ${CLASSE_STATUS[l.status] ?? ""}`}>
-                    {ROTULO[l.status] ?? l.status}
-                  </span>
-                </td>
-                {ehAdmin && <td className="fraco">{l.comprador ?? "—"}</td>}
-                <td className="fraco">{l.observacao ?? "—"}</td>
+                {mostrar("tipo") && <td className="fraco">{l.tipo ?? "—"}</td>}
+                {mostrar("area") && <td className="d">{area(Number(l.area_m2))}</td>}
+                {mostrar("precoTabela") && (
+                  <td className="d">
+                    {l.preco_tabela ? moeda(Number(l.preco_tabela)) : "—"}
+                  </td>
+                )}
+                {mostrar("precoM2") && (
+                  <td className="d fraco">
+                    {l.preco_tabela
+                      ? precoM2(Number(l.preco_tabela) / Number(l.area_m2))
+                      : "—"}
+                  </td>
+                )}
+                {mostrar("status") && (
+                  <td>
+                    <span className={`selo-status ${CLASSE_STATUS[l.status] ?? ""}`}>
+                      {ROTULO[l.status] ?? l.status}
+                    </span>
+                  </td>
+                )}
+                {mostrar("comprador") && (
+                  <td className="fraco">{l.comprador ?? "—"}</td>
+                )}
+                {mostrar("observacao") && (
+                  <td className="fraco">{l.observacao ?? "—"}</td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -175,6 +236,14 @@ body{ background:#e9e6e2; }
   padding:8px 14px; font-size:14px; font-weight:600; cursor:pointer;
 }
 .barra-acao .dica{ font-size:12px; color:var(--cinza); }
+
+.colunas{
+  display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px;
+  padding:8px 16px; background:#fff; border-bottom:1px solid var(--linha);
+  font-size:12.5px; color:var(--cinza);
+}
+.colunas-titulo{ font-weight:600; color:var(--tinta); }
+.colunas-item{ display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
 
 .folha{
   width:210mm; min-height:297mm; margin:16px auto; background:#fff;
