@@ -90,6 +90,53 @@ export async function criarProposta(formData: FormData) {
     throw new Error("Escolha o empreendimento e ao menos um lote.");
   }
 
+  // Impede duas propostas idênticas (mesmo cliente e mesmos lotes) — vale
+  // para admin e corretor. O gatilho real é o formulário poder ser reenviado
+  // (duplo clique, F5 na volta) e cada envio virar uma proposta nova em vez
+  // de um cenário dentro da MESMA proposta, que é como o simulador já
+  // permite comparar mais de uma condição de pagamento. Não se aplica a
+  // "Duplicar proposta": ali a cópia é deliberada.
+  {
+    const loteIdsSet = new Set(loteIds);
+    const nomeNormalizado = nomeCliente.toLowerCase();
+    const tituloNormalizado = titulo?.toLowerCase() ?? null;
+
+    const { data: candidatas } = await supabase
+      .from("propostas")
+      .select("codigo, cliente_id, titulo, clientes(nome), proposta_lotes(lote_id)")
+      .eq("empreendimento_id", empreendimentoId);
+
+    const duplicada = (
+      candidatas as unknown as {
+        codigo: string;
+        cliente_id: string | null;
+        titulo: string | null;
+        clientes: { nome: string } | null;
+        proposta_lotes: { lote_id: string | null }[];
+      }[]
+    )?.find((p) => {
+      const idsDaProposta = new Set(p.proposta_lotes.map((l) => l.lote_id));
+      if (idsDaProposta.size !== loteIdsSet.size) return false;
+      for (const id of loteIdsSet) if (!idsDaProposta.has(id)) return false;
+
+      if (clienteExistente) return p.cliente_id === clienteExistente;
+      if (nomeNormalizado) {
+        return (p.clientes?.nome ?? "").trim().toLowerCase() === nomeNormalizado;
+      }
+      return (
+        !p.cliente_id &&
+        tituloNormalizado !== null &&
+        (p.titulo ?? "").trim().toLowerCase() === tituloNormalizado
+      );
+    });
+
+    if (duplicada) {
+      throw new Error(
+        `Já existe uma proposta igual, com o mesmo cliente e os mesmos lotes (${duplicada.codigo}). Para outra condição de pagamento, abra essa proposta e adicione uma opção no simulador, em vez de criar uma proposta nova.`
+      );
+    }
+  }
+
   const [{ data: lotes }, { data: condicoes }, { data: tabela }] = await Promise.all([
     supabase.from("lotes_visiveis").select("*").in("id", loteIds),
     condicaoIds.length
@@ -189,6 +236,49 @@ export async function criarProposta(formData: FormData) {
     ...c,
   }));
 
+  // snapshot do cálculo de cada opção, para a listagem de propostas não
+  // depender de uma primeira passagem pelo simulador (ver salvarProposta)
+  const lotesResumo = ordenados.map((l) => ({
+    quadra: l.quadra,
+    numero: l.numero,
+    area_m2: l.area_m2,
+    preco_tabela: l.preco_tabela ?? 0,
+    valor_negociado: l.preco_tabela ?? 0,
+  }));
+  const premissas = {
+    incc_mensal: tabela?.incc_mensal ?? 0.005,
+    juros_vp_mensal: tabela?.juros_vp_mensal ?? 0.01,
+    correcao_primeira_parcela: false,
+  };
+  const resultadosPorOrdem = new Map<number, Resultado>(
+    aCriar.map((c) => [
+      c.ordem,
+      calcular({
+        lotes: lotesResumo,
+        blocos: (c.template.length ? c.template : TEMPLATE_PADRAO).map((b, i) => ({
+          id: String(i),
+          ordem: i,
+          rotulo: b.rotulo,
+          tipo: b.tipo,
+          base_percentual: b.base_percentual ?? null,
+          base_valor: b.base_valor ?? null,
+          absorve_residuo: b.absorve_residuo ?? false,
+          qtd_parcelas: b.qtd_parcelas,
+          mes_inicio: b.mes_inicio,
+          periodicidade_meses: b.periodicidade_meses ?? 1,
+          indexador: b.indexador,
+          taxa_indexador_mensal: b.taxa_indexador_mensal ?? null,
+          juros_mensal: b.juros_mensal,
+          amortizacao: b.amortizacao,
+          parcela_fixa: b.parcela_fixa ?? null,
+        })),
+        premissas,
+        desconto_pct: Number(c.desconto_pct),
+        desconto_valor: 0,
+      }),
+    ])
+  );
+
   const { data: cenarios, error: erroCenarios } = await supabase
     .from("proposta_cenarios")
     .insert(
@@ -199,6 +289,7 @@ export async function criarProposta(formData: FormData) {
         condicao_origem: c.condicao_origem,
         desconto_pct: c.desconto_pct,
         recomendado: c.recomendado,
+        resultado: resultadosPorOrdem.get(c.ordem) ?? null,
       }))
     )
     .select("id, ordem");
@@ -211,6 +302,13 @@ export async function criarProposta(formData: FormData) {
 
   const { error: erroBlocos } = await supabase.from("proposta_blocos").insert(blocos);
   if (erroBlocos) throw new Error(erroBlocos.message);
+
+  const recomendado = aCriar.find((c) => c.recomendado) ?? aCriar[0];
+  const { error: erroResultado } = await supabase
+    .from("propostas")
+    .update({ resultado: recomendado ? resultadosPorOrdem.get(recomendado.ordem) ?? null : null })
+    .eq("id", proposta.id);
+  if (erroResultado) throw new Error(erroResultado.message);
 
   revalidatePath("/propostas");
   redirect(`/propostas/${proposta.id}`);
@@ -480,6 +578,21 @@ export async function apagarProposta(id: string) {
   if (error) throw new Error(error.message);
   revalidatePath("/propostas");
   redirect("/propostas");
+}
+
+/**
+ * Apaga várias propostas de uma vez, pela seleção da listagem. Chamada de
+ * dentro de um try/catch no cliente (ver PropostasTabela) — por isso não
+ * redireciona (ver "redirect() não sobrevive a um try/catch" no CLAUDE.md).
+ * A RLS (`propostas: autor apaga`) é quem decide o que cada usuário pode
+ * apagar: aqui não se verifica de novo.
+ */
+export async function apagarPropostas(ids: string[]) {
+  if (!ids.length) return;
+  const supabase = await createClient();
+  const { error } = await supabase.from("propostas").delete().in("id", ids);
+  if (error) throw new Error(error.message);
+  revalidatePath("/propostas");
 }
 
 export async function duplicarProposta(id: string) {

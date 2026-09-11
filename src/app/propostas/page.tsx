@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import Cabecalho from "@/components/Cabecalho";
-import { SeloProposta } from "@/components/SeloStatus";
+import PropostasTabela, { type PropostaLinha } from "@/components/PropostasTabela";
 import { createClient } from "@/lib/supabase/server";
-import { mapaDePerfis, nomeCurto } from "@/lib/supabase/perfil";
-import { dataBR, moeda, pct } from "@/lib/formato";
+import { mapaDePerfis, nomeCurto, perfilAtual } from "@/lib/supabase/perfil";
 import { compararLote } from "@/lib/ordenacao";
 
 export const dynamic = "force-dynamic";
@@ -32,16 +31,41 @@ interface Linha {
 
 export default async function PropostasPage() {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("propostas")
-    .select(
-      "id, codigo, titulo, status, criado_em, criado_por, resultado, clientes(nome), empreendimentos(nome), proposta_lotes(quadra, numero), proposta_cenarios(id)"
-    )
-    .order("criado_em", { ascending: false });
+  const [{ data }, autores, perfil] = await Promise.all([
+    supabase
+      .from("propostas")
+      .select(
+        "id, codigo, titulo, status, criado_em, criado_por, resultado, clientes(nome), empreendimentos(nome), proposta_lotes(quadra, numero), proposta_cenarios(id)"
+      )
+      .order("criado_em", { ascending: false }),
+    mapaDePerfis(),
+    perfilAtual(),
+  ]);
 
   const propostas = (data ?? []) as unknown as Linha[];
   // a RLS já filtra: corretor recebe só as próprias
-  const autores = await mapaDePerfis();
+  const ehAdmin = perfil?.ehAdmin ?? false;
+
+  const linhas: PropostaLinha[] = propostas.map((p) => ({
+    id: p.id,
+    codigo: p.codigo,
+    clienteNome: p.clientes?.nome ?? p.titulo ?? "—",
+    lotesTexto: p.proposta_lotes.length
+      ? [...p.proposta_lotes]
+          .sort(compararLote)
+          .map((l) => `${l.quadra}-${l.numero}`)
+          .join(", ")
+      : "—",
+    valorTabela: p.resultado?.valorTabela ?? 0,
+    valorNegociado: p.resultado?.valorNegociado ?? 0,
+    descontoEfetivoPct: p.resultado?.descontoEfetivoPct ?? 0,
+    totalVP: p.resultado?.totalVP ?? 0,
+    prazoMeses: p.resultado?.prazoMeses ?? 0,
+    nOpcoes: p.proposta_cenarios.length,
+    status: p.status,
+    autorNome: nomeCurto(autores.get(p.criado_por ?? "")),
+    criadoEm: p.criado_em,
+  }));
 
   return (
     <>
@@ -57,74 +81,7 @@ export default async function PropostasPage() {
           </Link>
         </div>
 
-        <section className="cartao overflow-x-auto">
-          <table className="tabela">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Cliente</th>
-                <th>Lotes</th>
-                <th className="num">Tabela</th>
-                <th className="num">Negociado</th>
-                <th className="num">Desc.</th>
-                <th className="num">Valor presente</th>
-                <th className="num">Prazo</th>
-                <th className="num">Opções</th>
-                <th>Status</th>
-                <th>Criada por</th>
-                <th>Criada</th>
-              </tr>
-            </thead>
-            <tbody>
-              {propostas.map((p) => (
-                <tr key={p.id} className="hover:bg-papel-alt">
-                  <td className="whitespace-nowrap">
-                    <Link href={`/propostas/${p.id}`} className="text-vinho font-semibold">
-                      {p.codigo}
-                    </Link>
-                  </td>
-                  <td>{p.clientes?.nome ?? p.titulo ?? "—"}</td>
-                  <td className="text-cinza whitespace-nowrap">
-                    {p.proposta_lotes.length
-                      ? [...p.proposta_lotes]
-                          .sort(compararLote)
-                          .map((l) => `${l.quadra}-${l.numero}`)
-                          .join(", ")
-                      : "—"}
-                  </td>
-                  <td className="num text-cinza">{moeda(p.resultado?.valorTabela ?? 0)}</td>
-                  <td className="num font-semibold">
-                    {moeda(p.resultado?.valorNegociado ?? 0)}
-                  </td>
-                  <td className="num">
-                    {p.resultado?.descontoEfetivoPct
-                      ? `−${pct(p.resultado.descontoEfetivoPct, 1)}`
-                      : "—"}
-                  </td>
-                  <td className="num">{moeda(p.resultado?.totalVP ?? 0)}</td>
-                  <td className="num text-cinza">
-                    {p.resultado?.prazoMeses ? `${p.resultado.prazoMeses}m` : "—"}
-                  </td>
-                  <td className="num text-cinza">{p.proposta_cenarios.length}</td>
-                  <td>
-                    <SeloProposta status={p.status} />
-                  </td>
-                  <td className="text-cinza whitespace-nowrap">
-                    {nomeCurto(autores.get(p.criado_por ?? ""))}
-                  </td>
-                  <td className="text-cinza whitespace-nowrap">{dataBR(p.criado_em)}</td>
-                </tr>
-              ))}
-              {propostas.length === 0 && (
-                <tr>
-                  <td colSpan={12} className="text-center text-cinza py-8">
-                    Nenhuma proposta ainda.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </section>
+        <PropostasTabela propostas={linhas} ehAdmin={ehAdmin} />
       </main>
     </>
   );

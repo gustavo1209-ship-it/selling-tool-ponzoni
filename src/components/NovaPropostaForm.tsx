@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { Check, Plus, Star, Trash2 } from "lucide-react";
 import { criarProposta } from "@/app/propostas/acoes";
 import MontarOpcao from "./MontarOpcao";
@@ -24,6 +25,21 @@ import {
 interface OpcaoMontada {
   nome: string;
   blocos: BlocoTemplate[];
+}
+
+/**
+ * `useFormStatus` só funciona num componente renderizado DENTRO do <form>,
+ * nunca no mesmo componente que declara a tag — por isso este botão é
+ * separado. Sem o `pending`, um duplo clique (ou clique de novo enquanto a
+ * rede demora) reenvia o formulário e cria uma proposta a mais a cada envio.
+ */
+function BotaoEnviar({ desabilitado }: { desabilitado: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <button className="btn btn-primario" disabled={desabilitado || pending}>
+      {pending ? "Criando…" : "Criar e abrir o simulador"}
+    </button>
+  );
 }
 
 export default function NovaPropostaForm({
@@ -404,9 +420,7 @@ export default function NovaPropostaForm({
       )}
 
       <div className="flex justify-end gap-2">
-        <button className="btn btn-primario" disabled={escolhidos.length === 0}>
-          Criar e abrir o simulador
-        </button>
+        <BotaoEnviar desabilitado={escolhidos.length === 0} />
       </div>
     </form>
   );
