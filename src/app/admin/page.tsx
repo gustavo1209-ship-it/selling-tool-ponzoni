@@ -1,35 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, Building2, KanbanSquare, Users } from "lucide-react";
+import { ArrowRight, Building2, KanbanSquare, Trophy, Users } from "lucide-react";
 import Cabecalho from "@/components/Cabecalho";
 import { createClient } from "@/lib/supabase/server";
 import { perfilAtual } from "@/lib/supabase/perfil";
 
 export const dynamic = "force-dynamic";
-
-const TELAS = [
-  {
-    href: "/admin/empreendimentos",
-    icone: Building2,
-    titulo: "Empreendimentos",
-    texto:
-      "Cadastrar loteamento novo, apontar o espelho do Google Sheets, montar a tabela de preço e as condições de pagamento.",
-  },
-  {
-    href: "/admin/corretores",
-    icone: Users,
-    titulo: "Corretores",
-    texto:
-      "Quem é admin, e quais empreendimentos cada corretor enxerga. Por padrão todos veem todos.",
-  },
-  {
-    href: "/admin/funil",
-    icone: KanbanSquare,
-    titulo: "Etapas do funil",
-    texto:
-      "As colunas do quadro de negociações: nome, cor, ordem e o que cada uma significa para o negócio.",
-  },
-];
 
 export default async function AdminPage() {
   const perfil = await perfilAtual();
@@ -46,7 +22,40 @@ export default async function AdminPage() {
         .eq("ativa", true),
     ]);
 
-  const contagens = [empreendimentos, pessoas, etapas];
+  const telas = [
+    {
+      href: "/admin/empreendimentos",
+      icone: Building2,
+      titulo: "Empreendimentos",
+      texto:
+        "Cadastrar loteamento novo, apontar o espelho do Google Sheets, montar a tabela de preço e as condições de pagamento.",
+      rodape: `${empreendimentos ?? 0} cadastrado(s)`,
+    },
+    {
+      href: "/admin/corretores",
+      icone: Users,
+      titulo: "Corretores",
+      texto:
+        "Quem é admin, e quais empreendimentos cada corretor enxerga. Por padrão todos veem todos.",
+      rodape: `${pessoas ?? 0} cadastrado(s)`,
+    },
+    {
+      href: "/admin/funil",
+      icone: KanbanSquare,
+      titulo: "Etapas do funil",
+      texto:
+        "As colunas do quadro de negociações: nome, cor, ordem e o que cada uma significa para o negócio.",
+      rodape: `${etapas ?? 0} cadastrado(s)`,
+    },
+    {
+      href: "/admin/desempenho",
+      icone: Trophy,
+      titulo: "Desempenho da equipe",
+      texto:
+        "Clientes cadastrados, propostas criadas, contratos firmados e negociações perdidas por corretor, numa janela de tempo escolhida.",
+      rodape: "ver painel",
+    },
+  ];
 
   return (
     <>
@@ -61,7 +70,7 @@ export default async function AdminPage() {
         </div>
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {TELAS.map((t, i) => (
+          {telas.map((t) => (
             <Link key={t.href} href={t.href} className="cartao p-5 flex flex-col gap-3 hover:border-vinho">
               <t.icone size={22} className="text-vinho" />
               <div>
@@ -69,7 +78,7 @@ export default async function AdminPage() {
                 <p className="text-sm text-cinza mt-1">{t.texto}</p>
               </div>
               <p className="text-sm text-vinho font-semibold mt-auto flex items-center gap-1.5">
-                {contagens[i] ?? 0} cadastrado(s) <ArrowRight size={14} />
+                {t.rodape} <ArrowRight size={14} />
               </p>
             </Link>
           ))}
