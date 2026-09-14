@@ -10,7 +10,7 @@ function Formulario() {
   const params = useSearchParams();
   const proximo = params.get("proximo") || "/";
 
-  const [modo, setModo] = useState<"entrar" | "criar">("entrar");
+  const [modo, setModo] = useState<"entrar" | "criar" | "recuperar">("entrar");
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -24,6 +24,22 @@ function Formulario() {
     setAviso(null);
     setCarregando(true);
     const supabase = createClient();
+
+    if (modo === "recuperar") {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login/redefinir`,
+      });
+      if (error) {
+        setErro(traduzir(error.message));
+        setCarregando(false);
+        return;
+      }
+      setAviso(
+        "Se houver conta com esse e-mail, um link para trocar a senha foi enviado."
+      );
+      setCarregando(false);
+      return;
+    }
 
     if (modo === "entrar") {
       const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
@@ -87,21 +103,38 @@ function Formulario() {
         />
       </div>
 
-      <div>
-        <label className="rotulo" htmlFor="senha">
-          Senha
-        </label>
-        <input
-          id="senha"
-          type="password"
-          className="campo"
-          value={senha}
-          onChange={(e) => setSenha(e.target.value)}
-          required
-          minLength={6}
-          autoComplete={modo === "entrar" ? "current-password" : "new-password"}
-        />
-      </div>
+      {modo !== "recuperar" && (
+        <div>
+          <div className="flex items-center justify-between">
+            <label className="rotulo" htmlFor="senha">
+              Senha
+            </label>
+            {modo === "entrar" && (
+              <button
+                type="button"
+                className="text-xs text-vinho font-semibold"
+                onClick={() => {
+                  setModo("recuperar");
+                  setErro(null);
+                  setAviso(null);
+                }}
+              >
+                Esqueci minha senha
+              </button>
+            )}
+          </div>
+          <input
+            id="senha"
+            type="password"
+            className="campo"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            required
+            minLength={6}
+            autoComplete={modo === "entrar" ? "current-password" : "new-password"}
+          />
+        </div>
+      )}
 
       {erro && (
         <p className="text-sm text-vermelho bg-vermelho-fraco rounded-md px-3 py-2">
@@ -113,20 +146,40 @@ function Formulario() {
       )}
 
       <button className="btn btn-primario w-full" disabled={carregando}>
-        {carregando ? "Aguarde…" : modo === "entrar" ? "Entrar" : "Criar conta"}
+        {carregando
+          ? "Aguarde…"
+          : modo === "entrar"
+            ? "Entrar"
+            : modo === "criar"
+              ? "Criar conta"
+              : "Enviar link de recuperação"}
       </button>
 
-      <button
-        type="button"
-        className="btn btn-fantasma w-full"
-        onClick={() => {
-          setModo(modo === "entrar" ? "criar" : "entrar");
-          setErro(null);
-          setAviso(null);
-        }}
-      >
-        {modo === "entrar" ? "Criar uma conta" : "Já tenho conta"}
-      </button>
+      {modo === "recuperar" ? (
+        <button
+          type="button"
+          className="btn btn-fantasma w-full"
+          onClick={() => {
+            setModo("entrar");
+            setErro(null);
+            setAviso(null);
+          }}
+        >
+          Voltar para entrar
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="btn btn-fantasma w-full"
+          onClick={() => {
+            setModo(modo === "entrar" ? "criar" : "entrar");
+            setErro(null);
+            setAviso(null);
+          }}
+        >
+          {modo === "entrar" ? "Criar uma conta" : "Já tenho conta"}
+        </button>
+      )}
     </form>
   );
 }
@@ -148,6 +201,9 @@ function traduzir(mensagem: string): string {
       "O cadastro está fechado. Peça a um admin para criar sua conta pelo " +
       "painel do Supabase."
     );
+  }
+  if (/security purposes.*only request this/i.test(mensagem)) {
+    return "Aguarde um pouco antes de pedir outro link — já foi enviado um recentemente.";
   }
   return mensagem;
 }
