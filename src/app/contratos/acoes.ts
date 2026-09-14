@@ -510,6 +510,22 @@ export async function apagarContrato(id: string) {
 }
 
 /**
+ * Apaga vários contratos de uma vez, pela seleção da listagem — o mesmo
+ * padrão de `apagarPropostas` em `propostas/acoes.ts`. Chamada de dentro de
+ * um try/catch no cliente (ver ContratosTabela), por isso não redireciona
+ * (ver "redirect() não sobrevive a um try/catch" no CLAUDE.md). A RLS de
+ * `contratos` é quem decide o que cada usuário pode apagar.
+ */
+export async function apagarContratos(ids: string[]) {
+  if (!ids.length) return;
+  const supabase = await createClient();
+  const { error } = await supabase.from("contratos").delete().in("id", ids);
+  if (error) throw new Error(error.message);
+  revalidatePath("/contratos");
+  revalidatePath("/cobranca");
+}
+
+/**
  * Como datar a baixa de um lote de parcelas.
  *
  * `no_vencimento` é o caso do contrato antigo que entra na ferramenta com

@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { AlertTriangle, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import Cabecalho from "@/components/Cabecalho";
-import { SeloContrato } from "@/components/SeloStatus";
+import ContratosTabela, { type ContratoLinha } from "@/components/ContratosTabela";
 import { createClient } from "@/lib/supabase/server";
 import { calcularContrato } from "@/lib/contratos/correcao";
 import { carregarIndices, serieDe } from "@/lib/contratos/servidor";
-import { mapaDePerfis, nomeCurto } from "@/lib/supabase/perfil";
+import { mapaDePerfis, nomeCurto, perfilAtual } from "@/lib/supabase/perfil";
 import type { ContratoParcela } from "@/lib/db/tipos";
-import { dataBR, moeda, moedaCurta } from "@/lib/formato";
+import { moedaCurta } from "@/lib/formato";
 import { compararLote } from "@/lib/ordenacao";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ interface Linha {
 export default async function ContratosPage() {
   const supabase = await createClient();
 
-  const [{ data }, indices] = await Promise.all([
+  const [{ data }, indices, autores, perfil] = await Promise.all([
     supabase
       .from("contratos")
       .select(
@@ -42,10 +42,12 @@ export default async function ContratosPage() {
       )
       .order("criado_em", { ascending: false }),
     carregarIndices(),
+    mapaDePerfis(),
+    perfilAtual(),
   ]);
 
   const contratos = (data ?? []) as unknown as Linha[];
-  const autores = await mapaDePerfis();
+  const ehAdmin = perfil?.ehAdmin ?? false;
 
   const calculados = contratos.map((c) => {
     const { serie, taxa } = serieDe(indices, c.indexador as never);
@@ -72,6 +74,30 @@ export default async function ContratosPage() {
   const carteira = ativos.reduce((s, c) => s + c.calculo.saldoCorrigido, 0);
   const emAtraso = calculados.filter((c) => c.calculo.vencidas.length > 0);
   const totalAtraso = emAtraso.reduce((s, c) => s + c.calculo.totalVencido, 0);
+
+  const linhas: ContratoLinha[] = calculados.map(({ contrato: c, calculo }) => ({
+    id: c.id,
+    codigo: c.codigo,
+    compradorNome: c.clientes?.nome ?? c.titulo ?? "—",
+    lotesTexto: c.contrato_lotes.length
+      ? [...c.contrato_lotes]
+          .sort(compararLote)
+          .map((l) => `${l.quadra}-${l.numero}`)
+          .join(", ")
+      : "—",
+    valorTotal: Number(c.valor_total),
+    totalPago: calculo.totalPago,
+    saldoCorrigido: calculo.saldoCorrigido,
+    temEstimativa: calculo.temEstimativa,
+    parcelasPagas: calculo.parcelasPagas,
+    parcelasTotal: calculo.parcelasTotal,
+    proximaVencimento: calculo.proxima?.vencimento ?? null,
+    proximaValor: calculo.proxima?.valorCorrigido ?? null,
+    totalVencido: calculo.totalVencido,
+    temVencidas: calculo.vencidas.length > 0,
+    autorNome: nomeCurto(autores.get(c.criado_por ?? "")),
+    status: c.status,
+  }));
 
   return (
     <>
@@ -133,100 +159,7 @@ export default async function ContratosPage() {
           </div>
         </section>
 
-        <section className="cartao overflow-x-auto">
-          <table className="tabela">
-            <thead>
-              <tr>
-                <th>Contrato</th>
-                <th>Comprador</th>
-                <th>Lotes</th>
-                <th className="num">Valor</th>
-                <th className="num">Recebido</th>
-                <th className="num">Saldo corrigido</th>
-                <th className="num">Parcelas</th>
-                <th>Próximo vencimento</th>
-                <th className="num">Em atraso</th>
-                <th>Cadastrado por</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {calculados.map(({ contrato: c, calculo }) => (
-                <tr key={c.id} className="hover:bg-papel-alt">
-                  <td className="whitespace-nowrap">
-                    <Link href={`/contratos/${c.id}`} className="text-vinho font-semibold">
-                      {c.codigo}
-                    </Link>
-                  </td>
-                  <td>{c.clientes?.nome ?? c.titulo ?? "—"}</td>
-                  <td className="text-cinza whitespace-nowrap">
-                    {c.contrato_lotes.length
-                      ? [...c.contrato_lotes]
-                          .sort(compararLote)
-                          .map((l) => `${l.quadra}-${l.numero}`)
-                          .join(", ")
-                      : "—"}
-                  </td>
-                  <td className="num text-cinza">{moeda(Number(c.valor_total))}</td>
-                  <td className="num">{moeda(calculo.totalPago)}</td>
-                  <td className="num font-semibold">
-                    {moeda(calculo.saldoCorrigido)}
-                    {calculo.temEstimativa && (
-                      <span
-                        className="text-cinza ml-1"
-                        title="Parte das parcelas depende de índice ainda não lançado"
-                      >
-                        ~
-                      </span>
-                    )}
-                  </td>
-                  <td className="num text-cinza">
-                    {calculo.parcelasPagas}/{calculo.parcelasTotal}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    {calculo.proxima ? (
-                      <>
-                        {dataBR(calculo.proxima.vencimento)}{" "}
-                        <span className="text-cinza">
-                          · {moeda(calculo.proxima.valorCorrigido)}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-cinza">—</span>
-                    )}
-                  </td>
-                  <td className="num">
-                    {calculo.vencidas.length > 0 ? (
-                      <span className="text-vermelho font-semibold inline-flex items-center gap-1">
-                        <AlertTriangle size={13} />
-                        {moeda(calculo.totalVencido)}
-                      </span>
-                    ) : (
-                      <span className="text-cinza">—</span>
-                    )}
-                  </td>
-                  <td className="text-cinza whitespace-nowrap">
-                    {nomeCurto(autores.get(c.criado_por ?? ""))}
-                  </td>
-                  <td>
-                    <SeloContrato status={c.status} />
-                  </td>
-                </tr>
-              ))}
-              {calculados.length === 0 && (
-                <tr>
-                  <td colSpan={11} className="text-center text-cinza py-8">
-                    Nenhum contrato ainda. Cadastre uma venda já fechada em{" "}
-                    <Link href="/contratos/novo" className="text-vinho font-semibold">
-                      Novo contrato
-                    </Link>
-                    , ou gere um a partir de uma proposta aceita.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </section>
+        <ContratosTabela contratos={linhas} ehAdmin={ehAdmin} />
       </main>
     </>
   );
