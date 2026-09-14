@@ -225,9 +225,6 @@ export default function LoginPage() {
             </Suspense>
           </div>
         </div>
-        <p className="text-xs text-cinza text-center mt-4">
-          Uso interno. Os dados de venda vêm do espelho no Supabase.
-        </p>
       </div>
     </main>
   );
