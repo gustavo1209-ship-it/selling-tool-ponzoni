@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { Indexador } from "@/lib/calc/tipos";
+import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
 import { competencia, hojeISO, primeiroDia, somarMeses } from "@/lib/contratos/mes";
 import {
   buscarSerieBcb,
@@ -40,57 +41,62 @@ export interface LancamentoIndice {
  * o upsert o segundo lançamento batia na unique e a tela dava erro de
  * banco em cima de uma operação de rotina.
  */
-export async function lancarIndice(dados: LancamentoIndice) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Não autenticado.");
+export async function lancarIndice(dados: LancamentoIndice): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado.");
 
-  const comp = competencia(dados.competencia);
-  if (!/^\d{4}-\d{2}$/.test(comp)) {
-    throw new Error("Competência inválida. Use o mês no formato AAAA-MM.");
-  }
-  if (!Number.isFinite(dados.variacao)) {
-    throw new Error("Informe a variação do mês.");
-  }
+    const comp = competencia(dados.competencia);
+    if (!/^\d{4}-\d{2}$/.test(comp)) {
+      throw new Error("Competência inválida. Use o mês no formato AAAA-MM.");
+    }
+    if (!Number.isFinite(dados.variacao)) {
+      throw new Error("Informe a variação do mês.");
+    }
 
-  const { error } = await supabase.from("indices_mensais").upsert(
-    {
-      indexador: dados.indexador,
-      competencia: primeiroDia(comp),
-      variacao: dados.variacao,
-      fonte: dados.fonte?.trim() || null,
-      observacao: dados.observacao?.trim() || null,
-      criado_por: user.id,
-    },
-    { onConflict: "indexador,competencia" }
-  );
-  if (error) throw new Error(error.message);
+    const { error } = await supabase.from("indices_mensais").upsert(
+      {
+        indexador: dados.indexador,
+        competencia: primeiroDia(comp),
+        variacao: dados.variacao,
+        fonte: dados.fonte?.trim() || null,
+        observacao: dados.observacao?.trim() || null,
+        criado_por: user.id,
+      },
+      { onConflict: "indexador,competencia" }
+    );
+    if (error) throw new Error(error.message);
 
-  await recalcularReferencia(dados.indexador);
-  revalidatePath("/indices");
-  revalidatePath("/cobranca");
-  revalidatePath("/contratos");
-  return { ok: true };
+    await recalcularReferencia(dados.indexador);
+    revalidatePath("/indices");
+    revalidatePath("/cobranca");
+    revalidatePath("/contratos");
+    return {};
+  });
 }
 
-export async function apagarIndice(id: string) {
-  const supabase = await createClient();
+export async function apagarIndice(id: string): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
 
-  const { data: linha } = await supabase
-    .from("indices_mensais")
-    .select("indexador")
-    .eq("id", id)
-    .maybeSingle();
+    const { data: linha } = await supabase
+      .from("indices_mensais")
+      .select("indexador")
+      .eq("id", id)
+      .maybeSingle();
 
-  const { error } = await supabase.from("indices_mensais").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+    const { error } = await supabase.from("indices_mensais").delete().eq("id", id);
+    if (error) throw new Error(error.message);
 
-  if (linha) await recalcularReferencia(linha.indexador as Indexador);
-  revalidatePath("/indices");
-  revalidatePath("/cobranca");
-  revalidatePath("/contratos");
+    if (linha) await recalcularReferencia(linha.indexador as Indexador);
+    revalidatePath("/indices");
+    revalidatePath("/cobranca");
+    revalidatePath("/contratos");
+    return {};
+  });
 }
 
 /**
@@ -170,76 +176,95 @@ export interface ResultadoImportacao {
  * Os meses que mudam de valor mexem no boleto de quem já tem contrato, então
  * a função devolve a contagem do que entrou — é o que a tela mostra.
  */
+/**
+ * Não usa `comoResultado`: quem chama (`importarTodasAsSeries`, e a tela
+ * quando importa um índice só) trata a falha pelo campo `erro` opcional de
+ * `ResultadoImportacao`, não por um `{ok,erro}` à parte — mesmo formato dos
+ * dois caminhos, para a tela não precisar saber qual foi usado.
+ */
 export async function importarSerieBcb(
   indexador: Indexador,
   desde: string,
   substituir = false
 ): Promise<ResultadoImportacao> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Não autenticado.");
-
   const nome = SERIE_SGS[indexador]?.nome ?? indexador;
-  const pontos = await buscarSerieBcb(indexador, desde, hojeISO());
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado.");
 
-  if (pontos.length === 0) {
+    const pontos = await buscarSerieBcb(indexador, desde, hojeISO());
+
+    if (pontos.length === 0) {
+      return {
+        indexador, nome, novos: 0, atualizados: 0, mantidos: 0,
+        primeiro: null, ultimo: null,
+      };
+    }
+
+    const { data: existentes } = await supabase
+      .from("indices_mensais")
+      .select("competencia, variacao")
+      .eq("indexador", indexador)
+      .gte("competencia", primeiroDia(pontos[0].competencia));
+
+    const atuais = new Map(
+      (existentes ?? []).map((l) => [competencia(l.competencia), Number(l.variacao)])
+    );
+
+    const aGravar = pontos.filter((p) => {
+      const atual = atuais.get(p.competencia);
+      if (atual === undefined) return true;
+      if (!substituir) return false;
+      // já lançado com o mesmo número não conta como atualização
+      return Math.abs(atual - p.variacao) > 1e-9;
+    });
+
+    const novos = aGravar.filter((p) => !atuais.has(p.competencia)).length;
+
+    if (aGravar.length > 0) {
+      const { error } = await supabase.from("indices_mensais").upsert(
+        aGravar.map((p) => ({
+          indexador,
+          competencia: primeiroDia(p.competencia),
+          variacao: p.variacao,
+          fonte: fonteDoBcb(indexador),
+          criado_por: user.id,
+        })),
+        { onConflict: "indexador,competencia" }
+      );
+      if (error) throw new Error(error.message);
+
+      await recalcularReferencia(indexador);
+    }
+
+    revalidatePath("/indices");
+    revalidatePath("/cobranca");
+    revalidatePath("/contratos");
+
     return {
-      indexador, nome, novos: 0, atualizados: 0, mantidos: 0,
-      primeiro: null, ultimo: null,
+      indexador,
+      nome,
+      novos,
+      atualizados: aGravar.length - novos,
+      mantidos: pontos.length - aGravar.length,
+      primeiro: pontos[0].competencia,
+      ultimo: pontos[pontos.length - 1].competencia,
+    };
+  } catch (e) {
+    return {
+      indexador,
+      nome,
+      novos: 0,
+      atualizados: 0,
+      mantidos: 0,
+      primeiro: null,
+      ultimo: null,
+      erro: e instanceof Error ? e.message : String(e),
     };
   }
-
-  const { data: existentes } = await supabase
-    .from("indices_mensais")
-    .select("competencia, variacao")
-    .eq("indexador", indexador)
-    .gte("competencia", primeiroDia(pontos[0].competencia));
-
-  const atuais = new Map(
-    (existentes ?? []).map((l) => [competencia(l.competencia), Number(l.variacao)])
-  );
-
-  const aGravar = pontos.filter((p) => {
-    const atual = atuais.get(p.competencia);
-    if (atual === undefined) return true;
-    if (!substituir) return false;
-    // já lançado com o mesmo número não conta como atualização
-    return Math.abs(atual - p.variacao) > 1e-9;
-  });
-
-  const novos = aGravar.filter((p) => !atuais.has(p.competencia)).length;
-
-  if (aGravar.length > 0) {
-    const { error } = await supabase.from("indices_mensais").upsert(
-      aGravar.map((p) => ({
-        indexador,
-        competencia: primeiroDia(p.competencia),
-        variacao: p.variacao,
-        fonte: fonteDoBcb(indexador),
-        criado_por: user.id,
-      })),
-      { onConflict: "indexador,competencia" }
-    );
-    if (error) throw new Error(error.message);
-
-    await recalcularReferencia(indexador);
-  }
-
-  revalidatePath("/indices");
-  revalidatePath("/cobranca");
-  revalidatePath("/contratos");
-
-  return {
-    indexador,
-    nome,
-    novos,
-    atualizados: aGravar.length - novos,
-    mantidos: pontos.length - aGravar.length,
-    primeiro: pontos[0].competencia,
-    ultimo: pontos[pontos.length - 1].competencia,
-  };
 }
 
 /**

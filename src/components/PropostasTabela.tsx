@@ -53,7 +53,8 @@ export default function PropostasTabela({
     setErro(null);
     iniciar(async () => {
       try {
-        await apagarPropostas(selecionadas);
+        const resultado = await apagarPropostas(selecionadas);
+        if (!resultado.ok) throw new Error(resultado.erro);
         setSelecionadas([]);
         router.refresh();
       } catch (e) {

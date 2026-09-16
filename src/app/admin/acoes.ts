@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { BlocoTemplate } from "@/lib/db/tipos";
+import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
 
 /**
  * As telas de administração.
@@ -72,56 +73,62 @@ export interface DadosEmpreendimento {
  * empreendimento. Renomear "Florescer" para "Florescer Parque" não pode
  * quebrar o link que alguém salvou.
  */
-export async function criarEmpreendimento(dados: DadosEmpreendimento) {
-  const { supabase } = await exigirAdmin();
+export async function criarEmpreendimento(
+  dados: DadosEmpreendimento
+): Promise<ResultadoAcao<{ id: string; slug: string }>> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
 
-  const nome = dados.nome.trim();
-  if (!nome) throw new Error("O empreendimento precisa de um nome.");
+    const nome = dados.nome.trim();
+    if (!nome) throw new Error("O empreendimento precisa de um nome.");
 
-  const slug = aSlug(nome);
-  if (!slug) throw new Error("Não consegui derivar um endereço a partir desse nome.");
+    const slug = aSlug(nome);
+    if (!slug) throw new Error("Não consegui derivar um endereço a partir desse nome.");
 
-  const { data: existente } = await supabase
-    .from("empreendimentos")
-    .select("id")
-    .eq("slug", slug)
-    .maybeSingle();
-  if (existente) {
-    throw new Error(`Já existe um empreendimento com o endereço "${slug}".`);
-  }
+    const { data: existente } = await supabase
+      .from("empreendimentos")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (existente) {
+      throw new Error(`Já existe um empreendimento com o endereço "${slug}".`);
+    }
 
-  const { data, error } = await supabase
-    .from("empreendimentos")
-    .insert({ ...normalizar(dados), nome, slug })
-    .select("id, slug")
-    .single();
-  if (error) throw new Error(error.message);
+    const { data, error } = await supabase
+      .from("empreendimentos")
+      .insert({ ...normalizar(dados), nome, slug })
+      .select("id, slug")
+      .single();
+    if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/empreendimentos");
-  revalidatePath("/");
-  return { id: data.id as string, slug: data.slug as string };
+    revalidatePath("/admin/empreendimentos");
+    revalidatePath("/");
+    return { id: data.id as string, slug: data.slug as string };
+  });
 }
 
 export async function atualizarEmpreendimento(
   id: string,
   dados: DadosEmpreendimento
-) {
-  const { supabase } = await exigirAdmin();
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
 
-  const nome = dados.nome.trim();
-  if (!nome) throw new Error("O empreendimento precisa de um nome.");
+    const nome = dados.nome.trim();
+    if (!nome) throw new Error("O empreendimento precisa de um nome.");
 
-  const { error } = await supabase
-    .from("empreendimentos")
-    .update({ ...normalizar(dados), nome })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+    const { error } = await supabase
+      .from("empreendimentos")
+      .update({ ...normalizar(dados), nome })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/empreendimentos");
-  revalidatePath("/espelho");
-  revalidatePath("/mapa");
-  revalidatePath("/");
-  return { ok: true };
+    revalidatePath("/admin/empreendimentos");
+    revalidatePath("/espelho");
+    revalidatePath("/mapa");
+    revalidatePath("/");
+    return {};
+  });
 }
 
 function normalizar(d: DadosEmpreendimento) {
@@ -162,36 +169,38 @@ export async function salvarTabelaPreco(
   empreendimentoId: string,
   tabelaId: string | null,
   dados: DadosTabela
-) {
-  const { supabase } = await exigirAdmin();
+): Promise<ResultadoAcao<{ id: string }>> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
 
-  const referencia = dados.referencia.trim();
-  if (!referencia) throw new Error("A tabela precisa de uma referência.");
+    const referencia = dados.referencia.trim();
+    if (!referencia) throw new Error("A tabela precisa de uma referência.");
 
-  const linha = {
-    empreendimento_id: empreendimentoId,
-    referencia,
-    condicao_base: dados.condicao_base.trim() || "À vista",
-    vigente_desde: dados.vigente_desde,
-    incc_mensal: dados.incc_mensal,
-    juros_vp_mensal: dados.juros_vp_mensal,
-    ativa: true,
-  };
+    const linha = {
+      empreendimento_id: empreendimentoId,
+      referencia,
+      condicao_base: dados.condicao_base.trim() || "À vista",
+      vigente_desde: dados.vigente_desde,
+      incc_mensal: dados.incc_mensal,
+      juros_vp_mensal: dados.juros_vp_mensal,
+      ativa: true,
+    };
 
-  const { data, error } = tabelaId
-    ? await supabase
-        .from("tabelas_preco")
-        .update(linha)
-        .eq("id", tabelaId)
-        .select("id")
-        .single()
-    : await supabase.from("tabelas_preco").insert(linha).select("id").single();
+    const { data, error } = tabelaId
+      ? await supabase
+          .from("tabelas_preco")
+          .update(linha)
+          .eq("id", tabelaId)
+          .select("id")
+          .single()
+      : await supabase.from("tabelas_preco").insert(linha).select("id").single();
 
-  if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/empreendimentos");
-  revalidatePath("/espelho");
-  return { id: data.id as string };
+    revalidatePath("/admin/empreendimentos");
+    revalidatePath("/espelho");
+    return { id: data.id as string };
+  });
 }
 
 // ----------------------------------------------------------- condições
@@ -215,66 +224,75 @@ export interface DadosCondicao {
  * arredondamento sobra ou falta no fim do fluxo. Ver "Três armadilhas da
  * estrutura de pagamento" no CLAUDE.md — o `MontarOpcao` já entrega assim.
  */
-export async function criarCondicao(tabelaId: string, dados: DadosCondicao) {
-  const { supabase } = await exigirAdmin();
+export async function criarCondicao(
+  tabelaId: string,
+  dados: DadosCondicao
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
 
-  const nome = dados.nome.trim();
-  if (!nome) throw new Error("A condição precisa de um nome.");
-  if (dados.template.length === 0) {
-    throw new Error("A condição precisa de pelo menos um bloco de pagamento.");
-  }
+    const nome = dados.nome.trim();
+    if (!nome) throw new Error("A condição precisa de um nome.");
+    if (dados.template.length === 0) {
+      throw new Error("A condição precisa de pelo menos um bloco de pagamento.");
+    }
 
-  const { error } = await supabase.from("condicoes_pagamento").insert({
-    tabela_preco_id: tabelaId,
-    nome,
-    descricao: limpo(dados.descricao),
-    desconto_pct: dados.desconto_pct,
-    ordem: dados.ordem,
-    ativa: dados.ativa,
-    oficial: true,
-    template: dados.template,
-  });
-  if (error) throw new Error(error.message);
-
-  revalidatePath("/admin/empreendimentos");
-  revalidatePath("/espelho");
-  return { ok: true };
-}
-
-export async function atualizarCondicao(
-  id: string,
-  dados: Omit<DadosCondicao, "template">
-) {
-  const { supabase } = await exigirAdmin();
-
-  const nome = dados.nome.trim();
-  if (!nome) throw new Error("A condição precisa de um nome.");
-
-  const { error } = await supabase
-    .from("condicoes_pagamento")
-    .update({
+    const { error } = await supabase.from("condicoes_pagamento").insert({
+      tabela_preco_id: tabelaId,
       nome,
       descricao: limpo(dados.descricao),
       desconto_pct: dados.desconto_pct,
       ordem: dados.ordem,
       ativa: dados.ativa,
-    })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+      oficial: true,
+      template: dados.template,
+    });
+    if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/empreendimentos");
-  revalidatePath("/espelho");
-  return { ok: true };
+    revalidatePath("/admin/empreendimentos");
+    revalidatePath("/espelho");
+    return {};
+  });
 }
 
-export async function apagarCondicao(id: string) {
-  const { supabase } = await exigirAdmin();
-  const { error } = await supabase.from("condicoes_pagamento").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+export async function atualizarCondicao(
+  id: string,
+  dados: Omit<DadosCondicao, "template">
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
 
-  revalidatePath("/admin/empreendimentos");
-  revalidatePath("/espelho");
-  return { ok: true };
+    const nome = dados.nome.trim();
+    if (!nome) throw new Error("A condição precisa de um nome.");
+
+    const { error } = await supabase
+      .from("condicoes_pagamento")
+      .update({
+        nome,
+        descricao: limpo(dados.descricao),
+        desconto_pct: dados.desconto_pct,
+        ordem: dados.ordem,
+        ativa: dados.ativa,
+      })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/empreendimentos");
+    revalidatePath("/espelho");
+    return {};
+  });
+}
+
+export async function apagarCondicao(id: string): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
+    const { error } = await supabase.from("condicoes_pagamento").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/empreendimentos");
+    revalidatePath("/espelho");
+    return {};
+  });
 }
 
 // ---------------------------------------------------------- corretores
@@ -290,33 +308,35 @@ export async function definirAcessoEmpreendimentos(
   perfilId: string,
   restrito: boolean,
   empreendimentoIds: string[]
-) {
-  const { supabase } = await exigirAdmin();
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
 
-  const { error: erroPerfil } = await supabase
-    .from("perfis")
-    .update({ empreendimentos_restritos: restrito })
-    .eq("id", perfilId);
-  if (erroPerfil) throw new Error(erroPerfil.message);
+    const { error: erroPerfil } = await supabase
+      .from("perfis")
+      .update({ empreendimentos_restritos: restrito })
+      .eq("id", perfilId);
+    if (erroPerfil) throw new Error(erroPerfil.message);
 
-  const { error: erroLimpeza } = await supabase
-    .from("corretor_empreendimentos")
-    .delete()
-    .eq("perfil_id", perfilId);
-  if (erroLimpeza) throw new Error(erroLimpeza.message);
+    const { error: erroLimpeza } = await supabase
+      .from("corretor_empreendimentos")
+      .delete()
+      .eq("perfil_id", perfilId);
+    if (erroLimpeza) throw new Error(erroLimpeza.message);
 
-  if (empreendimentoIds.length > 0) {
-    const { error } = await supabase.from("corretor_empreendimentos").insert(
-      empreendimentoIds.map((empreendimento_id) => ({
-        perfil_id: perfilId,
-        empreendimento_id,
-      }))
-    );
-    if (error) throw new Error(error.message);
-  }
+    if (empreendimentoIds.length > 0) {
+      const { error } = await supabase.from("corretor_empreendimentos").insert(
+        empreendimentoIds.map((empreendimento_id) => ({
+          perfil_id: perfilId,
+          empreendimento_id,
+        }))
+      );
+      if (error) throw new Error(error.message);
+    }
 
-  revalidatePath("/admin/corretores");
-  return { ok: true };
+    revalidatePath("/admin/corretores");
+    return {};
+  });
 }
 
 /**
@@ -324,23 +344,28 @@ export async function definirAcessoEmpreendimentos(
  * digitado na hora de criar o usuário no painel do Supabase — errar ou
  * digitar um apelido ali não deveria exigir voltar lá para corrigir.
  */
-export async function renomearCorretor(perfilId: string, nome: string) {
-  const { supabase } = await exigirAdmin();
+export async function renomearCorretor(
+  perfilId: string,
+  nome: string
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
 
-  const nomeLimpo = nome.trim();
-  if (!nomeLimpo) throw new Error("O nome não pode ficar vazio.");
+    const nomeLimpo = nome.trim();
+    if (!nomeLimpo) throw new Error("O nome não pode ficar vazio.");
 
-  const { error } = await supabase
-    .from("perfis")
-    .update({ nome: nomeLimpo })
-    .eq("id", perfilId);
-  if (error) throw new Error(error.message);
+    const { error } = await supabase
+      .from("perfis")
+      .update({ nome: nomeLimpo })
+      .eq("id", perfilId);
+    if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/corretores");
-  revalidatePath("/admin/desempenho");
-  revalidatePath("/propostas");
-  revalidatePath("/contratos");
-  return { ok: true };
+    revalidatePath("/admin/corretores");
+    revalidatePath("/admin/desempenho");
+    revalidatePath("/propostas");
+    revalidatePath("/contratos");
+    return {};
+  });
 }
 
 /**
@@ -348,21 +373,26 @@ export async function renomearCorretor(perfilId: string, nome: string) {
  * rebaixasse por engano ficaria sem quem o promovesse de volta sem passar
  * pelo SQL do painel do Supabase.
  */
-export async function definirPapel(perfilId: string, papel: "corretor" | "admin") {
-  const { supabase, userId } = await exigirAdmin();
+export async function definirPapel(
+  perfilId: string,
+  papel: "corretor" | "admin"
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase, userId } = await exigirAdmin();
 
-  if (perfilId === userId) {
-    throw new Error("Você não pode mudar o próprio papel.");
-  }
+    if (perfilId === userId) {
+      throw new Error("Você não pode mudar o próprio papel.");
+    }
 
-  const { error } = await supabase
-    .from("perfis")
-    .update({ papel })
-    .eq("id", perfilId);
-  if (error) throw new Error(error.message);
+    const { error } = await supabase
+      .from("perfis")
+      .update({ papel })
+      .eq("id", perfilId);
+    if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/corretores");
-  return { ok: true };
+    revalidatePath("/admin/corretores");
+    return {};
+  });
 }
 
 // --------------------------------------------------------- etapas do funil
@@ -375,35 +405,42 @@ export interface DadosEtapa {
   ativa: boolean;
 }
 
-export async function criarEtapa(dados: DadosEtapa) {
-  const { supabase } = await exigirAdmin();
+export async function criarEtapa(dados: DadosEtapa): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
 
-  const nome = dados.nome.trim();
-  if (!nome) throw new Error("A etapa precisa de um nome.");
+    const nome = dados.nome.trim();
+    if (!nome) throw new Error("A etapa precisa de um nome.");
 
-  const { error } = await supabase.from("funil_etapas").insert({ ...dados, nome });
-  if (error) throw new Error(error.message);
+    const { error } = await supabase.from("funil_etapas").insert({ ...dados, nome });
+    if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/funil");
-  revalidatePath("/funil");
-  return { ok: true };
+    revalidatePath("/admin/funil");
+    revalidatePath("/funil");
+    return {};
+  });
 }
 
-export async function atualizarEtapa(id: string, dados: DadosEtapa) {
-  const { supabase } = await exigirAdmin();
+export async function atualizarEtapa(
+  id: string,
+  dados: DadosEtapa
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
 
-  const nome = dados.nome.trim();
-  if (!nome) throw new Error("A etapa precisa de um nome.");
+    const nome = dados.nome.trim();
+    if (!nome) throw new Error("A etapa precisa de um nome.");
 
-  const { error } = await supabase
-    .from("funil_etapas")
-    .update({ ...dados, nome })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+    const { error } = await supabase
+      .from("funil_etapas")
+      .update({ ...dados, nome })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/funil");
-  revalidatePath("/funil");
-  return { ok: true };
+    revalidatePath("/admin/funil");
+    revalidatePath("/funil");
+    return {};
+  });
 }
 
 /**
@@ -416,24 +453,26 @@ export async function atualizarEtapa(id: string, dados: DadosEtapa) {
  * número é o real. Se um dia um não-admin chegar aqui, `exigirAdmin` já o
  * terá barrado.
  */
-export async function apagarEtapa(id: string) {
-  const { supabase } = await exigirAdmin();
+export async function apagarEtapa(id: string): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
 
-  const { count } = await supabase
-    .from("negociacoes")
-    .select("id", { count: "exact", head: true })
-    .eq("etapa_id", id);
+    const { count } = await supabase
+      .from("negociacoes")
+      .select("id", { count: "exact", head: true })
+      .eq("etapa_id", id);
 
-  if (count && count > 0) {
-    throw new Error(
-      `Esta etapa tem ${count} negociação(ões). Mova os cartões para outra coluna, ou desmarque "ativa" para tirá-la do quadro sem perder o histórico.`
-    );
-  }
+    if (count && count > 0) {
+      throw new Error(
+        `Esta etapa tem ${count} negociação(ões). Mova os cartões para outra coluna, ou desmarque "ativa" para tirá-la do quadro sem perder o histórico.`
+      );
+    }
 
-  const { error } = await supabase.from("funil_etapas").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+    const { error } = await supabase.from("funil_etapas").delete().eq("id", id);
+    if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/funil");
-  revalidatePath("/funil");
-  return { ok: true };
+    revalidatePath("/admin/funil");
+    revalidatePath("/funil");
+    return {};
+  });
 }

@@ -56,7 +56,8 @@ export default function ContratosTabela({
     setErro(null);
     iniciar(async () => {
       try {
-        await apagarContratos(selecionados);
+        const resultado = await apagarContratos(selecionados);
+        if (!resultado.ok) throw new Error(resultado.erro);
         setSelecionados([]);
         router.refresh();
       } catch (e) {

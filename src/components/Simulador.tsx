@@ -344,13 +344,14 @@ export default function Simulador({
     setFavoritando(c.id);
     iniciarSalvar(async () => {
       try {
-        await favoritarCenario({
+        const resultado = await favoritarCenario({
           tabela_preco_id: proposta.tabela_preco_id!,
           nome: c.nome,
           descricao: `Favorita montada em ${proposta.codigo}.`,
           desconto_pct: Number(c.desconto_pct),
           blocos: c.blocos,
         });
+        if (!resultado.ok) throw new Error(resultado.erro);
         setRecado(`"${c.nome}" virou favorita e já aparece em novas propostas.`);
       } catch (e) {
         setRecado(mensagemDeFalha(e));
@@ -460,6 +461,7 @@ export default function Simulador({
           lotes,
           cenarios: cenarios as unknown as CenarioPayload[],
         });
+        if (!retorno.ok) throw new Error(retorno.erro);
         if (criandoCliente && retorno.cliente_id) {
           setClienteId(retorno.cliente_id);
           setCriandoCliente(false);
@@ -490,8 +492,9 @@ export default function Simulador({
     setRecado(null);
     iniciarSalvar(async () => {
       try {
-        const { id } = await gerarContratoDaProposta(proposta.id, ativo.id);
-        router.push(`/contratos/${id}`);
+        const resultado = await gerarContratoDaProposta(proposta.id, ativo.id);
+        if (!resultado.ok) throw new Error(resultado.erro);
+        router.push(`/contratos/${resultado.id}`);
       } catch (e) {
         setRecado(mensagemDeFalha(e));
       }
@@ -563,7 +566,14 @@ export default function Simulador({
           )}
           <button
             className="btn btn-fantasma"
-            onClick={() => duplicarProposta(proposta.id)}
+            onClick={() => {
+              // sem try/catch de propósito: duplicarProposta() redireciona ao
+              // terminar, e um catch aqui engoliria esse redirect (ver o
+              // comentário em apagarProposta, em propostas/acoes.ts)
+              duplicarProposta(proposta.id).then((r) => {
+                if (!r.ok) setRecado(r.erro);
+              });
+            }}
             title="Duplicar proposta"
           >
             <Copy size={15} />
@@ -572,7 +582,9 @@ export default function Simulador({
             className="btn btn-fantasma text-vermelho"
             onClick={() => {
               if (confirm("Apagar esta proposta? Não dá para desfazer.")) {
-                apagarProposta(proposta.id);
+                apagarProposta(proposta.id).then((r) => {
+                  if (!r.ok) setRecado(r.erro);
+                });
               }
             }}
             title="Apagar proposta"

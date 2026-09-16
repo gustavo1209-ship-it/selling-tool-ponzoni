@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Check, Plus, Star, Trash2 } from "lucide-react";
 import { criarProposta } from "@/app/propostas/acoes";
@@ -63,6 +63,8 @@ export default function NovaPropostaForm({
   const [condicoesEscolhidas, setCondicoesEscolhidas] = useState<string[]>([]);
   const [montando, setMontando] = useState(false);
   const [customs, setCustoms] = useState<OpcaoMontada[]>([]);
+
+  const [estado, formAction] = useActionState(criarProposta, null);
 
   const tabela = useMemo(
     () => tabelas.find((t) => t.empreendimento_id === empreendimentoId) ?? null,
@@ -150,7 +152,12 @@ export default function NovaPropostaForm({
   }
 
   return (
-    <form action={criarProposta} className="flex flex-col gap-6">
+    <form action={formAction} className="flex flex-col gap-6">
+      {estado && !estado.ok && (
+        <p className="text-sm text-vermelho bg-vermelho-fraco rounded-md px-3 py-2">
+          {estado.erro}
+        </p>
+      )}
       <input type="hidden" name="empreendimento_id" value={empreendimentoId} />
       {efetivas.map((id) => (
         <input key={id} type="hidden" name="condicao_id" value={id} />

@@ -108,13 +108,14 @@ export default function IndicesPainel({
     setAviso(null);
     iniciar(async () => {
       try {
-        await lancarIndice({
+        const resultado = await lancarIndice({
           indexador: codigo,
           competencia: mes,
           variacao: variacao / 100,
           fonte: fonte || null,
           observacao: null,
         });
+        if (!resultado.ok) throw new Error(resultado.erro);
         setVariacao(null);
         setMes((m) => somarMeses(m, 1));
         setAviso(`${ROTULO_INDEXADOR[codigo]} de ${mes} lançado.`);
@@ -158,7 +159,8 @@ export default function IndicesPainel({
     setErro(null);
     iniciar(async () => {
       try {
-        await apagarIndice(linha.id);
+        const resultado = await apagarIndice(linha.id);
+        if (!resultado.ok) throw new Error(resultado.erro);
         router.refresh();
       } catch (e) {
         setErro(mensagemDeFalha(e));

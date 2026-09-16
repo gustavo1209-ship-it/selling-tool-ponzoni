@@ -50,6 +50,7 @@ import {
   pct,
   ROTULO_INDEXADOR,
 } from "@/lib/formato";
+import { verificarResultado } from "@/lib/resultadoAcao";
 
 export default function ContratoDetalhe({
   contrato,
@@ -125,7 +126,7 @@ export default function ContratoDetalhe({
     setErro(null);
     iniciar(async () => {
       try {
-        await fn();
+        verificarResultado(await fn());
         router.refresh();
       } catch (e) {
         setErro(mensagemDeFalha(e));
@@ -146,7 +147,7 @@ export default function ContratoDetalhe({
   function baixarSelecionadas() {
     if (escolhidasEmAberto.length === 0) return;
     agir(async () => {
-      await darBaixaEmLote(
+      const resultado = await darBaixaEmLote(
         escolhidasEmAberto.map((p) => p.id),
         {
           modo: modoLote,
@@ -154,6 +155,7 @@ export default function ContratoDetalhe({
           forma_pagamento: formaLote || null,
         }
       );
+      if (!resultado.ok) throw new Error(resultado.erro);
       setSelecionadas([]);
     });
   }
@@ -168,7 +170,8 @@ export default function ContratoDetalhe({
       return;
     }
     agir(async () => {
-      await desfazerBaixaEmLote(escolhidasPagas.map((p) => p.id));
+      const resultado = await desfazerBaixaEmLote(escolhidasPagas.map((p) => p.id));
+      if (!resultado.ok) throw new Error(resultado.erro);
       setSelecionadas([]);
     });
   }
@@ -189,13 +192,14 @@ export default function ContratoDetalhe({
 
   function confirmarBaixa(p: ParcelaCalculada) {
     agir(async () => {
-      await darBaixa(p.id, {
+      const resultado = await darBaixa(p.id, {
         pago_em: pagoEm,
         valor_pago: valorPago,
         forma_pagamento: forma || null,
         boleto_numero: boleto || null,
         observacao: null,
       });
+      if (!resultado.ok) throw new Error(resultado.erro);
       setBaixando(null);
     });
   }
@@ -214,7 +218,7 @@ export default function ContratoDetalhe({
   function salvarParcela(p: ParcelaCalculada) {
     if (!rascunhoParcela) return;
     agir(async () => {
-      await atualizarParcela(p.id, {
+      const resultado = await atualizarParcela(p.id, {
         vencimento: rascunhoParcela.vencimento,
         valor_original: rascunhoParcela.valor_original ?? 0,
         indexada: p.indexada,
@@ -222,6 +226,7 @@ export default function ContratoDetalhe({
         boleto_numero: p.boleto_numero,
         observacao: rascunhoParcela.observacao || null,
       });
+      if (!resultado.ok) throw new Error(resultado.erro);
       setEditandoParcela(null);
       setRascunhoParcela(null);
     });
@@ -229,7 +234,7 @@ export default function ContratoDetalhe({
 
   function salvarAjustes() {
     agir(async () => {
-      await atualizarContrato(contrato.id, {
+      const resultado = await atualizarContrato(contrato.id, {
         titulo: cfg.titulo.trim() || null,
         cliente_id: cfg.cliente_id || null,
         status: cfg.status,
@@ -244,6 +249,7 @@ export default function ContratoDetalhe({
         multa_atraso_pct: (cfg.multa_atraso_pct ?? 0) / 100,
         observacoes: cfg.observacoes || null,
       });
+      if (!resultado.ok) throw new Error(resultado.erro);
       setAjustes(false);
     });
   }
@@ -458,7 +464,11 @@ export default function ContratoDetalhe({
               disabled={pendente}
               onClick={() =>
                 agir(async () => {
-                  await definirColunasDoDocumento(contrato.id, colunasEscolhidas);
+                  const resultado = await definirColunasDoDocumento(
+                    contrato.id,
+                    colunasEscolhidas
+                  );
+                  if (!resultado.ok) throw new Error(resultado.erro);
                   setColunas(false);
                 })
               }
@@ -656,7 +666,8 @@ export default function ContratoDetalhe({
                   setErro(null);
                   iniciar(async () => {
                     try {
-                      await apagarContrato(contrato.id);
+                      const resultado = await apagarContrato(contrato.id);
+                      if (!resultado.ok) throw new Error(resultado.erro);
                       router.push("/contratos");
                     } catch (e) {
                       setErro(mensagemDeFalha(e));

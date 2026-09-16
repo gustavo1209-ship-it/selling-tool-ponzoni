@@ -11,6 +11,7 @@ import {
 } from "@/app/admin/acoes";
 import type { FunilEtapa } from "@/lib/db/tipos";
 import { mensagemDeFalha } from "@/lib/erros";
+import { verificarResultado } from "@/lib/resultadoAcao";
 
 const DESFECHOS: { valor: DadosEtapa["desfecho"]; rotulo: string; ajuda: string }[] = [
   {
@@ -57,7 +58,7 @@ export default function AdminFunil({
     setErro(null);
     iniciar(async () => {
       try {
-        await fn();
+        verificarResultado(await fn());
         router.refresh();
       } catch (e) {
         setErro(mensagemDeFalha(e));
@@ -71,8 +72,10 @@ export default function AdminFunil({
     const vizinha = etapas[i + direcao];
     if (!vizinha) return;
     agir(async () => {
-      await atualizarEtapa(atual.id, { ...paraDados(atual), ordem: vizinha.ordem });
-      await atualizarEtapa(vizinha.id, { ...paraDados(vizinha), ordem: atual.ordem });
+      const r1 = await atualizarEtapa(atual.id, { ...paraDados(atual), ordem: vizinha.ordem });
+      if (!r1.ok) throw new Error(r1.erro);
+      const r2 = await atualizarEtapa(vizinha.id, { ...paraDados(vizinha), ordem: atual.ordem });
+      if (!r2.ok) throw new Error(r2.erro);
     });
   }
 
@@ -109,7 +112,8 @@ export default function AdminFunil({
           pendente={pendente}
           aoSalvar={(d) =>
             agir(async () => {
-              await criarEtapa(d);
+              const resultado = await criarEtapa(d);
+              if (!resultado.ok) throw new Error(resultado.erro);
               setNova(false);
             })
           }
@@ -169,7 +173,8 @@ function LinhaEtapa({
         pendente={pendente}
         aoSalvar={(d) =>
           agir(async () => {
-            await atualizarEtapa(etapa.id, d);
+            const resultado = await atualizarEtapa(etapa.id, d);
+            if (!resultado.ok) throw new Error(resultado.erro);
             setEditando(false);
           })
         }

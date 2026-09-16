@@ -32,6 +32,7 @@ import type {
 } from "@/lib/db/tipos";
 import { mensagemDeFalha } from "@/lib/erros";
 import { pct } from "@/lib/formato";
+import { verificarResultado } from "@/lib/resultadoAcao";
 
 const VAZIO: DadosEmpreendimento = {
   nome: "",
@@ -83,7 +84,7 @@ export default function AdminEmpreendimentos({
     setErro(null);
     iniciar(async () => {
       try {
-        await fn();
+        verificarResultado(await fn());
         router.refresh();
       } catch (e) {
         setErro(mensagemDeFalha(e));
@@ -139,10 +140,11 @@ export default function AdminEmpreendimentos({
               disabled={pendente}
               onClick={() =>
                 agir(async () => {
-                  const { slug } = await criarEmpreendimento(rascunho);
+                  const resultado = await criarEmpreendimento(rascunho);
+                  if (!resultado.ok) throw new Error(resultado.erro);
                   setNovo(false);
                   setRecado(
-                    `Empreendimento criado com o endereço "${slug}". Falta a tabela de preço, as condições e o primeiro Sincronizar.`
+                    `Empreendimento criado com o endereço "${resultado.slug}". Falta a tabela de preço, as condições e o primeiro Sincronizar.`
                   );
                 })
               }

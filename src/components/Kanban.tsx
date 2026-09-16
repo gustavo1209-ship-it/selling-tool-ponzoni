@@ -157,7 +157,8 @@ export default function Kanban({
     iniciar(async () => {
       moverOtimista({ id, etapaId, ordem });
       try {
-        await moverNegociacao(id, etapaId, ordem);
+        const resultado = await moverNegociacao(id, etapaId, ordem);
+        if (!resultado.ok) throw new Error(resultado.erro);
       } catch (e) {
         setErro(mensagemDeFalha(e));
       }
@@ -460,8 +461,10 @@ function PainelNegociacao({
 
   function salvar() {
     agir(async () => {
-      if (negociacao) await atualizarNegociacao(negociacao.id, dados);
-      else await criarNegociacao(dados);
+      const resultado = negociacao
+        ? await atualizarNegociacao(negociacao.id, dados)
+        : await criarNegociacao(dados);
+      if (!resultado.ok) throw new Error(resultado.erro);
       aoFechar();
     });
   }
@@ -549,7 +552,8 @@ function PainelNegociacao({
             disabled={pendente}
             onClick={() =>
               agir(async () => {
-                await promoverACliente(negociacao.id);
+                const resultado = await promoverACliente(negociacao.id);
+                if (!resultado.ok) throw new Error(resultado.erro);
                 aoFechar();
               })
             }
@@ -666,7 +670,8 @@ function PainelNegociacao({
               disabled={pendente}
               onClick={() =>
                 agir(async () => {
-                  await apagarNegociacao(negociacao.id);
+                  const resultado = await apagarNegociacao(negociacao.id);
+                  if (!resultado.ok) throw new Error(resultado.erro);
                   aoFechar();
                 })
               }

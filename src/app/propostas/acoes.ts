@@ -13,6 +13,7 @@ import type {
 } from "@/lib/db/tipos";
 import { compararLote } from "@/lib/ordenacao";
 import type { DadosCliente } from "@/app/clientes/acoes";
+import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
 
 /** Blocos default quando a condição escolhida não traz template. */
 const TEMPLATE_PADRAO: BlocoTemplate[] = [
@@ -59,7 +60,16 @@ function linhasDeBloco(cenarioId: string, template: BlocoTemplate[]) {
   }));
 }
 
-export async function criarProposta(formData: FormData) {
+/**
+ * Assinatura `(estadoAnterior, formData)` de propósito: é o formato que
+ * `useActionState` exige — ver o mesmo comentário em `criarContrato`
+ * (`contratos/acoes.ts`) e `comoResultado` em `@/lib/resultadoAcao`.
+ */
+export async function criarProposta(
+  _estadoAnterior: ResultadoAcao | null,
+  formData: FormData
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -356,6 +366,7 @@ export async function criarProposta(formData: FormData) {
 
   revalidatePath("/propostas");
   redirect(`/propostas/${proposta.id}`);
+  });
 }
 
 export interface CenarioPayload extends PropostaCenario {
@@ -387,7 +398,10 @@ export interface PayloadSalvar {
  * snapshot do cálculo de cada cenário. Cenários e blocos são reescritos do
  * zero — a lista é pequena e assim não sobra órfão de linha removida na tela.
  */
-export async function salvarProposta(payload: PayloadSalvar) {
+export async function salvarProposta(
+  payload: PayloadSalvar
+): Promise<ResultadoAcao<{ cliente_id: string | null }>> {
+  return comoResultado(async () => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -543,7 +557,8 @@ export async function salvarProposta(payload: PayloadSalvar) {
   revalidatePath(`/propostas/${payload.id}`);
   revalidatePath("/propostas");
   revalidatePath("/clientes");
-  return { ok: true, cliente_id: clienteId };
+  return { cliente_id: clienteId };
+  });
 }
 
 /**
@@ -559,7 +574,8 @@ export async function favoritarCenario(payload: {
   descricao: string | null;
   desconto_pct: number;
   blocos: PropostaBloco[];
-}) {
+}): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -613,15 +629,25 @@ export async function favoritarCenario(payload: {
   if (error) throw new Error(error.message);
 
   revalidatePath("/propostas/nova");
-  return { ok: true };
+  return {};
+  });
 }
 
-export async function apagarProposta(id: string) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("propostas").delete().eq("id", id);
-  if (error) throw new Error(error.message);
-  revalidatePath("/propostas");
-  redirect("/propostas");
+/**
+ * Chamada sem `await`/try-catch em `Simulador` (botão de apagar a proposta
+ * aberta) — de propósito, o mesmo motivo do comentário em `apagarPropostas`:
+ * envolver a chamada num try/catch ali engoliria o `redirect()` daqui.
+ * `comoResultado` deixa o redirect atravessar e só transforma em dado o que
+ * não é redirect.
+ */
+export async function apagarProposta(id: string): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
+    const { error } = await supabase.from("propostas").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    revalidatePath("/propostas");
+    redirect("/propostas");
+  });
 }
 
 /**
@@ -631,15 +657,19 @@ export async function apagarProposta(id: string) {
  * A RLS (`propostas: autor apaga`) é quem decide o que cada usuário pode
  * apagar: aqui não se verifica de novo.
  */
-export async function apagarPropostas(ids: string[]) {
-  if (!ids.length) return;
-  const supabase = await createClient();
-  const { error } = await supabase.from("propostas").delete().in("id", ids);
-  if (error) throw new Error(error.message);
-  revalidatePath("/propostas");
+export async function apagarPropostas(ids: string[]): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    if (!ids.length) return {};
+    const supabase = await createClient();
+    const { error } = await supabase.from("propostas").delete().in("id", ids);
+    if (error) throw new Error(error.message);
+    revalidatePath("/propostas");
+    return {};
+  });
 }
 
-export async function duplicarProposta(id: string) {
+export async function duplicarProposta(id: string): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -710,4 +740,5 @@ export async function duplicarProposta(id: string) {
 
   revalidatePath("/propostas");
   redirect(`/propostas/${nova.id}`);
+  });
 }

@@ -10,6 +10,7 @@ import {
 } from "@/app/admin/acoes";
 import type { Empreendimento, Perfil } from "@/lib/db/tipos";
 import { mensagemDeFalha } from "@/lib/erros";
+import { verificarResultado } from "@/lib/resultadoAcao";
 
 /**
  * Quem é admin e quem vê o quê.
@@ -45,7 +46,7 @@ export default function AdminCorretores({
     setErro(null);
     iniciar(async () => {
       try {
-        await fn();
+        verificarResultado(await fn());
         router.refresh();
       } catch (e) {
         setErro(mensagemDeFalha(e));
@@ -115,7 +116,8 @@ function LinhaPerfil({
 
   function salvarNome() {
     agir(async () => {
-      await renomearCorretor(perfil.id, nomeRascunho);
+      const resultado = await renomearCorretor(perfil.id, nomeRascunho);
+      if (!resultado.ok) throw new Error(resultado.erro);
       setEditandoNome(false);
     });
   }

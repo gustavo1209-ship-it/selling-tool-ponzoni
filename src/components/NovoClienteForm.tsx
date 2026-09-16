@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import { criarCliente } from "@/app/clientes/acoes";
 import type { Empreendimento, FunilEtapa, Lote } from "@/lib/db/tipos";
 import { ROTULO_STATUS_LOTE } from "@/lib/formato";
@@ -25,13 +25,19 @@ export default function NovoClienteForm({
   lotes: Lote[];
 }) {
   const [empreendimentoId, setEmpreendimentoId] = useState("");
+  const [estado, formAction, enviando] = useActionState(criarCliente, null);
 
   const lotesDoEmpreendimento = empreendimentoId
     ? lotes.filter((l) => l.empreendimento_id === empreendimentoId)
     : [];
 
   return (
-    <form action={criarCliente} className="cartao p-4 flex flex-col gap-4">
+    <form action={formAction} className="cartao p-4 flex flex-col gap-4">
+      {estado && !estado.ok && (
+        <p className="text-sm text-vermelho bg-vermelho-fraco rounded-md px-3 py-2">
+          {estado.erro}
+        </p>
+      )}
       <div className="grid gap-3 md:grid-cols-6 items-end">
         <div className="md:col-span-2">
           <label className="rotulo">Nome</label>
@@ -49,7 +55,9 @@ export default function NovoClienteForm({
           <label className="rotulo">Telefone</label>
           <input name="telefone" className="campo" />
         </div>
-        <button className="btn btn-primario">Adicionar</button>
+        <button className="btn btn-primario" disabled={enviando}>
+          {enviando ? "Adicionando…" : "Adicionar"}
+        </button>
       </div>
 
       {etapas.length > 0 && (

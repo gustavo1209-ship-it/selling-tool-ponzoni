@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
 
 /**
  * O quadro de negociações.
@@ -54,66 +55,75 @@ async function carimbo(
   return null;
 }
 
-export async function criarNegociacao(dados: DadosNegociacao) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Não autenticado.");
+export async function criarNegociacao(
+  dados: DadosNegociacao
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado.");
 
-  if (!dados.cliente_id && !limpo(dados.titulo)) {
-    throw new Error("Dê um nome ao prospecto, ou vincule um cliente já cadastrado.");
-  }
+    if (!dados.cliente_id && !limpo(dados.titulo)) {
+      throw new Error("Dê um nome ao prospecto, ou vincule um cliente já cadastrado.");
+    }
 
-  // entra no topo da coluna: o lead novo é o que se olha primeiro
-  const { data: primeiro } = await supabase
-    .from("negociacoes")
-    .select("ordem")
-    .eq("etapa_id", dados.etapa_id)
-    .order("ordem")
-    .limit(1)
-    .maybeSingle();
+    // entra no topo da coluna: o lead novo é o que se olha primeiro
+    const { data: primeiro } = await supabase
+      .from("negociacoes")
+      .select("ordem")
+      .eq("etapa_id", dados.etapa_id)
+      .order("ordem")
+      .limit(1)
+      .maybeSingle();
 
-  const { error } = await supabase.from("negociacoes").insert({
-    ...normalizar(dados),
-    ordem: Number(primeiro?.ordem ?? 0) - 10,
-    fechada_em: await carimbo(supabase, dados.etapa_id, null),
-    criado_por: user.id,
+    const { error } = await supabase.from("negociacoes").insert({
+      ...normalizar(dados),
+      ordem: Number(primeiro?.ordem ?? 0) - 10,
+      fechada_em: await carimbo(supabase, dados.etapa_id, null),
+      criado_por: user.id,
+    });
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/funil");
+    return {};
   });
-  if (error) throw new Error(error.message);
-
-  revalidatePath("/funil");
-  return { ok: true };
 }
 
-export async function atualizarNegociacao(id: string, dados: DadosNegociacao) {
-  const supabase = await createClient();
+export async function atualizarNegociacao(
+  id: string,
+  dados: DadosNegociacao
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
 
-  if (!dados.cliente_id && !limpo(dados.titulo)) {
-    throw new Error("Dê um nome ao prospecto, ou vincule um cliente já cadastrado.");
-  }
+    if (!dados.cliente_id && !limpo(dados.titulo)) {
+      throw new Error("Dê um nome ao prospecto, ou vincule um cliente já cadastrado.");
+    }
 
-  const { data: atual } = await supabase
-    .from("negociacoes")
-    .select("fechada_em")
-    .eq("id", id)
-    .maybeSingle();
+    const { data: atual } = await supabase
+      .from("negociacoes")
+      .select("fechada_em")
+      .eq("id", id)
+      .maybeSingle();
 
-  const { error } = await supabase
-    .from("negociacoes")
-    .update({
-      ...normalizar(dados),
-      fechada_em: await carimbo(
-        supabase,
-        dados.etapa_id,
-        (atual?.fechada_em as string | null) ?? null
-      ),
-    })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+    const { error } = await supabase
+      .from("negociacoes")
+      .update({
+        ...normalizar(dados),
+        fechada_em: await carimbo(
+          supabase,
+          dados.etapa_id,
+          (atual?.fechada_em as string | null) ?? null
+        ),
+      })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
 
-  revalidatePath("/funil");
-  return { ok: true };
+    revalidatePath("/funil");
+    return {};
+  });
 }
 
 function normalizar(d: DadosNegociacao) {
@@ -139,40 +149,48 @@ function normalizar(d: DadosNegociacao) {
  * `ordem` é numérico justamente para isso: a tela manda o ponto médio entre
  * os dois vizinhos e nenhum outro cartão precisa ser reescrito.
  */
-export async function moverNegociacao(id: string, etapaId: string, ordem: number) {
-  const supabase = await createClient();
+export async function moverNegociacao(
+  id: string,
+  etapaId: string,
+  ordem: number
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
 
-  const { data: atual } = await supabase
-    .from("negociacoes")
-    .select("fechada_em")
-    .eq("id", id)
-    .maybeSingle();
+    const { data: atual } = await supabase
+      .from("negociacoes")
+      .select("fechada_em")
+      .eq("id", id)
+      .maybeSingle();
 
-  const { error } = await supabase
-    .from("negociacoes")
-    .update({
-      etapa_id: etapaId,
-      ordem,
-      fechada_em: await carimbo(
-        supabase,
-        etapaId,
-        (atual?.fechada_em as string | null) ?? null
-      ),
-    })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+    const { error } = await supabase
+      .from("negociacoes")
+      .update({
+        etapa_id: etapaId,
+        ordem,
+        fechada_em: await carimbo(
+          supabase,
+          etapaId,
+          (atual?.fechada_em as string | null) ?? null
+        ),
+      })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
 
-  revalidatePath("/funil");
-  return { ok: true };
+    revalidatePath("/funil");
+    return {};
+  });
 }
 
-export async function apagarNegociacao(id: string) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("negociacoes").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+export async function apagarNegociacao(id: string): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
+    const { error } = await supabase.from("negociacoes").delete().eq("id", id);
+    if (error) throw new Error(error.message);
 
-  revalidatePath("/funil");
-  return { ok: true };
+    revalidatePath("/funil");
+    return {};
+  });
 }
 
 /**
@@ -184,44 +202,48 @@ export async function apagarNegociacao(id: string) {
  * caminho de hoje, que é cadastrar de novo em /clientes e depois lembrar de
  * voltar aqui para vincular.
  */
-export async function promoverACliente(id: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Não autenticado.");
+export async function promoverACliente(
+  id: string
+): Promise<ResultadoAcao<{ clienteId: string }>> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado.");
 
-  const { data: negociacao } = await supabase
-    .from("negociacoes")
-    .select("titulo, telefone, cliente_id, observacao")
-    .eq("id", id)
-    .maybeSingle();
+    const { data: negociacao } = await supabase
+      .from("negociacoes")
+      .select("titulo, telefone, cliente_id, observacao")
+      .eq("id", id)
+      .maybeSingle();
 
-  if (!negociacao) throw new Error("Negociação não encontrada.");
-  if (negociacao.cliente_id) throw new Error("Esta negociação já tem cliente.");
+    if (!negociacao) throw new Error("Negociação não encontrada.");
+    if (negociacao.cliente_id) throw new Error("Esta negociação já tem cliente.");
 
-  const nome = limpo(negociacao.titulo as string | null);
-  if (!nome) throw new Error("Sem nome para cadastrar.");
+    const nome = limpo(negociacao.titulo as string | null);
+    if (!nome) throw new Error("Sem nome para cadastrar.");
 
-  const { data: cliente, error } = await supabase
-    .from("clientes")
-    .insert({
-      nome,
-      telefone: negociacao.telefone,
-      observacao: negociacao.observacao,
-      criado_por: user.id,
-    })
-    .select("id")
-    .single();
-  if (error) throw new Error(error.message);
+    const { data: cliente, error } = await supabase
+      .from("clientes")
+      .insert({
+        nome,
+        telefone: negociacao.telefone,
+        observacao: negociacao.observacao,
+        criado_por: user.id,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
 
-  const { error: erroVinculo } = await supabase
-    .from("negociacoes")
-    .update({ cliente_id: cliente.id })
-    .eq("id", id);
-  if (erroVinculo) throw new Error(erroVinculo.message);
+    const { error: erroVinculo } = await supabase
+      .from("negociacoes")
+      .update({ cliente_id: cliente.id })
+      .eq("id", id);
+    if (erroVinculo) throw new Error(erroVinculo.message);
 
-  revalidatePath("/funil");
-  revalidatePath("/clientes");
-  return { clienteId: cliente.id as string };
+    revalidatePath("/funil");
+    revalidatePath("/clientes");
+    return { clienteId: cliente.id as string };
+  });
 }

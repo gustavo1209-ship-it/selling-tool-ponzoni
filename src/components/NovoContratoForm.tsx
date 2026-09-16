@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { criarContrato } from "@/app/contratos/acoes";
 import CampoNumero from "./CampoNumero";
@@ -55,6 +55,8 @@ export default function NovoContratoForm({
   const [corrigePrimeira, setCorrigePrimeira] = useState(true);
   const [jurosMora, setJurosMora] = useState<number | null>(1);
   const [multa, setMulta] = useState<number | null>(2);
+
+  const [estado, formAction, enviando] = useActionState(criarContrato, null);
 
   const disponiveis = useMemo(
     () =>
@@ -141,7 +143,12 @@ export default function NovoContratoForm({
   const numero = (v: number | null) => (v === null ? "" : String(v));
 
   return (
-    <form action={criarContrato} className="flex flex-col gap-6">
+    <form action={formAction} className="flex flex-col gap-6">
+      {estado && !estado.ok && (
+        <p className="text-sm text-vermelho bg-vermelho-fraco rounded-md px-3 py-2">
+          {estado.erro}
+        </p>
+      )}
       {selecionados.map((id) => (
         <input key={id} type="hidden" name="lote_id" value={id} />
       ))}
@@ -519,8 +526,11 @@ export default function NovoContratoForm({
       )}
 
       <div className="flex justify-end gap-3">
-        <button className="btn btn-primario" disabled={!valorTotal || previa.length === 0}>
-          Criar contrato
+        <button
+          className="btn btn-primario"
+          disabled={!valorTotal || previa.length === 0 || enviando}
+        >
+          {enviando ? "Criando…" : "Criar contrato"}
         </button>
       </div>
     </form>
