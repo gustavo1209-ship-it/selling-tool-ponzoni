@@ -68,10 +68,23 @@ export async function criarCliente(formData: FormData) {
   revalidatePath("/clientes");
 }
 
-export async function atualizarCliente(id: string, dados: DadosCliente) {
+/**
+ * Retorna `{ ok: false, erro }` em vez de lançar exceção.
+ *
+ * Em produção o Next.js troca a mensagem de qualquer erro lançado dentro de
+ * uma Server Action por um texto genérico ("An error occurred in the Server
+ * Components render…"), para não vazar detalhe interno — e engole junto a
+ * mensagem que a tela precisa mostrar ("nome não pode ficar vazio", "cliente
+ * tem propostas"). Só acontecia em produção, nunca em `npm run dev`, o que
+ * escondeu o problema até alguém apagar um cliente na Vercel.
+ */
+export async function atualizarCliente(
+  id: string,
+  dados: DadosCliente
+): Promise<{ ok: true } | { ok: false; erro: string }> {
   const supabase = await createClient();
   const nome = dados.nome.trim();
-  if (!nome) throw new Error("O nome do cliente não pode ficar vazio.");
+  if (!nome) return { ok: false, erro: "O nome do cliente não pode ficar vazio." };
 
   const { error } = await supabase
     .from("clientes")
@@ -84,14 +97,16 @@ export async function atualizarCliente(id: string, dados: DadosCliente) {
       observacao: dados.observacao?.trim() || null,
     })
     .eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { ok: false, erro: error.message };
 
   revalidatePath("/clientes");
   revalidatePath("/propostas");
   return { ok: true };
 }
 
-export async function apagarCliente(id: string) {
+export async function apagarCliente(
+  id: string
+): Promise<{ ok: true } | { ok: false; erro: string }> {
   const supabase = await createClient();
 
   const { count } = await supabase
@@ -100,12 +115,15 @@ export async function apagarCliente(id: string) {
     .eq("cliente_id", id);
 
   if (count && count > 0) {
-    throw new Error(
-      `Este cliente tem ${count} proposta(s). Apague ou reatribua as propostas antes.`
-    );
+    return {
+      ok: false,
+      erro: `Este cliente tem ${count} proposta(s). Apague ou reatribua as propostas antes.`,
+    };
   }
 
   const { error } = await supabase.from("clientes").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { ok: false, erro: error.message };
+
   revalidatePath("/clientes");
+  return { ok: true };
 }

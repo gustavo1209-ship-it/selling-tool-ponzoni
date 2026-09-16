@@ -45,7 +45,7 @@ export default function ClientesTabela({
     setErro(null);
     iniciar(async () => {
       try {
-        await atualizarCliente(rascunho.id, {
+        const resultado = await atualizarCliente(rascunho.id, {
           nome: rascunho.nome,
           empresa: rascunho.empresa,
           documento: rascunho.documento,
@@ -53,6 +53,10 @@ export default function ClientesTabela({
           telefone: rascunho.telefone,
           observacao: rascunho.observacao,
         });
+        if (!resultado.ok) {
+          setErro(resultado.erro);
+          return;
+        }
         setEditando(null);
         setRascunho(null);
         router.refresh();
@@ -67,7 +71,11 @@ export default function ClientesTabela({
     setErro(null);
     iniciar(async () => {
       try {
-        await apagarCliente(c.id);
+        const resultado = await apagarCliente(c.id);
+        if (!resultado.ok) {
+          setErro(resultado.erro);
+          return;
+        }
         router.refresh();
       } catch (e) {
         setErro(mensagemDeFalha(e));
