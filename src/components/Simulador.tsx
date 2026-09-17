@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   BookmarkPlus,
+  Check,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -148,6 +149,8 @@ export default function Simulador({
   const [ativoId, setAtivoId] = useState(cenariosIniciais[0]?.id ?? "");
   const [mostrarFluxo, setMostrarFluxo] = useState(false);
   const [montando, setMontando] = useState(false);
+  /** Não nula = modal de "qual opção virou contrato" aberto, com essa pré-marcada. */
+  const [escolhaContrato, setEscolhaContrato] = useState<string | null>(null);
 
   const [salvando, iniciarSalvar] = useTransition();
   const [favoritando, setFavoritando] = useState<string | null>(null);
@@ -467,7 +470,7 @@ export default function Simulador({
           setCriandoCliente(false);
         }
         setSujo(false);
-        setRecado("Proposta salva.");
+        setRecado(retorno.avisoCliente ? `Proposta salva. ${retorno.avisoCliente}` : "Proposta salva.");
       } catch (e) {
         setRecado(mensagemDeFalha(e));
       }
@@ -475,24 +478,19 @@ export default function Simulador({
   }
 
   /**
-   * Fecha a venda: a opção aberta vira o cronograma de um contrato.
+   * Fecha a venda: a opção que o cliente escolheu vira o cronograma de um
+   * contrato. Pergunta qual foi, em vez de assumir a aba aberta no
+   * simulador — com mais de uma opção, quem clica pode estar numa aba
+   * diferente da que o cliente realmente fechou.
    *
    * Só depois de salvo — o contrato copia o cálculo gravado do cenário, e
    * não o que está na tela. Mesma trava do PDF e do XLSX, pelo mesmo motivo.
    */
-  function virarContrato() {
-    if (!ativo) return;
-    if (
-      !confirm(
-        `Gerar contrato a partir da opção "${ativo.nome}"? O cronograma será copiado e passará a ser acompanhado em Contratos.`
-      )
-    ) {
-      return;
-    }
+  function gerarContrato(cenarioId: string) {
     setRecado(null);
     iniciarSalvar(async () => {
       try {
-        const resultado = await gerarContratoDaProposta(proposta.id, ativo.id);
+        const resultado = await gerarContratoDaProposta(proposta.id, cenarioId);
         if (!resultado.ok) throw new Error(resultado.erro);
         router.push(`/contratos/${resultado.id}`);
       } catch (e) {
@@ -556,9 +554,9 @@ export default function Simulador({
               </a>
               <button
                 className="btn btn-secundario"
-                title="Vendeu? O cronograma desta opção vira um contrato para acompanhar os pagamentos."
+                title="Vendeu? Escolha qual opção o cliente fechou para virar um contrato."
                 disabled={salvando}
-                onClick={virarContrato}
+                onClick={() => setEscolhaContrato(ativo?.id ?? cenarios[0]?.id ?? null)}
               >
                 <FileSignature size={15} /> Gerar contrato
               </button>
@@ -1440,6 +1438,89 @@ export default function Simulador({
           </div>
         </section>
       </div>
+
+      {/* --------------------------------------- qual opção virou contrato */}
+      {escolhaContrato !== null && (
+        <div className="fixed inset-0 z-50 bg-tinta/40 flex items-center justify-center p-4 sem-impressao">
+          <div className="cartao p-5 w-full max-w-lg flex flex-col gap-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="serif text-lg">Gerar contrato</h2>
+                <p className="text-sm text-cinza mt-1">
+                  Qual opção de pagamento o cliente fechou? O cronograma dela
+                  vira o contrato.
+                </p>
+              </div>
+              <button
+                className="btn btn-fantasma"
+                onClick={() => setEscolhaContrato(null)}
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {cenarios.map((c) => {
+                const res = resultados.get(c.id);
+                return (
+                  <label
+                    key={c.id}
+                    className={`flex items-start gap-3 rounded-md border px-3 py-2.5 cursor-pointer ${
+                      escolhaContrato === c.id
+                        ? "border-vinho bg-vinho-fraco"
+                        : "border-linha hover:bg-papel-alt"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="cenario-contrato"
+                      className="mt-1"
+                      checked={escolhaContrato === c.id}
+                      onChange={() => setEscolhaContrato(c.id)}
+                    />
+                    <span className="flex-1">
+                      <span className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold">{c.nome}</span>
+                        {c.recomendado && (
+                          <span className="selo selo-ouro">Recomendada</span>
+                        )}
+                      </span>
+                      {res && (
+                        <span className="text-xs text-cinza block mt-0.5">
+                          {moeda(res.valorNegociado)} · entrada {moeda(res.entrada)} ·{" "}
+                          {res.prazoMeses}x de {moeda(res.parcelaInicial)}
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                className="btn btn-primario flex-1"
+                disabled={salvando || !escolhaContrato}
+                onClick={() => {
+                  const id = escolhaContrato;
+                  if (!id) return;
+                  setEscolhaContrato(null);
+                  gerarContrato(id);
+                }}
+              >
+                <Check size={15} /> Gerar contrato
+              </button>
+              <button
+                className="btn btn-secundario"
+                disabled={salvando}
+                onClick={() => setEscolhaContrato(null)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
