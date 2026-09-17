@@ -11,6 +11,8 @@ import { dataBR } from "@/lib/formato";
 
 export interface ClienteComPropostas extends Cliente {
   propostas: { id: string; codigo: string }[];
+  /** Quem cadastrou — com corretores, a carteira de cada um é privada. */
+  autorNome: string;
 }
 
 export default function ClientesTabela({
@@ -126,6 +128,7 @@ export default function ClientesTabela({
               <th>E-mail</th>
               <th>Propostas</th>
               <th>Cadastrado</th>
+              <th>Cadastrado por</th>
               <th />
             </tr>
           </thead>
@@ -140,6 +143,7 @@ export default function ClientesTabela({
                   <td>{campo("email")}</td>
                   <td className="text-cinza">{c.propostas.length}</td>
                   <td className="text-cinza">{dataBR(c.criado_em)}</td>
+                  <td className="text-cinza whitespace-nowrap">{c.autorNome}</td>
                   <td>
                     <span className="flex items-center">
                       <button
@@ -189,6 +193,7 @@ export default function ClientesTabela({
                     )}
                   </td>
                   <td className="text-cinza whitespace-nowrap">{dataBR(c.criado_em)}</td>
+                  <td className="text-cinza whitespace-nowrap">{c.autorNome}</td>
                   <td>
                     <span className="flex items-center">
                       <button
@@ -212,7 +217,7 @@ export default function ClientesTabela({
             )}
             {visiveis.length === 0 && (
               <tr>
-                <td colSpan={8} className="text-center text-cinza py-8">
+                <td colSpan={9} className="text-center text-cinza py-8">
                   {clientes.length === 0
                     ? "Nenhum cliente cadastrado."
                     : "Nenhum cliente com esse filtro."}

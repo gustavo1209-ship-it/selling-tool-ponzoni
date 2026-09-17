@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { criarNegociacao } from "@/app/funil/acoes";
+import { avisoDuplicidade } from "@/lib/clientes/duplicidade";
 import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
 
 export interface DadosCliente {
@@ -26,10 +27,12 @@ const limpo = (v: FormDataEntryValue | null) => {
  * como "An error occurred in the Server Components render…" em produção,
  * nunca em `npm run dev`, o que escondeu o problema por um tempo.
  */
+export type EstadoNovoCliente = ResultadoAcao<{ aviso?: string }>;
+
 export async function criarCliente(
-  _estadoAnterior: ResultadoAcao | null,
+  _estadoAnterior: EstadoNovoCliente | null,
   formData: FormData
-): Promise<ResultadoAcao> {
+): Promise<EstadoNovoCliente> {
   return comoResultado(async () => {
     const supabase = await createClient();
     const {
@@ -41,13 +44,16 @@ export async function criarCliente(
     if (!nome) throw new Error("Informe o nome do cliente.");
 
     const telefone = limpo(formData.get("telefone"));
+    const documento = limpo(formData.get("documento"));
+
+    const aviso = await avisoDuplicidade(supabase, { nome, documento, telefone });
 
     const { data: cliente, error } = await supabase
       .from("clientes")
       .insert({
         nome,
         empresa: limpo(formData.get("empresa")),
-        documento: limpo(formData.get("documento")),
+        documento,
         email: limpo(formData.get("email")),
         telefone,
         criado_por: user.id,
@@ -79,7 +85,7 @@ export async function criarCliente(
     }
 
     revalidatePath("/clientes");
-    return {};
+    return aviso ? { aviso } : {};
   });
 }
 

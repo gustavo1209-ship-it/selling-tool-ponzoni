@@ -13,6 +13,7 @@ import type {
 } from "@/lib/db/tipos";
 import { compararLote } from "@/lib/ordenacao";
 import type { DadosCliente } from "@/app/clientes/acoes";
+import { avisoDuplicidade } from "@/lib/clientes/duplicidade";
 import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
 
 /** Blocos default quando a condição escolhida não traz template. */
@@ -400,7 +401,7 @@ export interface PayloadSalvar {
  */
 export async function salvarProposta(
   payload: PayloadSalvar
-): Promise<ResultadoAcao<{ cliente_id: string | null }>> {
+): Promise<ResultadoAcao<{ cliente_id: string | null; avisoCliente?: string }>> {
   return comoResultado(async () => {
   const supabase = await createClient();
   const {
@@ -441,6 +442,7 @@ export async function salvarProposta(
 
   // o cliente é gravado antes: se o nome mudou, a listagem já reflete
   let clienteId = payload.cliente_id;
+  let avisoCliente: string | undefined;
 
   if (payload.cliente) {
     const nome = payload.cliente.nome.trim();
@@ -455,6 +457,13 @@ export async function salvarProposta(
     };
 
     if (payload.criar_cliente) {
+      avisoCliente =
+        (await avisoDuplicidade(supabase, {
+          nome,
+          documento: campos.documento,
+          telefone: campos.telefone,
+        })) ?? undefined;
+
       const { data: novo, error } = await supabase
         .from("clientes")
         .insert({ ...campos, criado_por: user.id })
@@ -557,7 +566,7 @@ export async function salvarProposta(
   revalidatePath(`/propostas/${payload.id}`);
   revalidatePath("/propostas");
   revalidatePath("/clientes");
-  return { cliente_id: clienteId };
+  return { cliente_id: clienteId, avisoCliente };
   });
 }
 

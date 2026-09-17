@@ -7,7 +7,7 @@ import { AlertTriangle, Trash2 } from "lucide-react";
 import { apagarContratos } from "@/app/contratos/acoes";
 import { mensagemDeFalha } from "@/lib/erros";
 import { SeloContrato } from "@/components/SeloStatus";
-import { dataBR, moeda } from "@/lib/formato";
+import { dataBR, moeda, pct } from "@/lib/formato";
 
 export interface ContratoLinha {
   id: string;
@@ -26,6 +26,8 @@ export interface ContratoLinha {
   temVencidas: boolean;
   autorNome: string;
   status: string;
+  comissaoPercentual: number | null;
+  comissaoValor: number | null;
 }
 
 export default function ContratosTabela({
@@ -110,12 +112,17 @@ export default function ContratosTabela({
             <th>Contrato</th>
             <th>Comprador</th>
             <th>Lotes</th>
-            <th className="num">Valor</th>
-            <th className="num">Recebido</th>
-            <th className="num">Saldo corrigido</th>
-            <th className="num">Parcelas</th>
-            <th>Próximo vencimento</th>
-            <th className="num">Em atraso</th>
+            {ehAdmin && (
+              <>
+                <th className="num">Valor</th>
+                <th className="num">Recebido</th>
+                <th className="num">Saldo corrigido</th>
+                <th className="num">Parcelas</th>
+                <th>Próximo vencimento</th>
+                <th className="num">Em atraso</th>
+              </>
+            )}
+            <th className="num">Comissão</th>
             <th>Cadastrado por</th>
             <th>Status</th>
           </tr>
@@ -142,42 +149,58 @@ export default function ContratosTabela({
               </td>
               <td>{c.compradorNome}</td>
               <td className="text-cinza whitespace-nowrap">{c.lotesTexto}</td>
-              <td className="num text-cinza">{moeda(c.valorTotal)}</td>
-              <td className="num">{moeda(c.totalPago)}</td>
-              <td className="num font-semibold">
-                {moeda(c.saldoCorrigido)}
-                {c.temEstimativa && (
-                  <span
-                    className="text-cinza ml-1"
-                    title="Parte das parcelas depende de índice ainda não lançado"
-                  >
-                    ~
-                  </span>
-                )}
-              </td>
-              <td className="num text-cinza">
-                {c.parcelasPagas}/{c.parcelasTotal}
-              </td>
-              <td className="whitespace-nowrap">
-                {c.proximaVencimento ? (
+              {ehAdmin && (
+                <>
+                  <td className="num text-cinza">{moeda(c.valorTotal)}</td>
+                  <td className="num">{moeda(c.totalPago)}</td>
+                  <td className="num font-semibold">
+                    {moeda(c.saldoCorrigido)}
+                    {c.temEstimativa && (
+                      <span
+                        className="text-cinza ml-1"
+                        title="Parte das parcelas depende de índice ainda não lançado"
+                      >
+                        ~
+                      </span>
+                    )}
+                  </td>
+                  <td className="num text-cinza">
+                    {c.parcelasPagas}/{c.parcelasTotal}
+                  </td>
+                  <td className="whitespace-nowrap">
+                    {c.proximaVencimento ? (
+                      <>
+                        {dataBR(c.proximaVencimento)}{" "}
+                        <span className="text-cinza">
+                          · {moeda(c.proximaValor ?? 0)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-cinza">—</span>
+                    )}
+                  </td>
+                  <td className="num">
+                    {c.temVencidas ? (
+                      <span className="text-vermelho font-semibold inline-flex items-center gap-1">
+                        <AlertTriangle size={13} />
+                        {moeda(c.totalVencido)}
+                      </span>
+                    ) : (
+                      <span className="text-cinza">—</span>
+                    )}
+                  </td>
+                </>
+              )}
+              <td className="num whitespace-nowrap">
+                {c.comissaoValor != null ? (
                   <>
-                    {dataBR(c.proximaVencimento)}{" "}
-                    <span className="text-cinza">
-                      · {moeda(c.proximaValor ?? 0)}
-                    </span>
+                    {moeda(c.comissaoValor)}
+                    {c.comissaoPercentual != null && (
+                      <span className="text-cinza"> · {pct(c.comissaoPercentual)}</span>
+                    )}
                   </>
                 ) : (
-                  <span className="text-cinza">—</span>
-                )}
-              </td>
-              <td className="num">
-                {c.temVencidas ? (
-                  <span className="text-vermelho font-semibold inline-flex items-center gap-1">
-                    <AlertTriangle size={13} />
-                    {moeda(c.totalVencido)}
-                  </span>
-                ) : (
-                  <span className="text-cinza">—</span>
+                  <span className="text-cinza">Pendente</span>
                 )}
               </td>
               <td className="text-cinza whitespace-nowrap">{c.autorNome}</td>
@@ -188,7 +211,7 @@ export default function ContratosTabela({
           ))}
           {contratos.length === 0 && (
             <tr>
-              <td colSpan={ehAdmin ? 12 : 11} className="text-center text-cinza py-8">
+              <td colSpan={ehAdmin ? 13 : 6} className="text-center text-cinza py-8">
                 Nenhum contrato ainda. Cadastre uma venda já fechada em{" "}
                 <Link href="/contratos/novo" className="text-vinho font-semibold">
                   Novo contrato

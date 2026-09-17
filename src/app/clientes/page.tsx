@@ -4,6 +4,7 @@ import ClientesTabela, {
 } from "@/components/ClientesTabela";
 import NovoClienteForm from "@/components/NovoClienteForm";
 import { createClient } from "@/lib/supabase/server";
+import { mapaDePerfis, nomeCurto } from "@/lib/supabase/perfil";
 import type { Empreendimento, FunilEtapa, Lote } from "@/lib/db/tipos";
 import { ordenarLotes } from "@/lib/ordenacao";
 
@@ -16,14 +17,19 @@ export default async function ClientesPage() {
     { data: etapas },
     { data: empreendimentos },
     { data: lotes },
+    autores,
   ] = await Promise.all([
     supabase.from("clientes").select("*, propostas(id, codigo)").order("nome"),
     supabase.from("funil_etapas").select("*").eq("ativa", true).order("ordem"),
     supabase.from("empreendimentos").select("*").eq("ativo", true).order("nome"),
     supabase.from("lotes_visiveis").select("*"),
+    mapaDePerfis(),
   ]);
 
-  const clientes = (data ?? []) as unknown as ClienteComPropostas[];
+  const clientes = ((data ?? []) as unknown as ClienteComPropostas[]).map((c) => ({
+    ...c,
+    autorNome: nomeCurto(autores.get(c.criado_por ?? "")),
+  }));
 
   return (
     <>

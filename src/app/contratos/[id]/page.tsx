@@ -6,8 +6,13 @@ import ContratoDetalhe from "@/components/ContratoDetalhe";
 import { createClient } from "@/lib/supabase/server";
 import { calcularContrato } from "@/lib/contratos/correcao";
 import { carregarIndices, serieDe } from "@/lib/contratos/servidor";
-import { mapaDePerfis } from "@/lib/supabase/perfil";
-import type { Cliente, ContratoCompleto, IndexadorRef } from "@/lib/db/tipos";
+import { mapaDePerfis, perfilAtual } from "@/lib/supabase/perfil";
+import type {
+  Cliente,
+  ComissaoContrato,
+  ContratoCompleto,
+  IndexadorRef,
+} from "@/lib/db/tipos";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +23,10 @@ export default async function ContratoPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
+  const perfil = await perfilAtual();
+  const ehAdmin = perfil?.ehAdmin ?? false;
 
-  const [{ data }, { data: indexadores }, indices] = await Promise.all([
+  const [{ data }, { data: indexadores }, indices, { data: comissao }] = await Promise.all([
     supabase
       .from("contratos")
       .select(
@@ -29,6 +36,7 @@ export default async function ContratoPage({
       .maybeSingle(),
     supabase.from("indexadores").select("*").order("ordem"),
     carregarIndices(),
+    supabase.from("contrato_comissoes").select("*").eq("contrato_id", id).maybeSingle(),
   ]);
 
   // a RLS filtra: admin vê todos, corretor só os seus
@@ -76,6 +84,8 @@ export default async function ContratoPage({
           indexadores={(indexadores ?? []) as IndexadorRef[]}
           clientes={(clientes ?? []) as Cliente[]}
           autor={autores.get(contrato.criado_por ?? "") ?? null}
+          ehAdmin={ehAdmin}
+          comissao={comissao as ComissaoContrato | null}
         />
       </main>
     </>

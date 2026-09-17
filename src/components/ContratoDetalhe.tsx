@@ -8,6 +8,7 @@ import {
   CheckCheck,
   FileSpreadsheet,
   Pencil,
+  Percent,
   Printer,
   RotateCcw,
   Settings2,
@@ -22,6 +23,7 @@ import {
   darBaixa,
   darBaixaEmLote,
   definirColunasDoDocumento,
+  definirComissao,
   desfazerBaixa,
   desfazerBaixaEmLote,
   type ModoBaixa,
@@ -34,6 +36,7 @@ import { hojeISO, rotuloCompetencia } from "@/lib/contratos/mes";
 import type { ContratoCalculado, ParcelaCalculada } from "@/lib/contratos/tipos";
 import type {
   Cliente,
+  ComissaoContrato,
   Contrato,
   ContratoLote,
   Empreendimento,
@@ -61,6 +64,8 @@ export default function ContratoDetalhe({
   indexadores,
   clientes,
   autor,
+  ehAdmin,
+  comissao,
 }: {
   contrato: Contrato;
   empreendimento: Empreendimento;
@@ -72,6 +77,9 @@ export default function ContratoDetalhe({
   clientes: Cliente[];
   /** Quem cadastrou o contrato — com corretores, deixa de ser óbvio. */
   autor: string | null;
+  /** Só admin define ou muda a comissão — a RLS de contrato_comissoes barra o resto. */
+  ehAdmin: boolean;
+  comissao: ComissaoContrato | null;
 }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
@@ -120,6 +128,21 @@ export default function ContratoDetalhe({
     juros_mora_mensal: Number(contrato.juros_mora_mensal) * 100 as number | null,
     multa_atraso_pct: Number(contrato.multa_atraso_pct) * 100 as number | null,
     observacoes: contrato.observacoes ?? "",
+  });
+
+  const [comissaoAberta, setComissaoAberta] = useState(false);
+  const [cfgComissao, setCfgComissao] = useState({
+    percentual:
+      comissao?.percentual != null ? (Number(comissao.percentual) * 100 as number | null) : null,
+    valor_absoluto:
+      comissao?.valor_absoluto != null ? (Number(comissao.valor_absoluto) as number | null) : null,
+    forma_pagamento: comissao?.forma_pagamento ?? "",
+    permuta: comissao?.permuta ?? false,
+    permuta_descricao: comissao?.permuta_descricao ?? "",
+    permuta_valor_mercado:
+      comissao?.permuta_valor_mercado != null
+        ? (Number(comissao.permuta_valor_mercado) as number | null)
+        : null,
   });
 
   function agir(fn: () => Promise<unknown>) {
@@ -251,6 +274,21 @@ export default function ContratoDetalhe({
       });
       if (!resultado.ok) throw new Error(resultado.erro);
       setAjustes(false);
+    });
+  }
+
+  function salvarComissao() {
+    agir(async () => {
+      const resultado = await definirComissao(contrato.id, {
+        percentual: cfgComissao.percentual != null ? cfgComissao.percentual / 100 : null,
+        valor_absoluto: cfgComissao.valor_absoluto,
+        forma_pagamento: cfgComissao.forma_pagamento.trim() || null,
+        permuta: cfgComissao.permuta,
+        permuta_descricao: cfgComissao.permuta_descricao.trim() || null,
+        permuta_valor_mercado: cfgComissao.permuta_valor_mercado,
+      });
+      if (!resultado.ok) throw new Error(resultado.erro);
+      setComissaoAberta(false);
     });
   }
 
@@ -404,6 +442,152 @@ export default function ContratoDetalhe({
             {calculo.proxima ? dataBR(calculo.proxima.vencimento) : "contrato quitado"}
           </p>
         </div>
+      </section>
+
+      {/* ------------------------------------------ comissão do corretor */}
+      <section className="cartao p-5 flex flex-col gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="serif text-lg">Comissão do corretor</h2>
+            <p className="text-sm text-cinza mt-1">
+              {comissao
+                ? "Definida pelo escritório."
+                : "Pendente — o escritório ainda vai definir o percentual e a forma de pagamento."}
+            </p>
+          </div>
+          {ehAdmin && (
+            <button
+              className="btn btn-secundario"
+              onClick={() => setComissaoAberta((a) => !a)}
+            >
+              <Percent size={15} /> {comissao ? "Editar comissão" : "Definir comissão"}
+            </button>
+          )}
+        </div>
+
+        {!comissaoAberta &&
+          (comissao ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p className="eyebrow">Percentual</p>
+                <p className="serif text-xl tabular mt-1">
+                  {pct(comissao.percentual != null ? Number(comissao.percentual) : null)}
+                </p>
+              </div>
+              <div>
+                <p className="eyebrow">Valor</p>
+                <p className="serif text-xl tabular mt-1">
+                  {moeda(comissao.valor_absoluto != null ? Number(comissao.valor_absoluto) : null)}
+                </p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="eyebrow">Forma de pagamento</p>
+                <p className="text-sm mt-1">{comissao.forma_pagamento || "—"}</p>
+              </div>
+              {comissao.permuta && (
+                <div className="sm:col-span-2 lg:col-span-4 rounded-md border border-linha px-3 py-2">
+                  <p className="eyebrow">Permuta</p>
+                  <p className="text-sm mt-1">
+                    {comissao.permuta_descricao || "sem descrição"}
+                    {comissao.permuta_valor_mercado != null && (
+                      <span className="text-cinza">
+                        {" "}
+                        · valor de mercado {moeda(Number(comissao.permuta_valor_mercado))}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <span className="selo selo-reservado w-fit">Pendente de definição</span>
+          ))}
+
+        {comissaoAberta && (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label className="rotulo">Percentual</label>
+              <CampoNumero
+                valor={cfgComissao.percentual}
+                aoMudar={(v) => setCfgComissao({ ...cfgComissao, percentual: v })}
+                sufixo="%"
+              />
+            </div>
+            <div>
+              <label className="rotulo">Valor</label>
+              <CampoNumero
+                valor={cfgComissao.valor_absoluto}
+                aoMudar={(v) => setCfgComissao({ ...cfgComissao, valor_absoluto: v })}
+                prefixo="R$"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="rotulo">Forma de pagamento</label>
+              <input
+                className="campo"
+                value={cfgComissao.forma_pagamento}
+                onChange={(e) =>
+                  setCfgComissao({ ...cfgComissao, forma_pagamento: e.target.value })
+                }
+                placeholder="Ex.: 50% na entrada, 50% em 30 dias"
+              />
+            </div>
+            <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="comissao-permuta"
+                checked={cfgComissao.permuta}
+                onChange={(e) =>
+                  setCfgComissao({ ...cfgComissao, permuta: e.target.checked })
+                }
+              />
+              <label htmlFor="comissao-permuta" className="text-sm cursor-pointer">
+                Envolve permuta
+              </label>
+            </div>
+            {cfgComissao.permuta && (
+              <>
+                <div className="sm:col-span-2">
+                  <label className="rotulo">O que é a permuta</label>
+                  <input
+                    className="campo"
+                    value={cfgComissao.permuta_descricao}
+                    onChange={(e) =>
+                      setCfgComissao({ ...cfgComissao, permuta_descricao: e.target.value })
+                    }
+                    placeholder="Ex.: apartamento no bairro X"
+                  />
+                </div>
+                <div>
+                  <label className="rotulo">Valor de mercado</label>
+                  <CampoNumero
+                    valor={cfgComissao.permuta_valor_mercado}
+                    aoMudar={(v) =>
+                      setCfgComissao({ ...cfgComissao, permuta_valor_mercado: v })
+                    }
+                    prefixo="R$"
+                  />
+                </div>
+              </>
+            )}
+            <div className="flex items-end gap-2">
+              <button
+                className="btn btn-primario flex-1"
+                onClick={salvarComissao}
+                disabled={pendente}
+              >
+                <Check size={15} /> Salvar
+              </button>
+              <button
+                className="btn btn-secundario"
+                disabled={pendente}
+                onClick={() => setComissaoAberta(false)}
+              >
+                <X size={15} /> Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ------------------------------------------- colunas do documento */}

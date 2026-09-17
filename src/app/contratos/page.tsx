@@ -34,7 +34,7 @@ interface Linha {
 export default async function ContratosPage() {
   const supabase = await createClient();
 
-  const [{ data }, indices, autores, perfil] = await Promise.all([
+  const [{ data }, indices, autores, perfil, { data: comissoesData }] = await Promise.all([
     supabase
       .from("contratos")
       .select(
@@ -44,10 +44,17 @@ export default async function ContratosPage() {
     carregarIndices(),
     mapaDePerfis(),
     perfilAtual(),
+    supabase.from("contrato_comissoes").select("contrato_id, percentual, valor_absoluto"),
   ]);
 
   const contratos = (data ?? []) as unknown as Linha[];
   const ehAdmin = perfil?.ehAdmin ?? false;
+  const comissoes = new Map(
+    (comissoesData ?? []).map((c) => [
+      c.contrato_id as string,
+      { percentual: c.percentual as number | null, valor: c.valor_absoluto as number | null },
+    ])
+  );
 
   const calculados = contratos.map((c) => {
     const { serie, taxa } = serieDe(indices, c.indexador as never);
@@ -74,6 +81,10 @@ export default async function ContratosPage() {
   const carteira = ativos.reduce((s, c) => s + c.calculo.saldoCorrigido, 0);
   const emAtraso = calculados.filter((c) => c.calculo.vencidas.length > 0);
   const totalAtraso = emAtraso.reduce((s, c) => s + c.calculo.totalVencido, 0);
+  const comissaoAReceber = ativos.reduce(
+    (s, c) => s + (comissoes.get(c.contrato.id)?.valor ?? 0),
+    0
+  );
 
   const linhas: ContratoLinha[] = calculados.map(({ contrato: c, calculo }) => ({
     id: c.id,
@@ -97,6 +108,8 @@ export default async function ContratosPage() {
     temVencidas: calculo.vencidas.length > 0,
     autorNome: nomeCurto(autores.get(c.criado_por ?? "")),
     status: c.status,
+    comissaoPercentual: comissoes.get(c.id)?.percentual ?? null,
+    comissaoValor: comissoes.get(c.id)?.valor ?? null,
   }));
 
   return (
@@ -121,41 +134,54 @@ export default async function ContratosPage() {
           </div>
         </div>
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <section
+          className={`grid gap-4 sm:grid-cols-2 ${ehAdmin ? "lg:grid-cols-5" : "lg:grid-cols-2"}`}
+        >
           <div className="cartao p-4">
             <p className="eyebrow">Contratos ativos</p>
             <p className="serif text-2xl tabular mt-1">{ativos.length}</p>
             <p className="text-xs text-cinza mt-1">de {calculados.length} no total</p>
           </div>
+          {ehAdmin && (
+            <>
+              <div className="cartao p-4">
+                <p className="eyebrow">Carteira a receber</p>
+                <p className="serif text-2xl tabular mt-1 text-vinho">
+                  {moedaCurta(carteira)}
+                </p>
+                <p className="text-xs text-cinza mt-1">saldo corrigido dos ativos</p>
+              </div>
+              <div className="cartao p-4">
+                <p className="eyebrow">Já recebido</p>
+                <p className="serif text-2xl tabular mt-1">
+                  {moedaCurta(calculados.reduce((s, c) => s + c.calculo.totalPago, 0))}
+                </p>
+                <p className="text-xs text-cinza mt-1">
+                  {calculados.reduce((s, c) => s + c.calculo.parcelasPagas, 0)} parcelas
+                  baixadas
+                </p>
+              </div>
+              <div className="cartao p-4">
+                <p className="eyebrow">Em atraso</p>
+                <p
+                  className={`serif text-2xl tabular mt-1 ${
+                    totalAtraso > 0 ? "text-vermelho" : ""
+                  }`}
+                >
+                  {moedaCurta(totalAtraso)}
+                </p>
+                <p className="text-xs text-cinza mt-1">
+                  {emAtraso.length} contrato(s) com parcela vencida
+                </p>
+              </div>
+            </>
+          )}
           <div className="cartao p-4">
-            <p className="eyebrow">Carteira a receber</p>
+            <p className="eyebrow">Comissão a receber</p>
             <p className="serif text-2xl tabular mt-1 text-vinho">
-              {moedaCurta(carteira)}
+              {moedaCurta(comissaoAReceber)}
             </p>
-            <p className="text-xs text-cinza mt-1">saldo corrigido dos ativos</p>
-          </div>
-          <div className="cartao p-4">
-            <p className="eyebrow">Já recebido</p>
-            <p className="serif text-2xl tabular mt-1">
-              {moedaCurta(calculados.reduce((s, c) => s + c.calculo.totalPago, 0))}
-            </p>
-            <p className="text-xs text-cinza mt-1">
-              {calculados.reduce((s, c) => s + c.calculo.parcelasPagas, 0)} parcelas
-              baixadas
-            </p>
-          </div>
-          <div className="cartao p-4">
-            <p className="eyebrow">Em atraso</p>
-            <p
-              className={`serif text-2xl tabular mt-1 ${
-                totalAtraso > 0 ? "text-vermelho" : ""
-              }`}
-            >
-              {moedaCurta(totalAtraso)}
-            </p>
-            <p className="text-xs text-cinza mt-1">
-              {emAtraso.length} contrato(s) com parcela vencida
-            </p>
+            <p className="text-xs text-cinza mt-1">definida, dos contratos ativos</p>
           </div>
         </section>
 

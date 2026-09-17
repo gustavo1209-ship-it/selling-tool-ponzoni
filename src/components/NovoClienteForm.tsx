@@ -38,6 +38,11 @@ export default function NovoClienteForm({
           {estado.erro}
         </p>
       )}
+      {estado?.ok && estado.aviso && (
+        <p className="text-sm text-ambar bg-ambar-fraco rounded-md px-3 py-2">
+          {estado.aviso}
+        </p>
+      )}
       <div className="grid gap-3 md:grid-cols-6 items-end">
         <div className="md:col-span-2">
           <label className="rotulo">Nome</label>

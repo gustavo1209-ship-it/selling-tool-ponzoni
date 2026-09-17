@@ -382,6 +382,44 @@ export async function definirColunasDoDocumento(
   });
 }
 
+export interface DadosComissao {
+  percentual: number | null;
+  valor_absoluto: number | null;
+  forma_pagamento: string | null;
+  permuta: boolean;
+  permuta_descricao: string | null;
+  permuta_valor_mercado: number | null;
+}
+
+/**
+ * Só admin chega até aqui de verdade — a RLS de `contrato_comissoes`
+ * (migration 33) recusa a escrita de quem não é admin. A interface só evita
+ * oferecer o botão a quem não é; não checamos `ehAdmin` aqui, mesmo idioma
+ * de `/indices`.
+ */
+export async function definirComissao(
+  contratoId: string,
+  dados: DadosComissao
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado.");
+
+    const { error } = await supabase.from("contrato_comissoes").upsert(
+      { contrato_id: contratoId, ...dados, definido_por: user.id },
+      { onConflict: "contrato_id" }
+    );
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/contratos");
+    revalidatePath(`/contratos/${contratoId}`);
+    return {};
+  });
+}
+
 export interface Baixa {
   pago_em: string;
   valor_pago: number | null;

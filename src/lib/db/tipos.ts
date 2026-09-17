@@ -266,6 +266,25 @@ export interface ContratoParcela {
   observacao: string | null;
 }
 
+/**
+ * Comissão do corretor sobre o contrato. Nasce pendente: sem linha nesta
+ * tabela é "aguardando o admin definir" — só admin cria ou muda (RLS).
+ */
+export interface ComissaoContrato {
+  id: string;
+  contrato_id: string;
+  /** Fração: 0.08 = 8%. Mesmo padrão de `desconto_pct`. */
+  percentual: number | null;
+  valor_absoluto: number | null;
+  forma_pagamento: string | null;
+  permuta: boolean;
+  permuta_descricao: string | null;
+  permuta_valor_mercado: number | null;
+  definido_por: string | null;
+  criado_em: string;
+  atualizado_em: string;
+}
+
 /** Contrato com tudo que a tela de acompanhamento precisa. */
 export interface ContratoCompleto extends Contrato {
   empreendimento: Empreendimento;
