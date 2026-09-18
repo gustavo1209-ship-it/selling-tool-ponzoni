@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, Building2, KanbanSquare, Trophy, Users } from "lucide-react";
+import {
+  ArrowRight,
+  Building2,
+  KanbanSquare,
+  Settings,
+  Trophy,
+  Users,
+} from "lucide-react";
 import Cabecalho from "@/components/Cabecalho";
 import { createClient } from "@/lib/supabase/server";
 import { perfilAtual } from "@/lib/supabase/perfil";
@@ -54,6 +61,14 @@ export default async function AdminPage() {
       texto:
         "Clientes cadastrados, propostas criadas, contratos firmados e negociações perdidas por corretor, numa janela de tempo escolhida.",
       rodape: "ver painel",
+    },
+    {
+      href: "/admin/configuracoes",
+      icone: Settings,
+      titulo: "Configurações",
+      texto:
+        "O que o corretor vê do financeiro em Contratos, e se a ferramenta avisa sobre cliente duplicado entre corretores.",
+      rodape: "ver opções",
     },
   ];
 

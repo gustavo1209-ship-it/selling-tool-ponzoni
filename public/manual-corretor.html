@@ -135,10 +135,12 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     </tbody>
   </table>
   <p>
-    Três informações são da administração e não aparecem para você: o
-    <strong>nome do comprador</strong> de cada lote, o <strong>VGV</strong> e o
-    <strong>preço de lotes vendidos ou não disponíveis</strong>. Os lotes que
-    você pode vender mostram o preço normalmente.
+    Por padrão, três informações são só da administração e não aparecem para
+    você: o <strong>nome do comprador</strong> de cada lote, o
+    <strong>VGV</strong> e o <strong>preço de lotes vendidos ou não
+    disponíveis</strong>. Os lotes que você pode vender mostram o preço
+    normalmente. A administração pode habilitar qualquer uma das três em
+    Configurações — se um dia elas aparecerem para você, foi isso.
   </p>
   <div class="caixa">
     <span class="rot">Quais empreendimentos você vê</span>
@@ -263,8 +265,8 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     <li><strong>Propostas &rarr; Nova proposta.</strong> Escolha o empreendimento.</li>
     <li>
       <strong>Cliente.</strong> Selecione um cliente já cadastrado seu ou
-      digite o nome de um novo. O cadastro completo (documento, telefone,
-      e-mail) pode ser preenchido depois, dentro da proposta.
+      cadastre um novo ali mesmo, com nome, empresa, CPF/CNPJ, telefone e
+      e-mail — sem precisar completar depois em Clientes.
     </li>
     <li>
       <strong>Terrenos.</strong> Clique nos lotes. Dá para escolher mais de um;
@@ -284,6 +286,18 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     </li>
     <li><strong>Criar proposta.</strong> Você cai direto no simulador.</li>
   </ol>
+
+  <div class="caixa">
+    <span class="rot">Aviso de cliente duplicado</span>
+    <p>
+      Ao cadastrar um cliente novo, a ferramenta checa se o CPF, o
+      telefone+nome ou o e-mail já batem com o de um cliente de outro
+      corretor — sem dizer quem é o outro corretor, só avisa. Normalmente o
+      cadastro segue em frente do mesmo jeito; se a administração configurou
+      para <strong>bloquear</strong>, o cadastro não é criado e o sinal é
+      falar com a administração antes de continuar.
+    </p>
+  </div>
 
   <h2><span class="n">6</span> O simulador</h2>
   <p>
@@ -330,6 +344,15 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     &ldquo;Salve para gerar PDF/XLSX&rdquo;. Salve e eles voltam.
   </p>
 
+  <h3>Proposta ou contrato de teste</h3>
+  <p>
+    Está só treinando ou testando alguma coisa na ferramenta? Marque a caixa
+    <strong>Teste</strong> no topo do simulador (e, se virar contrato, ela
+    segue junto). Um registro de teste continua na sua lista, com um selo
+    &ldquo;Teste&rdquo;, mas fica fora de <strong>A receber</strong> e dos
+    totais financeiros de Contratos — não suja os números reais.
+  </p>
+
   <h2><span class="n">7</span> Entregar ao cliente</h2>
   <table class="t">
     <thead><tr><th>Botão</th><th>Para quê</th></tr></thead>
@@ -364,27 +387,74 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
 
   <h2><span class="n">8</span> Clientes</h2>
   <p>
-    A aba <strong>Clientes</strong> lista os seus, com as propostas de cada um.
-    O lápis edita em linha. Os mesmos dados também podem ser ajustados de
-    dentro da proposta, no cartão Cliente, o que é mais prático quando o erro
-    aparece no meio da conversa.
+    A aba <strong>Clientes</strong> lista os seus, com as propostas e os
+    <strong>contratos</strong> de cada um (o contrato aparece com um selo
+    dourado, para diferenciar de proposta). O lápis edita em linha. Os mesmos
+    dados também podem ser ajustados de dentro da proposta, no cartão
+    Cliente, o que é mais prático quando o erro aparece no meio da conversa.
   </p>
   <p>
-    Um cliente com proposta não pode ser apagado. Se precisar, apague ou
-    reatribua as propostas antes.
+    Um cliente com proposta ou contrato não pode ser apagado. Se precisar,
+    apague ou reatribua as propostas e os contratos antes.
   </p>
 
   <h2><span class="n">9</span> Contratos e o que há a receber</h2>
   <p>
     Quando a venda fecha, ela vira um <strong>contrato</strong>, que acompanha
-    os pagamentos. Você vê os contratos que cadastrou e, em
-    <strong>A receber</strong>, o que vence neles.
+    os pagamentos. Você vê os contratos que cadastrou.
   </p>
+  <div class="caixa">
+    <span class="rot">O que aparece em Contratos pode variar</span>
+    <p>
+      Por padrão, você <strong>não</strong> vê o valor do contrato, o quanto
+      já foi recebido, nem o saldo e o atraso — só a sua própria comissão. A
+      administração pode habilitar qualquer um desses números em
+      Configurações, então isso pode ser diferente do que este manual
+      descreve, dependendo de como a casa configurou.
+    </p>
+  </div>
   <p>
     A partir de uma proposta salva, o botão <strong>Gerar contrato</strong>
-    copia o cronograma da opção aberta. A emissão dos boletos e a baixa dos
-    pagamentos são feitas pela administração.
+    abre uma janela perguntando <strong>qual opção de pagamento o cliente
+    fechou</strong> (com a recomendada já marcada) — importante quando a
+    proposta tem mais de uma opção, porque nem sempre é a aba que estava
+    aberta no simulador. Depois de escolher, o cronograma daquela opção é
+    copiado para o contrato. A emissão dos boletos e a baixa dos pagamentos
+    do cliente são feitas pela administração.
   </p>
+  <p>
+    Também dá para cadastrar uma venda antiga direto em
+    <strong>Novo contrato</strong>, sem passar por proposta — por exemplo, um
+    contrato de antes desta ferramenta. O valor total já vem preenchido pela
+    soma dos terrenos marcados (edite se for diferente), a entrada é digitada
+    em <strong>percentual</strong>, cada lote mostra o preço e o status
+    colorido, e o cadastro do cliente é completo, com o mesmo aviso de
+    duplicidade da Nova Proposta.
+  </p>
+
+  <h3>Comissão do corretor</h3>
+  <p>
+    Dentro do contrato, o cartão <strong>Comissão do corretor</strong> mostra
+    o percentual, o valor e <strong>como vai ser pago</strong> — por exemplo,
+    &ldquo;3x de R$ 6.666,67, a primeira em 30 dias, a cada 30 dias&rdquo;.
+    Quando o negócio envolve <strong>permuta</strong>, aparece também o que é,
+    o valor de mercado do bem e quanto disso <strong>abate</strong> do valor
+    em dinheiro que sobra para você receber.
+  </p>
+  <p>
+    Quem define a comissão é a <strong>administração</strong> — você só
+    enxerga. Enquanto ela não for definida, o cartão mostra
+    &ldquo;Pendente de definição&rdquo;.
+  </p>
+  <p>
+    Depois de definida, a administração gera o <strong>cronograma de
+    pagamento</strong> da comissão, e você passa a ver as parcelas dela, com
+    vencimento e se já foi paga (a baixa também é só da administração). Em
+    <strong>Contratos</strong>, os cartões <strong>Comissão a receber</strong>
+    e <strong>Comissão recebida</strong> separam o que já entrou do que ainda
+    falta, sempre só da sua própria carteira.
+  </p>
+
   <p>
     Dentro do contrato, <strong>Demonstrativo</strong> é a folha A4 que o
     cliente pede quando quer conferir o que já pagou e o que falta.

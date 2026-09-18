@@ -10,6 +10,7 @@ import { mapaDePerfis, perfilAtual } from "@/lib/supabase/perfil";
 import type {
   Cliente,
   ComissaoContrato,
+  ComissaoParcela,
   ContratoCompleto,
   IndexadorRef,
 } from "@/lib/db/tipos";
@@ -36,7 +37,11 @@ export default async function ContratoPage({
       .maybeSingle(),
     supabase.from("indexadores").select("*").order("ordem"),
     carregarIndices(),
-    supabase.from("contrato_comissoes").select("*").eq("contrato_id", id).maybeSingle(),
+    supabase
+      .from("contrato_comissoes")
+      .select("*, parcelas:contrato_comissao_parcelas(*)")
+      .eq("contrato_id", id)
+      .maybeSingle(),
   ]);
 
   // a RLS filtra: admin vê todos, corretor só os seus
@@ -63,6 +68,10 @@ export default async function ContratoPage({
 
   const lotes = [...contrato.lotes].sort((a, b) => a.ordem - b.ordem);
   const autores = await mapaDePerfis();
+  const comissaoCompleta = comissao as (ComissaoContrato & { parcelas: ComissaoParcela[] }) | null;
+  const parcelasComissao = [...(comissaoCompleta?.parcelas ?? [])].sort(
+    (a, b) => a.numero - b.numero
+  );
 
   return (
     <>
@@ -85,7 +94,8 @@ export default async function ContratoPage({
           clientes={(clientes ?? []) as Cliente[]}
           autor={autores.get(contrato.criado_por ?? "") ?? null}
           ehAdmin={ehAdmin}
-          comissao={comissao as ComissaoContrato | null}
+          comissao={comissaoCompleta}
+          parcelasComissao={parcelasComissao}
         />
       </main>
     </>

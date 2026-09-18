@@ -26,6 +26,7 @@ export interface ContratoLinha {
   temVencidas: boolean;
   autorNome: string;
   status: string;
+  teste: boolean;
   comissaoPercentual: number | null;
   comissaoValor: number | null;
 }
@@ -33,9 +34,18 @@ export interface ContratoLinha {
 export default function ContratosTabela({
   contratos,
   ehAdmin,
+  verValor,
+  verRecebido,
+  verSaldoEAtraso,
 }: {
   contratos: ContratoLinha[];
   ehAdmin: boolean;
+  /** Coluna "Valor" — admin sempre; corretor, só se ligado em Configurações. */
+  verValor: boolean;
+  /** Coluna "Recebido" — idem. */
+  verRecebido: boolean;
+  /** Saldo corrigido, parcelas, próximo vencimento e em atraso — idem. */
+  verSaldoEAtraso: boolean;
 }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
@@ -112,10 +122,10 @@ export default function ContratosTabela({
             <th>Contrato</th>
             <th>Comprador</th>
             <th>Lotes</th>
-            {ehAdmin && (
+            {verValor && <th className="num">Valor</th>}
+            {verRecebido && <th className="num">Recebido</th>}
+            {verSaldoEAtraso && (
               <>
-                <th className="num">Valor</th>
-                <th className="num">Recebido</th>
                 <th className="num">Saldo corrigido</th>
                 <th className="num">Parcelas</th>
                 <th>Próximo vencimento</th>
@@ -149,10 +159,10 @@ export default function ContratosTabela({
               </td>
               <td>{c.compradorNome}</td>
               <td className="text-cinza whitespace-nowrap">{c.lotesTexto}</td>
-              {ehAdmin && (
+              {verValor && <td className="num text-cinza">{moeda(c.valorTotal)}</td>}
+              {verRecebido && <td className="num">{moeda(c.totalPago)}</td>}
+              {verSaldoEAtraso && (
                 <>
-                  <td className="num text-cinza">{moeda(c.valorTotal)}</td>
-                  <td className="num">{moeda(c.totalPago)}</td>
                   <td className="num font-semibold">
                     {moeda(c.saldoCorrigido)}
                     {c.temEstimativa && (
@@ -205,13 +215,25 @@ export default function ContratosTabela({
               </td>
               <td className="text-cinza whitespace-nowrap">{c.autorNome}</td>
               <td>
-                <SeloContrato status={c.status} />
+                <span className="flex items-center gap-1.5 flex-wrap">
+                  <SeloContrato status={c.status} />
+                  {c.teste && <span className="selo selo-neutro">Teste</span>}
+                </span>
               </td>
             </tr>
           ))}
           {contratos.length === 0 && (
             <tr>
-              <td colSpan={ehAdmin ? 13 : 6} className="text-center text-cinza py-8">
+              <td
+                colSpan={
+                  (ehAdmin ? 1 : 0) +
+                  (verValor ? 1 : 0) +
+                  (verRecebido ? 1 : 0) +
+                  (verSaldoEAtraso ? 4 : 0) +
+                  6
+                }
+                className="text-center text-cinza py-8"
+              >
                 Nenhum contrato ainda. Cadastre uma venda já fechada em{" "}
                 <Link href="/contratos/novo" className="text-vinho font-semibold">
                   Novo contrato

@@ -11,6 +11,7 @@ import { dataBR } from "@/lib/formato";
 
 export interface ClienteComPropostas extends Cliente {
   propostas: { id: string; codigo: string }[];
+  contratos: { id: string; codigo: string }[];
   /** Quem cadastrou — com corretores, a carteira de cada um é privada. */
   autorNome: string;
 }
@@ -127,6 +128,7 @@ export default function ClientesTabela({
               <th>Telefone</th>
               <th>E-mail</th>
               <th>Propostas</th>
+              <th>Contratos</th>
               <th>Cadastrado</th>
               <th>Cadastrado por</th>
               <th />
@@ -142,6 +144,7 @@ export default function ClientesTabela({
                   <td>{campo("telefone")}</td>
                   <td>{campo("email")}</td>
                   <td className="text-cinza">{c.propostas.length}</td>
+                  <td className="text-cinza">{c.contratos.length}</td>
                   <td className="text-cinza">{dataBR(c.criado_em)}</td>
                   <td className="text-cinza whitespace-nowrap">{c.autorNome}</td>
                   <td>
@@ -192,6 +195,23 @@ export default function ClientesTabela({
                       </span>
                     )}
                   </td>
+                  <td>
+                    {c.contratos.length === 0 ? (
+                      <span className="text-cinza">—</span>
+                    ) : (
+                      <span className="flex flex-wrap gap-1">
+                        {c.contratos.map((ct) => (
+                          <Link
+                            key={ct.id}
+                            href={`/contratos/${ct.id}`}
+                            className="selo selo-ouro"
+                          >
+                            {ct.codigo}
+                          </Link>
+                        ))}
+                      </span>
+                    )}
+                  </td>
                   <td className="text-cinza whitespace-nowrap">{dataBR(c.criado_em)}</td>
                   <td className="text-cinza whitespace-nowrap">{c.autorNome}</td>
                   <td>
@@ -217,7 +237,7 @@ export default function ClientesTabela({
             )}
             {visiveis.length === 0 && (
               <tr>
-                <td colSpan={9} className="text-center text-cinza py-8">
+                <td colSpan={10} className="text-center text-cinza py-8">
                   {clientes.length === 0
                     ? "Nenhum cliente cadastrado."
                     : "Nenhum cliente com esse filtro."}

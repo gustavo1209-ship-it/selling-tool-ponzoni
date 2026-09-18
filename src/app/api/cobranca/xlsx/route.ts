@@ -68,7 +68,8 @@ export async function GET(request: Request) {
       .select(
         "id, codigo, titulo, data_base, valor_total, indexador, defasagem_indice_meses, corrige_primeira_parcela, juros_mora_mensal, multa_atraso_pct, empreendimento_id, clientes(nome, documento, email, telefone), empreendimentos(nome), contrato_lotes(quadra, numero), contrato_parcelas(*)"
       )
-      .in("status", ["ativo", "suspenso"]),
+      .in("status", ["ativo", "suspenso"])
+      .eq("teste", false),
     carregarIndices(),
   ]);
 

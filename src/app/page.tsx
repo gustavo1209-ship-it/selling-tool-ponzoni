@@ -4,6 +4,7 @@ import Cabecalho from "@/components/Cabecalho";
 import { SeloProposta } from "@/components/SeloStatus";
 import { createClient } from "@/lib/supabase/server";
 import { perfilAtual } from "@/lib/supabase/perfil";
+import { obterConfiguracoes } from "@/lib/configuracoes";
 import { dataBR, moeda, moedaCurta, num } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +22,10 @@ interface LinhaProposta {
 
 export default async function Inicio() {
   const supabase = await createClient();
-  // VGV é número da casa, não do corretor
+  // VGV é número da casa por padrão; Admin > Configurações pode liberar
   const perfil = await perfilAtual();
+  const configuracoes = await obterConfiguracoes();
+  const mostrarVgv = (perfil?.ehAdmin ?? false) || configuracoes.corretor_ve_vgv;
 
   const [{ data: empreendimentos }, { data: lotes }, { data: propostas }] =
     await Promise.all([
@@ -84,7 +87,7 @@ export default async function Inicio() {
                   </div>
                 </dl>
 
-                {perfil?.ehAdmin && (
+                {mostrarVgv && (
                   <div className="bg-vinho-fraco rounded-md px-3 py-2">
                     <p className="eyebrow">VGV disponível (tabela)</p>
                     <p className="serif text-xl text-vinho tabular">{moedaCurta(vgv)}</p>

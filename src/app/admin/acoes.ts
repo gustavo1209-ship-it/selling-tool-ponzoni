@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { BlocoTemplate } from "@/lib/db/tipos";
+import type { BlocoTemplate, Configuracoes } from "@/lib/db/tipos";
 import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
 
 /**
@@ -473,6 +473,26 @@ export async function apagarEtapa(id: string): Promise<ResultadoAcao> {
 
     revalidatePath("/admin/funil");
     revalidatePath("/funil");
+    return {};
+  });
+}
+
+// ---------------------------------------------------- configurações
+
+export async function atualizarConfiguracoes(
+  dados: Configuracoes
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
+
+    const { error } = await supabase
+      .from("configuracoes")
+      .update(dados)
+      .eq("id", 1);
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/configuracoes");
+    revalidatePath("/contratos");
     return {};
   });
 }

@@ -3,12 +3,14 @@ import { ArrowLeft } from "lucide-react";
 import Cabecalho from "@/components/Cabecalho";
 import NovoContratoForm from "@/components/NovoContratoForm";
 import { createClient } from "@/lib/supabase/server";
+import { obterConfiguracoes } from "@/lib/configuracoes";
 import type { Cliente, Empreendimento, IndexadorRef, Lote } from "@/lib/db/tipos";
 
 export const dynamic = "force-dynamic";
 
 export default async function NovoContratoPage() {
   const supabase = await createClient();
+  const configuracoes = await obterConfiguracoes();
 
   const [{ data: empreendimentos }, { data: lotes }, { data: clientes }, { data: indexadores }] =
     await Promise.all([
@@ -45,6 +47,9 @@ export default async function NovoContratoPage() {
           lotes={(lotes ?? []) as Lote[]}
           clientes={(clientes ?? []) as Cliente[]}
           indexadores={(indexadores ?? []) as IndexadorRef[]}
+          diaVencimentoPadrao={configuracoes.dia_vencimento_padrao}
+          jurosMoraPadrao={configuracoes.juros_mora_padrao * 100}
+          multaAtrasoPadrao={configuracoes.multa_atraso_padrao * 100}
         />
       </main>
     </>

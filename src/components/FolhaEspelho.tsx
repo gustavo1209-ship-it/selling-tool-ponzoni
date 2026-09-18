@@ -28,11 +28,15 @@ type ColunaOpcional =
 export default function FolhaEspelho({
   empreendimento,
   lotes,
-  ehAdmin,
+  mostrarComprador,
+  mostrarVgv,
 }: {
   empreendimento: Empreendimento;
   lotes: Lote[];
-  ehAdmin: boolean;
+  /** Por padrão só admin; Admin > Configurações pode liberar pro corretor. */
+  mostrarComprador: boolean;
+  /** Idem, pro cartão de VGV (`corretor_ve_vgv`). */
+  mostrarVgv: boolean;
 }) {
   const temTipo = lotes.some((l) => l.tipo);
 
@@ -42,9 +46,9 @@ export default function FolhaEspelho({
     { chave: "precoTabela", rotulo: "Preço de tabela" },
     { chave: "precoM2", rotulo: "R$/m²" },
     { chave: "status", rotulo: "Status" },
-    // comprador é dado da casa — quem não é admin nem escolhe, porque a
-    // view já devolve null para essa coluna (migration 28)
-    ...(ehAdmin ? ([{ chave: "comprador", rotulo: "Comprador" }] as const) : []),
+    // comprador é dado da casa — a view já devolve null pra essa coluna
+    // quando corretor_ve_comprador está desligada (migrations 28 e 38)
+    ...(mostrarComprador ? ([{ chave: "comprador", rotulo: "Comprador" }] as const) : []),
     { chave: "observacao", rotulo: "Observação" },
   ];
 
@@ -59,7 +63,7 @@ export default function FolhaEspelho({
   });
 
   const mostrar = (c: ColunaOpcional) =>
-    colunas[c] && (c !== "comprador" || ehAdmin) && (c !== "tipo" || temTipo);
+    colunas[c] && (c !== "comprador" || mostrarComprador) && (c !== "tipo" || temTipo);
   const livres = lotes.filter((l) => l.status === "livre");
   const resumo = {
     livre: livres.length,
@@ -139,7 +143,7 @@ export default function FolhaEspelho({
             <span>Área livre</span>
             <strong>{num(resumo.areaLivre)} m²</strong>
           </div>
-          {ehAdmin && (
+          {mostrarVgv && (
             <div className="caixa destaque">
               <span>VGV disponível</span>
               <strong>{moedaCurta(resumo.vgv)}</strong>

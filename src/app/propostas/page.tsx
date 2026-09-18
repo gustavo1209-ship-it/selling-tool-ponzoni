@@ -4,6 +4,8 @@ import Cabecalho from "@/components/Cabecalho";
 import PropostasTabela, { type PropostaLinha } from "@/components/PropostasTabela";
 import { createClient } from "@/lib/supabase/server";
 import { mapaDePerfis, nomeCurto, perfilAtual } from "@/lib/supabase/perfil";
+import { obterConfiguracoes } from "@/lib/configuracoes";
+import { diasEntre, hojeISO } from "@/lib/contratos/mes";
 import { compararLote } from "@/lib/ordenacao";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +17,8 @@ interface Linha {
   status: string;
   criado_em: string;
   criado_por: string | null;
+  data_base: string;
+  validade_dias: number;
   resultado: {
     valorTabela?: number;
     valorNegociado?: number;
@@ -31,20 +35,31 @@ interface Linha {
 
 export default async function PropostasPage() {
   const supabase = await createClient();
-  const [{ data }, autores, perfil] = await Promise.all([
+  const [{ data }, autores, perfil, configuracoes] = await Promise.all([
     supabase
       .from("propostas")
       .select(
-        "id, codigo, titulo, status, criado_em, criado_por, resultado, clientes(nome), empreendimentos(nome), proposta_lotes(quadra, numero), proposta_cenarios(id)"
+        "id, codigo, titulo, status, criado_em, criado_por, data_base, validade_dias, resultado, clientes(nome), empreendimentos(nome), proposta_lotes(quadra, numero), proposta_cenarios(id)"
       )
       .order("criado_em", { ascending: false }),
     mapaDePerfis(),
     perfilAtual(),
+    obterConfiguracoes(),
   ]);
 
   const propostas = (data ?? []) as unknown as Linha[];
   // a RLS já filtra: corretor recebe só as próprias
   const ehAdmin = perfil?.ehAdmin ?? false;
+
+  // proposta perto de vencer: data_base + validade_dias, só as em aberto
+  const hoje = hojeISO();
+  const vencendo = propostas.filter((p) => {
+    if (p.status !== "enviada" && p.status !== "em_negociacao") return false;
+    const dataVencimento = new Date(`${p.data_base}T12:00:00`);
+    dataVencimento.setDate(dataVencimento.getDate() + p.validade_dias);
+    const dias = diasEntre(hoje, dataVencimento.toISOString().slice(0, 10));
+    return dias <= configuracoes.dias_aviso_proposta_vencendo;
+  });
 
   const linhas: PropostaLinha[] = propostas.map((p) => ({
     id: p.id,
@@ -80,6 +95,14 @@ export default async function PropostasPage() {
             <Plus size={16} /> Nova proposta
           </Link>
         </div>
+
+        {configuracoes.alertar_proposta_vencendo && vencendo.length > 0 && (
+          <p className="text-sm text-ambar bg-ambar-fraco rounded-md px-3 py-2">
+            {vencendo.length} proposta(s) {vencendo.length === 1 ? "vence" : "vencem"} em
+            até {configuracoes.dias_aviso_proposta_vencendo} dias (ou já venceu e
+            continua em aberto).
+          </p>
+        )}
 
         <PropostasTabela propostas={linhas} ehAdmin={ehAdmin} />
       </main>

@@ -108,6 +108,7 @@ export default function Simulador({
   condicoes,
   indexadores,
   autor,
+  podeMontarOpcao,
 }: {
   proposta: Proposta;
   empreendimento: Empreendimento;
@@ -120,6 +121,8 @@ export default function Simulador({
   indexadores: IndexadorRef[];
   /** Quem criou a proposta — com corretores, deixa de ser óbvio. */
   autor: string | null;
+  /** Desligado em Configurações, esconde "Montar opção" pro corretor. */
+  podeMontarOpcao: boolean;
 }) {
   const [titulo, setTitulo] = useState(proposta.titulo ?? "");
   const [status, setStatus] = useState<PropostaStatus>(proposta.status);
@@ -131,6 +134,7 @@ export default function Simulador({
     proposta.correcao_primeira_parcela
   );
   const [observacoes, setObservacoes] = useState(proposta.observacoes ?? "");
+  const [teste, setTeste] = useState(proposta.teste);
   const [metricas, setMetricas] = useState<MetricaParcela[]>(
     proposta.metricas_parcela?.length ? proposta.metricas_parcela : ["inicial"]
   );
@@ -461,6 +465,7 @@ export default function Simulador({
           correcao_primeira_parcela: corrigePrimeira,
           metricas_parcela: metricas,
           observacoes: observacoes || null,
+          teste,
           lotes,
           cenarios: cenarios as unknown as CenarioPayload[],
         });
@@ -529,6 +534,20 @@ export default function Simulador({
 
         <div className="flex items-center gap-2 flex-wrap sem-impressao">
           <SeloProposta status={status} />
+          <label
+            className="flex items-center gap-1.5 text-sm text-cinza cursor-pointer"
+            title="Proposta de teste/treino: o contrato gerado dela fica fora de 'A receber' e dos totais de Contratos."
+          >
+            <input
+              type="checkbox"
+              checked={teste}
+              onChange={(e) => {
+                setTeste(e.target.checked);
+                marcar();
+              }}
+            />
+            Teste
+          </label>
           {sujo ? (
             <span
               className="btn btn-secundario opacity-50 cursor-not-allowed"
@@ -851,16 +870,18 @@ export default function Simulador({
                 </option>
               ))}
             </select>
-            <button
-              className="btn btn-secundario"
-              onClick={() => setMontando((v) => !v)}
-            >
-              <Plus size={15} /> Montar opção
-            </button>
+            {podeMontarOpcao && (
+              <button
+                className="btn btn-secundario"
+                onClick={() => setMontando((v) => !v)}
+              >
+                <Plus size={15} /> Montar opção
+              </button>
+            )}
           </div>
         </div>
 
-        {montando && (
+        {podeMontarOpcao && montando && (
           <div className="p-4 pb-0">
             <MontarOpcao
               indexadores={indexadores}

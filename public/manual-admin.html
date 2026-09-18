@@ -203,6 +203,14 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     encargos e o valor final.
   </p>
   <p>
+    Parcela que já foi paga <strong>não some da lista do mês</strong> &mdash;
+    ela continua aparecendo, marcada como &ldquo;Paga&rdquo;, com fundo verde e
+    o valor que realmente entrou, não mais o valor projetado. O cartão
+    <strong>Recebido no mês</strong> soma só essas; <strong>Total a
+    cobrar</strong> continua somando só o que falta, e é esse total que vai
+    para o XLSX do banco.
+  </p>
+  <p>
     <strong>Exportar XLSX</strong> gera a planilha para o banco: sacado,
     CPF/CNPJ, vencimento e valor, mais as colunas de origem do número, e uma
     aba com as premissas de correção de cada contrato.
@@ -301,6 +309,76 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     O valor gravado é o que a parcela valia na data do pagamento. Quando o
     contrato quita, ele passa sozinho para <em>Quitado</em>; desfazer uma baixa
     o traz de volta para <em>Ativo</em>.
+  </p>
+
+  <h3>Cadastro manual de venda antiga</h3>
+  <p>
+    Em <strong>Contratos &rarr; Novo contrato</strong>, o valor total passa a
+    seguir sozinho a soma da tabela dos terrenos marcados assim que você marca
+    o primeiro lote &mdash; digite um valor diferente a qualquer momento, e o
+    link <em>usar da tabela</em> volta a fazer o valor seguir a seleção. A
+    <strong>entrada é digitada em percentual</strong>, igual ao simulador, e o
+    valor em reais aparece calculado embaixo. Cada lote no cartão de seleção
+    mostra o preço e o status colorido, e dá para cadastrar o comprador
+    completo &mdash; empresa, CPF, telefone, e-mail &mdash; sem sair da tela.
+  </p>
+
+  <h3>Comissão do corretor</h3>
+  <p>
+    Cada contrato tem um cartão <strong>Comissão do corretor</strong>, que
+    nasce <strong>pendente</strong>: só o administrador define, e o corretor
+    só lê. Preencha o <strong>percentual</strong> &mdash; a ferramenta sugere
+    o valor em reais a partir dele, sobre o valor do contrato, mas o número
+    final pode ser ajustado à mão quando o combinado não bate exato.
+  </p>
+  <p>
+    A <strong>forma de pagamento</strong> é feita de três campos &mdash; em
+    quantas vezes, o primeiro pagamento em quantos dias e o intervalo entre
+    parcelas &mdash;, e a ferramenta escreve sozinha a frase que o corretor vê,
+    do tipo &ldquo;3x de R$ 6.666,67, a primeira em 30 dias, a cada 30
+    dias&rdquo;.
+  </p>
+  <p>
+    Quando a venda envolve <strong>permuta</strong>, registre o que é e o valor
+    de mercado do bem &mdash; isso é só informativo. Separadamente, o campo
+    <strong>valor abatido da comissão</strong> diz quanto disso desconta do
+    dinheiro que o corretor recebe: os dois números podem ser diferentes,
+    porque o corretor pode topar receber menos em dinheiro do que o bem vale,
+    ou o contrário.
+  </p>
+
+  <h3>Cronograma de pagamento da comissão</h3>
+  <p>
+    Depois de definir a comissão, o botão <strong>Gerar cronograma de
+    pagamento</strong> cria as parcelas sozinho, a partir dos três campos da
+    forma de pagamento. Cada parcela tem <strong>Dar baixa</strong> (data e
+    valor) e <strong>Desfazer</strong> &mdash; uma vez paga, ela continua na
+    lista com o selo <em>Paga</em>, em vez de sumir.
+  </p>
+  <div class="caixa aviso">
+    <span class="rot">Recriar cronograma apaga baixa já dada</span>
+    <p>
+      Se o percentual ou a forma de pagamento mudarem depois de já ter baixa
+      registrada, <strong>Recriar cronograma</strong> avisa antes de apagar
+      esse histórico. Use só quando o combinado com o corretor realmente
+      mudou.
+    </p>
+  </div>
+  <p>
+    Em <strong>Contratos</strong>, &ldquo;Comissão a receber&rdquo; soma as
+    parcelas ainda não pagas de todos os corretores; &ldquo;Comissão
+    recebida&rdquo; soma as já pagas. Cada corretor vê os mesmos dois números,
+    só que da própria carteira.
+  </p>
+
+  <h3>Marcar como teste</h3>
+  <p>
+    Uma proposta ou um contrato pode nascer marcado como <strong>teste</strong>
+    &mdash; no simulador, ou em <em>Editar contrato</em>. Serve para treinar
+    alguém ou experimentar a ferramenta sem sujar os números reais: o registro
+    de teste continua na lista, com o selo <em>Teste</em>, para gerenciar ou
+    apagar depois, mas <strong>some de A receber e dos totais financeiros de
+    Contratos</strong>.
   </p>
 
   <h3>Demonstrativo e extrato</h3>
@@ -453,7 +531,91 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     índices.
   </p>
 
-  <h2><span class="n">8</span> Usuários e acessos</h2>
+  <h2><span class="n">8</span> Configurações</h2>
+  <p>
+    <strong>Admin &rarr; Configurações</strong> reúne o que a ferramenta faz
+    por padrão para a casa inteira &mdash; muda o comportamento sem precisar
+    pedir ajuste técnico. Toda opção nasce no valor que já está no ar hoje:
+    ligue ou desligue só quando quiser um comportamento diferente do atual.
+  </p>
+
+  <h3>Financeiro do corretor em Contratos</h3>
+  <p>
+    Três interruptores separados, todos desligados por padrão: <strong>vê o
+    valor do contrato</strong>, <strong>vê o recebido</strong> e <strong>vê
+    saldo corrigido e em atraso</strong>. Desligados, o corretor enxerga só a
+    própria comissão em Contratos, não o financeiro do cliente. Ligue cada um
+    à parte, conforme quanto do financeiro da casa a equipe deve ver.
+  </p>
+
+  <h3>Comercial</h3>
+  <table class="t">
+    <thead><tr><th>Opção</th><th>O que faz</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Limite de desconto do corretor</strong></td>
+        <td>
+          percentual máximo que um corretor (não admin) consegue aplicar numa
+          proposta. Vazio = sem limite. Acima do limite, a proposta
+          simplesmente <strong>não salva</strong> &mdash; o corretor precisa
+          reduzir o desconto ou pedir para um administrador salvar
+        </td>
+      </tr>
+      <tr>
+        <td><strong>Corretor monta opção livre</strong></td>
+        <td>
+          ligado (padrão), o corretor vê o botão <em>Montar opção</em> e cria
+          uma estrutura de pagamento do zero. Desligado, ele só escolhe
+          condições já cadastradas na tabela ou favoritadas pelo time
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Clientes</h3>
+  <p>
+    <strong>Nível de duplicidade</strong> decide o que acontece quando o CPF, o
+    telefone com o nome, ou o e-mail de um cliente novo batem com o de um
+    cliente já cadastrado por outro corretor: <em>desligado</em> não checa
+    nada, <em>avisar</em> mostra um aviso mas cadastra do mesmo jeito, e
+    <em>bloquear</em> recusa o cadastro. Em nenhum dos três casos o corretor
+    descobre quem é o outro cadastro &mdash; só que ele existe.
+  </p>
+  <p>
+    <strong>Carteira de clientes compartilhada</strong>, desligada por padrão,
+    faz cada corretor ver só os próprios clientes. Ligada, qualquer corretor vê
+    e edita cliente de outro &mdash; o que também reabre a chance de cadastro
+    duplicado, então ligue com a equipe combinada.
+  </p>
+
+  <h3>Contrato &mdash; padrões</h3>
+  <p>
+    Dia de vencimento, juros de mora e multa de atraso sugeridos ao abrir
+    <strong>Contratos &rarr; Novo contrato</strong> (e ao gerar contrato de uma
+    proposta). Mudar aqui não altera contrato já existente &mdash; é só o
+    ponto de partida de um contrato novo, que continua editável
+    individualmente.
+  </p>
+
+  <h3>Visibilidade do espelho</h3>
+  <p>
+    Três interruptores, todos desligados por padrão: <strong>corretor vê o
+    VGV</strong>, <strong>vê o comprador</strong> e <strong>vê o preço de lote
+    vendido</strong>. São as mesmas informações que ficaram só para admin
+    quando a ferramenta passou a atender corretores de fora da casa &mdash;
+    ligar aqui devolve cada uma independentemente, para quando a casa decidir
+    que a equipe pode ver.
+  </p>
+
+  <h3>Alertas</h3>
+  <p>
+    Avisos de <strong>contagem, sem valor em reais</strong>, para o corretor:
+    que ele tem parcela em atraso (em Contratos) ou proposta perto de vencer
+    (em Propostas). O campo <strong>dias de aviso</strong> controla com quanta
+    antecedência uma proposta entra no aviso de vencimento.
+  </p>
+
+  <h2><span class="n">9</span> Usuários e acessos</h2>
   <table class="t">
     <thead><tr><th>Papel</th><th>Enxerga</th></tr></thead>
     <tbody>
@@ -515,13 +677,16 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
   <div class="caixa ok">
     <span class="rot">Quem cadastrou o quê</span>
     <p>
-      As listagens de propostas e contratos trazem a coluna com o nome de quem
-      criou, e o mesmo nome aparece no topo do simulador, do contrato e nos
-      cartões do funil. É por ali que se acompanha a carteira de cada corretor.
+      As listagens de propostas, contratos e clientes trazem a coluna com o
+      nome de quem criou, e o mesmo nome aparece no topo do simulador, do
+      contrato e nos cartões do funil. Em <strong>Clientes</strong>, a coluna
+      <strong>Contratos</strong> mostra os contratos vinculados a cada um, do
+      mesmo jeito que a coluna Propostas já mostrava &mdash; é por ali que se
+      acompanha a carteira de cada corretor.
     </p>
   </div>
 
-  <h2><span class="n">9</span> Etapas do funil</h2>
+  <h2><span class="n">10</span> Etapas do funil</h2>
   <p>
     As colunas do quadro de negociações são configuráveis em
     <strong>Admin &rarr; Etapas do funil</strong>: nome, cor, ordem e o que cada
@@ -558,7 +723,7 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     </p>
   </div>
 
-  <h2><span class="n">10</span> Quando algo dá errado</h2>
+  <h2><span class="n">11</span> Quando algo dá errado</h2>
   <table class="t">
     <thead><tr><th>Sintoma</th><th>Causa provável</th></tr></thead>
     <tbody>
@@ -601,6 +766,35 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
       <tr>
         <td>&ldquo;O servidor não respondeu e nada foi gravado&rdquo;</td>
         <td>nada foi gravado pela metade; tente de novo</td>
+      </tr>
+      <tr>
+        <td>Corretor diz que não vê o valor do contrato em Contratos</td>
+        <td>
+          é o padrão. Ligue o interruptor correspondente em Admin &rarr;
+          Configurações &rarr; Financeiro do corretor
+        </td>
+      </tr>
+      <tr>
+        <td>Proposta não salva e mostra erro sobre desconto</td>
+        <td>
+          passou do limite de desconto do corretor, em Configurações; ajuste
+          o desconto ou peça para um administrador salvar
+        </td>
+      </tr>
+      <tr>
+        <td>Cliente não cadastra e mostra erro de duplicidade</td>
+        <td>
+          o nível de duplicidade está em &ldquo;bloquear&rdquo;, em
+          Configurações, e já existe cliente com esse CPF, telefone ou e-mail
+          cadastrado por outro corretor
+        </td>
+      </tr>
+      <tr>
+        <td>Recriei o cronograma da comissão e a baixa sumiu</td>
+        <td>
+          é o esperado &mdash; o aviso avisa antes disso. Não tem como
+          desfazer; lance a baixa de novo em cada parcela
+        </td>
       </tr>
     </tbody>
   </table>

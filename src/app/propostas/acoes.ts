@@ -13,8 +13,12 @@ import type {
 } from "@/lib/db/tipos";
 import { compararLote } from "@/lib/ordenacao";
 import type { DadosCliente } from "@/app/clientes/acoes";
-import { avisoDuplicidade } from "@/lib/clientes/duplicidade";
+import { checarDuplicidade } from "@/lib/clientes/duplicidade";
+import { obterConfiguracoes } from "@/lib/configuracoes";
 import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
+
+/** Fração de 6 casas, em pt-BR: 0.10254 → "10,25%". */
+const pctMensagem = (v: number) => `${(v * 100).toFixed(2).replace(".", ",")}%`;
 
 /** Blocos default quando a condição escolhida não traz template. */
 const TEMPLATE_PADRAO: BlocoTemplate[] = [
@@ -94,6 +98,10 @@ export async function criarProposta(
     .filter((x): x is { nome: string; blocos: BlocoTemplate[] } => Boolean(x));
   const loteIds = formData.getAll("lote_id").map(String).filter(Boolean);
   const nomeCliente = String(formData.get("cliente_nome") ?? "").trim();
+  const empresaCliente = String(formData.get("cliente_empresa") ?? "").trim() || null;
+  const documentoCliente = String(formData.get("cliente_documento") ?? "").trim() || null;
+  const telefoneCliente = String(formData.get("cliente_telefone") ?? "").trim() || null;
+  const emailCliente = String(formData.get("cliente_email") ?? "").trim() || null;
   const clienteExistente = String(formData.get("cliente_id") ?? "").trim();
   const titulo = String(formData.get("titulo") ?? "").trim() || null;
 
@@ -165,12 +173,31 @@ export async function criarProposta(
 
   if (!lotes || lotes.length === 0) throw new Error("Lotes não encontrados.");
 
-  // cliente: reaproveita o existente ou cria um novo com o nome digitado
+  // cliente: reaproveita o existente ou cria um novo já com os dados
+  // digitados aqui mesmo — sem isso, o cadastro nascia só com o nome e
+  // precisava ser completado depois em /clientes ou dentro do simulador
   let clienteId: string | null = clienteExistente || null;
   if (!clienteId && nomeCliente) {
+    const duplicidade = await checarDuplicidade(supabase, {
+      nome: nomeCliente,
+      documento: documentoCliente,
+      telefone: telefoneCliente,
+      email: emailCliente,
+    });
+    if (duplicidade.duplicado && duplicidade.bloqueado) {
+      throw new Error(duplicidade.mensagem);
+    }
+
     const { data: novo, error } = await supabase
       .from("clientes")
-      .insert({ nome: nomeCliente, criado_por: user.id })
+      .insert({
+        nome: nomeCliente,
+        empresa: empresaCliente,
+        documento: documentoCliente,
+        telefone: telefoneCliente,
+        email: emailCliente,
+        criado_por: user.id,
+      })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
@@ -290,6 +317,32 @@ export async function criarProposta(
     ])
   );
 
+  // Limite de desconto do corretor (Configurações): a proposta já existe
+  // neste ponto (precisa do id pra montar aCriar/resultadosPorOrdem lá em
+  // cima), então uma opção acima do limite desfaz o que já foi gravado em
+  // vez de deixar proposta órfã sem cenário nenhum.
+  {
+    const { data: perfilAtor } = await supabase
+      .from("perfis")
+      .select("papel")
+      .eq("id", user.id)
+      .maybeSingle();
+    const ehAdminAtor = perfilAtor?.papel === "admin";
+    const { desconto_maximo_corretor_pct: limite } = await obterConfiguracoes();
+
+    if (!ehAdminAtor && limite != null) {
+      for (const c of aCriar) {
+        const efetivo = resultadosPorOrdem.get(c.ordem)?.descontoEfetivoPct ?? 0;
+        if (efetivo > limite) {
+          await supabase.from("propostas").delete().eq("id", proposta.id);
+          throw new Error(
+            `A opção "${c.nome}" tem ${pctMensagem(efetivo)} de desconto, acima do limite de ${pctMensagem(limite)} para corretor. Ajuste o desconto ou peça pra um admin salvar.`
+          );
+        }
+      }
+    }
+  }
+
   const { data: cenarios, error: erroCenarios } = await supabase
     .from("proposta_cenarios")
     .insert(
@@ -390,6 +443,8 @@ export interface PayloadSalvar {
   correcao_primeira_parcela: boolean;
   metricas_parcela: MetricaParcela[];
   observacoes: string | null;
+  /** Teste/treino: o contrato gerado dela nasce marcado do mesmo jeito. */
+  teste: boolean;
   lotes: PropostaLote[];
   cenarios: CenarioPayload[];
 }
@@ -437,6 +492,29 @@ export async function salvarProposta(
     );
   }
 
+  // Limite de desconto do corretor (Configurações) — antes de qualquer
+  // escrita, então uma opção acima do limite não grava nada pela metade.
+  {
+    const { data: perfilAtor } = await supabase
+      .from("perfis")
+      .select("papel")
+      .eq("id", user.id)
+      .maybeSingle();
+    const ehAdminAtor = perfilAtor?.papel === "admin";
+    const { desconto_maximo_corretor_pct: limite } = await obterConfiguracoes();
+
+    if (!ehAdminAtor && limite != null) {
+      for (const c of payload.cenarios) {
+        const efetivo = resultados.get(c.id)?.descontoEfetivoPct ?? 0;
+        if (efetivo > limite) {
+          throw new Error(
+            `A opção "${c.nome}" tem ${pctMensagem(efetivo)} de desconto, acima do limite de ${pctMensagem(limite)} para corretor. Ajuste o desconto ou peça pra um admin salvar.`
+          );
+        }
+      }
+    }
+  }
+
   const recomendado =
     payload.cenarios.find((c) => c.recomendado) ?? payload.cenarios[0];
 
@@ -457,12 +535,16 @@ export async function salvarProposta(
     };
 
     if (payload.criar_cliente) {
-      avisoCliente =
-        (await avisoDuplicidade(supabase, {
-          nome,
-          documento: campos.documento,
-          telefone: campos.telefone,
-        })) ?? undefined;
+      const duplicidade = await checarDuplicidade(supabase, {
+        nome,
+        documento: campos.documento,
+        telefone: campos.telefone,
+        email: campos.email,
+      });
+      if (duplicidade.duplicado && duplicidade.bloqueado) {
+        throw new Error(duplicidade.mensagem);
+      }
+      if (duplicidade.duplicado) avisoCliente = duplicidade.mensagem;
 
       const { data: novo, error } = await supabase
         .from("clientes")
@@ -495,6 +577,7 @@ export async function salvarProposta(
         ? payload.metricas_parcela
         : ["inicial"],
       observacoes: payload.observacoes,
+      teste: payload.teste,
       resultado: recomendado ? resultados.get(recomendado.id) : null,
     })
     .eq("id", payload.id);

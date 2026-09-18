@@ -13,7 +13,6 @@ import {
   dataBR,
   moeda,
   moedaCurta,
-  pct,
   ROTULO_INDEXADOR,
   ROTULO_STATUS_LOTE,
 } from "@/lib/formato";
@@ -24,11 +23,18 @@ export default function NovoContratoForm({
   lotes,
   clientes,
   indexadores,
+  diaVencimentoPadrao,
+  jurosMoraPadrao,
+  multaAtrasoPadrao,
 }: {
   empreendimentos: Empreendimento[];
   lotes: Lote[];
   clientes: Cliente[];
   indexadores: IndexadorRef[];
+  /** Vêm de Admin > Configurações — só o ponto de partida, editável abaixo. */
+  diaVencimentoPadrao: number;
+  jurosMoraPadrao: number;
+  multaAtrasoPadrao: number;
 }) {
   const [empreendimentoId, setEmpreendimentoId] = useState(empreendimentos[0]?.id ?? "");
   const [selecionados, setSelecionados] = useState<string[]>([]);
@@ -37,12 +43,19 @@ export default function NovoContratoForm({
   const hoje = hojeISO();
   const [dataContrato, setDataContrato] = useState(hoje);
   const [dataBase, setDataBase] = useState(hoje);
-  const [valorTotal, setValorTotal] = useState<number | null>(null);
-  const [diaVencimento, setDiaVencimento] = useState<number | null>(10);
+  // Sozinho segue a soma da tabela dos terrenos marcados — vira manual
+  // assim que alguém edita o campo, e volta a seguir se o botão "usar da
+  // tabela" for clicado (ver `valorTotal` abaixo, derivado dos dois).
+  const [valorTotalManual, setValorTotalManual] = useState<number | null>(null);
+  const [diaVencimento, setDiaVencimento] = useState<number | null>(diaVencimentoPadrao);
   const [indexador, setIndexador] = useState<Indexador>("incc");
   const [defasagem, setDefasagem] = useState<number | null>(1);
 
-  const [entrada, setEntrada] = useState<number | null>(null);
+  // Entrada é percentual, igual ao resto da ferramenta (Simulador, Montar
+  // opção) — o valor em R$ é derivado, não digitado direto. 0,4 é o degrau
+  // mais comum das duas tabelas (Industrial e Florescer têm "40% entrada"
+  // como âncora da escada).
+  const [entradaPct, setEntradaPct] = useState(0.4);
   const [entradaParcelas, setEntradaParcelas] = useState<number | null>(1);
   const [qtdParcelas, setQtdParcelas] = useState<number | null>(36);
   const [primeiroMes, setPrimeiroMes] = useState<number | null>(1);
@@ -53,8 +66,8 @@ export default function NovoContratoForm({
   const [reforcoPrimeiroMes, setReforcoPrimeiroMes] = useState<number | null>(6);
 
   const [corrigePrimeira, setCorrigePrimeira] = useState(true);
-  const [jurosMora, setJurosMora] = useState<number | null>(1);
-  const [multa, setMulta] = useState<number | null>(2);
+  const [jurosMora, setJurosMora] = useState<number | null>(jurosMoraPadrao);
+  const [multa, setMulta] = useState<number | null>(multaAtrasoPadrao);
 
   const [estado, formAction, enviando] = useActionState(criarContrato, null);
 
@@ -66,9 +79,30 @@ export default function NovoContratoForm({
     [lotes, empreendimentoId]
   );
 
-  const escolhidos = disponiveis.filter((l) => selecionados.includes(l.id));
-  const somaTabela = escolhidos.reduce((s, l) => s + Number(l.preco_tabela ?? 0), 0);
-  const somaArea = escolhidos.reduce((s, l) => s + Number(l.area_m2), 0);
+  const escolhidos = useMemo(
+    () => disponiveis.filter((l) => selecionados.includes(l.id)),
+    [disponiveis, selecionados]
+  );
+  const somaTabela = useMemo(
+    () => escolhidos.reduce((s, l) => s + Number(l.preco_tabela ?? 0), 0),
+    [escolhidos]
+  );
+  const somaArea = useMemo(
+    () => escolhidos.reduce((s, l) => s + Number(l.area_m2), 0),
+    [escolhidos]
+  );
+
+  // Segue a soma da tabela dos terrenos marcados até alguém digitar um
+  // valor manualmente — sem isso, o "negócio" inteiro (entrada, parcelas,
+  // prévia) ficava em branco até alguém achar o botão "usar da tabela".
+  const valorTotal = useMemo(
+    () => valorTotalManual ?? (somaTabela > 0 ? somaTabela : null),
+    [valorTotalManual, somaTabela]
+  );
+  const entrada = useMemo(
+    () => (valorTotal ? Math.round(valorTotal * entradaPct * 100) / 100 : null),
+    [valorTotal, entradaPct]
+  );
 
   // A prévia roda no navegador com a mesma função que o servidor usa para
   // gravar: o cronograma que aparece aqui é o que vai para o banco.
@@ -231,6 +265,27 @@ export default function NovoContratoForm({
             required={!clienteId}
           />
         </div>
+
+        {!clienteId && (
+          <>
+            <div>
+              <label className="rotulo">Empresa</label>
+              <input className="campo" name="cliente_empresa" />
+            </div>
+            <div>
+              <label className="rotulo">CPF / CNPJ</label>
+              <input className="campo" name="cliente_documento" />
+            </div>
+            <div>
+              <label className="rotulo">Telefone</label>
+              <input className="campo" name="cliente_telefone" />
+            </div>
+            <div>
+              <label className="rotulo">E-mail</label>
+              <input className="campo" name="cliente_email" />
+            </div>
+          </>
+        )}
       </section>
 
       {/* -------------------------------------------------------- terrenos */}
@@ -276,13 +331,16 @@ export default function NovoContratoForm({
                           {marcado ? (
                             <Check size={14} className="text-vinho" />
                           ) : (
-                            <span className="text-[10px] text-cinza">
+                            <span className={`selo selo-${l.status} text-[10px]`}>
                               {ROTULO_STATUS_LOTE[l.status] ?? l.status}
                             </span>
                           )}
                         </span>
                         <span className="block text-xs text-cinza tabular">
                           {area(Number(l.area_m2))}
+                        </span>
+                        <span className="block text-xs tabular">
+                          {l.preco_tabela ? moeda(Number(l.preco_tabela)) : "sem preço"}
                         </span>
                         {l.comprador && (
                           <span className="block text-xs text-cinza truncate">
@@ -329,12 +387,12 @@ export default function NovoContratoForm({
         </div>
         <div>
           <label className="rotulo">Valor total do contrato</label>
-          <CampoNumero valor={valorTotal} aoMudar={setValorTotal} prefixo="R$" />
-          {somaTabela > 0 && valorTotal === null && (
+          <CampoNumero valor={valorTotal} aoMudar={setValorTotalManual} prefixo="R$" />
+          {somaTabela > 0 && valorTotal !== somaTabela && (
             <button
               type="button"
               className="text-xs text-vinho font-semibold mt-1"
-              onClick={() => setValorTotal(somaTabela)}
+              onClick={() => setValorTotalManual(null)}
             >
               usar {moeda(somaTabela)} da tabela
             </button>
@@ -353,10 +411,14 @@ export default function NovoContratoForm({
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className="rotulo">Entrada</label>
-            <CampoNumero valor={entrada} aoMudar={setEntrada} prefixo="R$" />
-            {valorTotal && entrada ? (
-              <p className="text-xs text-cinza mt-1">{pct(entrada / valorTotal, 1)} do total</p>
-            ) : null}
+            <CampoNumero
+              valor={entradaPct * 100}
+              aoMudar={(v) => setEntradaPct((v ?? 0) / 100)}
+              sufixo="%"
+            />
+            <p className="text-xs text-cinza mt-1">
+              {valorTotal ? moeda(entrada ?? 0) : "defina o valor total"}
+            </p>
           </div>
           <div>
             <label className="rotulo">Entrada em quantas vezes</label>

@@ -14,7 +14,18 @@ import { calcularContrato, type ParcelaBruta } from "@/lib/contratos/correcao";
 import { hojeISO } from "@/lib/contratos/mes";
 import { carregarIndices, serieDe } from "@/lib/contratos/servidor";
 import { compararLote } from "@/lib/ordenacao";
+import { obterConfiguracoes } from "@/lib/configuracoes";
+import { valorComissaoEmDinheiro } from "@/lib/comissao";
+import { checarDuplicidade } from "@/lib/clientes/duplicidade";
 import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
+
+/** Anexa dias a uma data, com a mesma âncora ao meio-dia que evita o dia
+ * escorregar por fuso horário (ver `paraData` em `@/lib/contratos/mes`). */
+function somarDias(dataISO: string, dias: number): string {
+  const d = new Date(`${dataISO}T12:00:00`);
+  d.setDate(d.getDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
 
 const texto = (v: FormDataEntryValue | null) => {
   const s = String(v ?? "").trim();
@@ -87,6 +98,10 @@ export async function criarContrato(
     const loteIds = formData.getAll("lote_id").map(String).filter(Boolean);
     const clienteExistente = String(formData.get("cliente_id") ?? "").trim();
     const nomeCliente = String(formData.get("cliente_nome") ?? "").trim();
+    const empresaCliente = String(formData.get("cliente_empresa") ?? "").trim() || null;
+    const documentoCliente = String(formData.get("cliente_documento") ?? "").trim() || null;
+    const telefoneCliente = String(formData.get("cliente_telefone") ?? "").trim() || null;
+    const emailCliente = String(formData.get("cliente_email") ?? "").trim() || null;
 
     if (!empreendimentoId) throw new Error("Escolha o empreendimento.");
     if (!clienteExistente && !nomeCliente) {
@@ -129,9 +144,26 @@ export async function criarContrato(
 
     let clienteId: string | null = clienteExistente || null;
     if (!clienteId && nomeCliente) {
+      const duplicidade = await checarDuplicidade(supabase, {
+        nome: nomeCliente,
+        documento: documentoCliente,
+        telefone: telefoneCliente,
+        email: emailCliente,
+      });
+      if (duplicidade.duplicado && duplicidade.bloqueado) {
+        throw new Error(duplicidade.mensagem);
+      }
+
       const { data: novo, error } = await supabase
         .from("clientes")
-        .insert({ nome: nomeCliente, criado_por: user.id })
+        .insert({
+          nome: nomeCliente,
+          empresa: empresaCliente,
+          documento: documentoCliente,
+          telefone: telefoneCliente,
+          email: emailCliente,
+          criado_por: user.id,
+        })
         .select("id")
         .single();
       if (error) throw new Error(error.message);
@@ -219,7 +251,7 @@ export async function gerarContratoDaProposta(
     const { data: proposta, error } = await supabase
       .from("propostas")
       .select(
-        "id, empreendimento_id, cliente_id, data_base, incc_mensal, correcao_primeira_parcela, observacoes, proposta_lotes(*), proposta_cenarios(id, nome, recomendado, resultado)"
+        "id, empreendimento_id, cliente_id, data_base, incc_mensal, correcao_primeira_parcela, observacoes, teste, proposta_lotes(*), proposta_cenarios(id, nome, recomendado, resultado)"
       )
       .eq("id", propostaId)
       .single();
@@ -255,7 +287,12 @@ export async function gerarContratoDaProposta(
     }
 
     const dataBase = proposta.data_base ?? hojeISO();
-    const parcelas = cronogramaDeResultado(cenario.resultado, dataBase, 10);
+    const {
+      dia_vencimento_padrao: diaVencimentoPadrao,
+      juros_mora_padrao: jurosMoraPadrao,
+      multa_atraso_padrao: multaAtrasoPadrao,
+    } = await obterConfiguracoes();
+    const parcelas = cronogramaDeResultado(cenario.resultado, dataBase, diaVencimentoPadrao);
 
     const { data: contrato, error: erroContrato } = await supabase
       .from("contratos")
@@ -266,6 +303,9 @@ export async function gerarContratoDaProposta(
         cenario_origem: cenario.nome,
         data_contrato: hojeISO(),
         data_base: dataBase,
+        dia_vencimento: diaVencimentoPadrao,
+        juros_mora_mensal: jurosMoraPadrao,
+        multa_atraso_pct: multaAtrasoPadrao,
         // a convenção da proposta vem junto: sem isso o contrato cobraria um
         // mês de INCC a mais do que o cliente viu no papel
         corrige_primeira_parcela: proposta.correcao_primeira_parcela ?? true,
@@ -278,6 +318,8 @@ export async function gerarContratoDaProposta(
           ? "incc"
           : "nenhum",
         observacoes: proposta.observacoes,
+        // copia da proposta: se ela nasceu de teste, o contrato também é
+        teste: proposta.teste ?? false,
         criado_por: user.id,
       })
       .select("id")
@@ -330,6 +372,7 @@ export interface DadosContrato {
   juros_mora_mensal: number;
   multa_atraso_pct: number;
   observacoes: string | null;
+  teste: boolean;
 }
 
 export async function atualizarContrato(
@@ -385,10 +428,14 @@ export async function definirColunasDoDocumento(
 export interface DadosComissao {
   percentual: number | null;
   valor_absoluto: number | null;
+  comissao_parcelas: number;
+  comissao_primeiro_pagamento_dias: number;
+  comissao_intervalo_dias: number;
   forma_pagamento: string | null;
   permuta: boolean;
   permuta_descricao: string | null;
   permuta_valor_mercado: number | null;
+  permuta_valor_abatido: number | null;
 }
 
 /**
@@ -416,6 +463,126 @@ export async function definirComissao(
 
     revalidatePath("/contratos");
     revalidatePath(`/contratos/${contratoId}`);
+    return {};
+  });
+}
+
+/**
+ * (Re)gera o cronograma de pagamento da comissão a partir de
+ * `comissao_parcelas`/`comissao_primeiro_pagamento_dias`/`comissao_intervalo_dias`.
+ *
+ * Apaga as linhas antigas e recria do zero — inclusive as já baixadas. É
+ * ação explícita do admin (a tela confirma antes de chamar quando já existe
+ * baixa), não algo que `definirComissao` dispara sozinho: mudar o
+ * percentual depois de já ter dado baixa numa parcela não deveria apagar
+ * esse histórico sem avisar.
+ */
+export async function gerarParcelasComissao(comissaoId: string): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
+
+    const { data: comissao, error } = await supabase
+      .from("contrato_comissoes")
+      .select(
+        "id, contrato_id, valor_absoluto, permuta, permuta_valor_abatido, comissao_parcelas, comissao_primeiro_pagamento_dias, comissao_intervalo_dias, contratos(data_contrato)"
+      )
+      .eq("id", comissaoId)
+      .single();
+    if (error) throw new Error(error.message);
+
+    const contrato = comissao.contratos as unknown as { data_contrato: string } | null;
+    const dataBase = contrato?.data_contrato ?? hojeISO();
+    const total = valorComissaoEmDinheiro({
+      valor_absoluto: comissao.valor_absoluto,
+      permuta: comissao.permuta,
+      permuta_valor_abatido: comissao.permuta_valor_abatido,
+    });
+    const parcelas = Math.max(comissao.comissao_parcelas ?? 1, 1);
+    const valorParcela = Math.round((total / parcelas) * 100) / 100;
+    // a última parcela absorve o resíduo de centavos, mesmo idioma do
+    // cronograma do contrato — ver cronogramaManual em src/lib/contratos
+    const residuo = Math.round((total - valorParcela * parcelas) * 100) / 100;
+
+    await supabase.from("contrato_comissao_parcelas").delete().eq("comissao_id", comissaoId);
+
+    const linhas = Array.from({ length: parcelas }, (_, i) => ({
+      comissao_id: comissaoId,
+      numero: i + 1,
+      vencimento: somarDias(
+        dataBase,
+        (comissao.comissao_primeiro_pagamento_dias ?? 0) +
+          i * (comissao.comissao_intervalo_dias ?? 30)
+      ),
+      valor: i === parcelas - 1 ? valorParcela + residuo : valorParcela,
+    }));
+
+    const { error: erroInsert } = await supabase
+      .from("contrato_comissao_parcelas")
+      .insert(linhas);
+    if (erroInsert) throw new Error(erroInsert.message);
+
+    revalidatePath(`/contratos/${comissao.contrato_id}`);
+    revalidatePath("/contratos");
+    return {};
+  });
+}
+
+export interface BaixaComissao {
+  pago_em: string;
+  valor_pago: number;
+}
+
+export async function darBaixaComissaoParcela(
+  parcelaId: string,
+  baixa: BaixaComissao
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
+
+    const { data: parcela, error: erroBusca } = await supabase
+      .from("contrato_comissao_parcelas")
+      .select("contrato_comissoes(contrato_id)")
+      .eq("id", parcelaId)
+      .single();
+    if (erroBusca) throw new Error(erroBusca.message);
+
+    const { error } = await supabase
+      .from("contrato_comissao_parcelas")
+      .update({ pago_em: baixa.pago_em, valor_pago: baixa.valor_pago })
+      .eq("id", parcelaId);
+    if (error) throw new Error(error.message);
+
+    const contratoId = (
+      parcela.contrato_comissoes as unknown as { contrato_id: string } | null
+    )?.contrato_id;
+    if (contratoId) revalidatePath(`/contratos/${contratoId}`);
+    revalidatePath("/contratos");
+    return {};
+  });
+}
+
+export async function desfazerBaixaComissaoParcela(parcelaId: string): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
+
+    const { data: parcela, error: erroBusca } = await supabase
+      .from("contrato_comissao_parcelas")
+      .select("contrato_comissoes(contrato_id)")
+      .eq("id", parcelaId)
+      .single();
+    if (erroBusca) throw new Error(erroBusca.message);
+
+    const { error } = await supabase
+      .from("contrato_comissao_parcelas")
+      .update({ pago_em: null, valor_pago: null })
+      .eq("id", parcelaId);
+    if (error) throw new Error(error.message);
+
+    const contratoId = (
+      parcela.contrato_comissoes as unknown as { contrato_id: string } | null
+    )?.contrato_id;
+    if (contratoId) revalidatePath(`/contratos/${contratoId}`);
+    revalidatePath("/contratos");
     return {};
   });
 }

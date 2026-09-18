@@ -546,6 +546,28 @@ insere o cadastro e devolve o `cliente_id` para a tela adotar — assim dá para
 corrigir um cliente errado sem sair da proposta, que é como o erro costuma
 aparecer.
 
+`/propostas/nova` e `/contratos/novo` também cadastram cliente novo, e
+desde que passaram a coletar empresa/CPF/telefone/e-mail (não só o nome)
+correm a mesma checagem de "Cliente duplicado entre corretores" antes de
+inserir — o cliente nasce completo, sem precisar passar por `/clientes`
+depois.
+
+`/clientes` lista, pra cada um, as colunas "Propostas" e "Contratos" (selo
+com link — dourado nos contratos, pra diferenciar venda fechada de
+projeção) e "Cadastrado por". `apagarCliente` trava se o cliente tiver
+proposta **ou** contrato vinculado, mesma mensagem e mesma ideia:
+reatribuir antes de apagar. Sem a segunda checagem, apagar um cliente com
+contrato apagaria em silêncio o vínculo do comprador num terreno já
+vendido, porque `contratos.cliente_id` também é `on delete set null`.
+
+Apagar cliente zera junto `negociacoes.cliente_id` do cartão do funil
+vinculado a ele (mesmo `on delete set null`) — e como `negociacoes.titulo`
+fica vazio assim que `cliente_id` está preenchido (é o apelido, não o nome
+principal), zerar os dois de uma vez deixaria uma linha sem nome nenhum, o
+que a constraint `negociacoes_tem_nome` recusa. `apagarCliente` copia o
+nome do cliente pro título de qualquer negociação órfã antes de apagar,
+exatamente pra não estourar essa constraint.
+
 ## Ordem dos lotes
 
 `numero` é `text` no banco (existe loteamento com "12A"), então a ordenação
@@ -778,6 +800,72 @@ português no lugar de "new row violates row-level security policy" — e evitar
 que um update que a policy simplesmente não alcança (zero linhas, sem erro)
 seja relatado como sucesso.
 
+## Configurações (`/admin/configuracoes`)
+
+Opções da casa, numa linha única (`configuracoes`, id fixo = 1 — não é
+catálogo, é configuração global, migrations 37 e 38).
+`src/lib/configuracoes.ts` → `obterConfiguracoes()` lê essa linha em
+qualquer server component ou action que precise saber o que está ligado;
+`src/components/ConfiguracoesForm.tsx` é o formulário, dividido nas mesmas
+seções da tela.
+
+**Financeiro do corretor, granular** (`corretor_ve_valor_contrato`,
+`corretor_ve_recebido`, `corretor_ve_saldo_e_atraso`) — por padrão os três
+desligados: o corretor vê em `/contratos` só a própria comissão, não o
+financeiro da casa. Cada opção liga um pedaço de volta (Valor, Recebido,
+ou Saldo corrigido/Parcelas/Próximo vencimento/Em atraso); admin sempre vê
+tudo, os interruptores só ampliam o que o corretor enxerga, nunca
+restringem o admin.
+
+**Limite de desconto do corretor** (`desconto_maximo_corretor_pct`,
+fração — `null` é sem limite) — bloqueio duro em `criarProposta` e
+`salvarProposta` (`src/app/propostas/acoes.ts`): se `!ehAdmin` e o
+`descontoEfetivoPct` de qualquer cenário passar do limite, a ação lança
+erro antes de gravar (em `criarProposta`, que já tem a proposta inserida
+nesse ponto do fluxo, ela é apagada de novo — `on delete cascade` limpa os
+lotes junto, sem deixar proposta órfã). Vale para qualquer cenário,
+oficial ou montado: isentar condição oficial exigiria guardar o desconto
+"original" da condição pra comparar contra o que foi editado depois, e o
+schema não guarda isso. Se a escada oficial já tiver um degrau maior que o
+limite configurado, é o número que precisa subir, não o cenário que devia
+ser isentado.
+
+**`corretor_monta_opcao_livre`** — desligado, esconde o botão "Montar
+opção" (`NovaPropostaForm`, `Simulador`) do corretor. É só cortesia de
+tela, no mesmo espírito do resto do app: a API não recusa um payload
+customizado que chegue de outro jeito.
+
+**`nivel_duplicidade_cliente`** — ver "Cliente duplicado entre corretores".
+
+**`clientes_compartilhados`** — ver "O cliente deixou de ser do time".
+
+**Padrões de contrato novo** (`dia_vencimento_padrao`,
+`juros_mora_padrao`, `multa_atraso_padrao`) — usados como valor inicial
+tanto no formulário manual (`NovoContratoForm`) quanto em
+`gerarContratoDaProposta`, que passou a gravar esses três campos
+explicitamente em vez de cair no default fixo da coluna (10 / 1% / 2%).
+Cada contrato continua editável individualmente depois — isso é só o
+ponto de partida.
+
+**`corretor_ve_vgv`, `corretor_ve_comprador`, `corretor_ve_preco_vendido`**
+— os três desligados por padrão, mesma regra de "O comprador e o VGV são
+da casa". Os dois últimos mudam a própria view `lotes_visiveis` (migration
+38: `create or replace view`, mesmas colunas da 31, só troca os
+`case when` pra checar a configuração além de `is_admin()`) — continua
+SECURITY DEFINER, então o `revoke`/`grant` de coluna da migration 28 não
+entra em conflito, é só uma trava a mais contra `select *` direto em
+`lotes`. VGV é interface pura (não passa por `lotes_visiveis`): o dado já
+chega sem máscara, o que muda é só o `{mostrarVgv && (...)}` no card, na
+home e no espelho.
+
+**Alertas em app** (`alertar_parcela_atrasada`, `alertar_proposta_vencendo`
++ `dias_aviso_proposta_vencendo`) — banners de contagem, sem valor em R$,
+então não vazam o que os interruptores de financeiro escondem. O de atraso
+aparece em `/contratos` só pro corretor (admin já tem o cartão detalhado);
+o de proposta vencendo aparece em `/propostas` pros dois papéis, calculado
+sobre `data_base + validade_dias` com `diasEntre`/`hojeISO` de
+`src/lib/contratos/mes.ts`.
+
 ## Adicionar um empreendimento (o caminho do Florescer)
 
 Quase tudo é dado, não código. Desde a migration 31 os passos 1, 2 e 3 têm
@@ -854,8 +942,12 @@ Dois papéis, e a regra é uma só: **vê quem criou; admin vê tudo.**
 
 | Papel | Enxerga |
 |---|---|
-| `corretor` (padrão de todo cadastro novo) | as propostas, os clientes e os contratos que ele mesmo criou. No espelho, tudo menos o nome do comprador e o VGV |
+| `corretor` (padrão de todo cadastro novo) | as propostas, os clientes e os contratos que ele mesmo criou. No espelho, tudo menos o nome do comprador e o VGV; em `/contratos`, só a própria comissão, não o financeiro da casa |
 | `admin` | tudo, e é o único que edita tabela de preço, espelho e índices |
+
+O financeiro do corretor, o comprador, o VGV e o preço de lote vendido têm
+interruptor em `/admin/configuracoes` (ver "Configurações") — o padrão de
+cada um é o que esta tabela descreve, mas o admin pode ligar de volta.
 
 Hoje os admins são Gustavo e Gelson. Para promover alguém:
 
@@ -951,7 +1043,28 @@ autor gerava cadastro duplicado quando outra pessoa atendia o mesmo
 comprador. A 26 reverte isso: com corretores, a carteira de contatos de um
 não pode aparecer para o outro. **O duplicado volta a ser possível, e é o
 preço combinado** — se um dia a casa voltar a ser uma equipe só, é a
-primeira policy a revisitar.
+primeira policy a revisitar. `configuracoes.clientes_compartilhados` (ver
+"Configurações") é justamente esse dia, se ele chegar, sem precisar mexer
+em RLS de novo.
+
+### Cliente duplicado entre corretores
+
+`configuracoes.nivel_duplicidade_cliente` decide o que acontece quando um
+CPF, um nome+telefone ou um e-mail batem com o cliente de **outro**
+corretor: `desligado` não checa nada, `avisar` (padrão) cadastra e mostra
+um aviso âmbar, `bloquear` recusa o cadastro. A checagem roda pela função
+`cliente_duplicado` (migrations 34, 35 e 38 — a 38 acrescentou o e-mail),
+SECURITY DEFINER que só devolve um boolean: nunca revela quem é o outro
+corretor nem o cadastro dele, preservando o combinado desta seção mesmo no
+nível "bloquear". `revoke ... from anon` (migration 35) é de propósito —
+diferente das outras `pode_ver_*`, esta recebe CPF/telefone/e-mail livres
+como parâmetro, e sem a revogação um anônimo sem login conseguiria varrer
+CPFs pela API REST.
+
+Vale nos lugares que criam cliente com dados completos: `/clientes`,
+dentro do Simulador (cartão Cliente da proposta), e desde que
+`/propostas/nova` e `/contratos/novo` passaram a coletar
+empresa/CPF/telefone/e-mail (não só o nome) também neles.
 
 ### Autoria na tela
 
@@ -968,6 +1081,22 @@ painel do Supabase (Authentication → Users → Add user). Manter o **provedor
 Email ligado** e desligar só o *Allow new users to sign up*: são dois
 interruptores na mesma tela, e trocar um pelo outro derruba o login de todo
 mundo (ver "O que fica exposto").
+
+## Marcar como teste
+
+Checkbox no Simulador (proposta) e em "Editar contrato"
+(`ContratoDetalhe`). Nasce na proposta — o corretor sabe desde o início
+que é treino ou teste — e o contrato gerado dela
+(`gerarContratoDaProposta`) copia a marcação sozinho; também dá pra marcar
+direto num contrato cadastrado manualmente, que não tem proposta de
+origem.
+
+Um contrato de teste continua listado em `/contratos`, com um selo cinza
+"Teste" — dá pra gerenciar e apagar sem procurar em outro lugar — mas fica
+de fora de `/cobranca` (a query já filtra `teste = false`, inclusive na
+exportação XLSX) e de qualquer soma de dinheiro em `/contratos` (cartões
+de KPI, coluna "Comissão"): a lista de contratos reais
+(`src/app/contratos/page.tsx`) exclui teste antes de qualquer `reduce`.
 
 ## Depois da venda: contratos, índices e cobrança
 
@@ -1133,10 +1262,26 @@ vendido: é justamente onde estão as vendas antigas. E o cadastro **não mexe
 em `lotes.status` nem em `lotes.comprador`** — a fonte de verdade desses dois
 continua sendo o Google Sheets, e a próxima sincronização sobrescreveria.
 
+O formulário segue a soma da tabela dos terrenos marcados até alguém
+digitar um valor manualmente (`valorTotalManual` — derivado a cada
+render, não um `useEffect` com `setState`, que o lint da casa recusa pelo
+mesmo motivo do arrastar do funil); "Entrada" é percentual, igual ao
+Simulador e ao "Montar opção", em vez de um campo aberto em R$; e o card
+de cada lote mostra o preço e o selo de status colorido, no mesmo padrão
+de `/propostas/nova`.
+
 `/cobranca` mostra os vencimentos do mês **mais o que ficou em atraso antes**
 — quem emite boleto precisa das duas coisas na mesma tela. O filtro que tira
 as atrasadas é `so_mes=1`, e não um `atrasadas=0`, porque checkbox de GET não
 manda nada quando é desmarcado: a informação tem de viajar na exceção.
+
+Uma parcela paga **continua na lista do mês** em vez de sumir assim que
+alguém dá baixa — antes, dar baixa também tirava a parcela da tela, e não
+dava pra ver junto o que já entrou e o que ainda falta no mesmo mês. Agora
+ela aparece com selo "Paga", fundo verde e o valor realmente pago (não o
+projetado), e o cartão "Recebido no mês" soma essas à parte de "Total a
+cobrar" — que continua só com o que falta receber, igual à exportação
+XLSX (nada de boleto pra quem já pagou).
 
 O XLSX de `/cobranca` é a planilha que vai para o banco: uma linha por
 boleto, com sacado, documento, vencimento e valor, mais as colunas de origem
@@ -1175,6 +1320,61 @@ primeira coluna que tem total. Não voltar a escrever `colSpan` na mão.
 
 A RLS segue `clientes`, não `propostas`: o time lê e escreve, e só o autor ou
 um admin apaga. Quem dá baixa num pagamento raramente é quem fechou a venda.
+
+### Qual opção virou contrato
+
+"Gerar contrato", no Simulador, pergunta qual das opções de pagamento da
+proposta o cliente fechou — abre uma janela listando todas (a recomendada
+marcada, com um resumo de valor/entrada/parcela) em vez de assumir a aba
+que estava aberta. Com mais de uma opção, quem clicava enquanto olhava um
+comparativo podia gerar o contrato da opção errada sem perceber.
+
+### Comissão do corretor
+
+`contrato_comissoes` (migrations 33 e 39) é opcional e nasce **pendente**:
+sem linha pra um contrato, é "aguardando o admin definir" — a tela mostra
+o selo "Pendente de definição" e só admin tem o botão pra preencher (RLS:
+`insert`/`update` exigem `is_admin()`, o corretor só lê).
+
+`valor_absoluto` é o total da comissão. A forma de pagamento é
+**estruturada**, não texto livre: `comissao_parcelas`,
+`comissao_primeiro_pagamento_dias` e `comissao_intervalo_dias` bastam pra
+`descreverFormaPagamento()` (`src/lib/comissao.ts`) montar sozinha a frase
+que o corretor vê — "À vista, no ato" ou "3x de R$ 6.666,67, a primeira em
+30 dias, a cada 30 dias". `forma_pagamento` (o campo de texto que existia
+antes) virou observação complementar, pra quando os três campos não
+bastam.
+
+**Permuta tem dois números que não são o mesmo:** `permuta_valor_mercado`
+é só informativo (quanto vale o bem trocado) e `permuta_valor_abatido` é
+quanto disso desconta de verdade do dinheiro que o corretor recebe —
+`valorComissaoEmDinheiro()` faz `valor_absoluto − permuta_valor_abatido`.
+Os dois podem divergir (o corretor pode topar receber menos em dinheiro do
+que o bem vale, ou o contrário), por isso são campos separados em vez de
+um só.
+
+### Cronograma de pagamento da comissão
+
+`contrato_comissao_parcelas` (migration 40) é a mesma ideia de
+`contrato_parcelas`, sem correção nem encargos — a comissão não é
+indexada. Admin clica "Gerar cronograma de pagamento" e a ferramenta cria
+as linhas a partir dos três campos estruturados acima, aplicados sobre
+`contrato.data_contrato`; cada parcela tem baixa própria
+(`darBaixaComissaoParcela`/`desfazerBaixaComissaoParcela`, em
+`src/app/contratos/acoes.ts`), e uma parcela paga **continua aparecendo**
+na lista, com selo "Paga", em vez de sumir.
+
+**"Recriar cronograma" é ação explícita, não automática.** Editar o
+percentual ou a forma de pagamento depois de já ter dado baixa numa
+parcela não regenera as linhas sozinho — isso apagaria histórico de
+pagamento sem avisar. A tela confirma antes, com uma frase diferente
+quando já existe baixa dada.
+
+Em `/contratos`, "Comissão a receber" soma as parcelas ainda não pagas (ou
+o valor em dinheiro inteiro, pra comissão que ainda não tem cronograma
+gerado) e "Comissão recebida" soma as já pagas — os dois cartões existem
+justamente pra separar o que já entrou do que ainda falta, o mesmo par que
+"Já recebido" / "Carteira a receber" já fazia pro financeiro do cliente.
 
 ## Tema escuro
 

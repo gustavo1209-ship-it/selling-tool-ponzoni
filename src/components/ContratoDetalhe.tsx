@@ -21,22 +21,27 @@ import {
   atualizarContrato,
   atualizarParcela,
   darBaixa,
+  darBaixaComissaoParcela,
   darBaixaEmLote,
   definirColunasDoDocumento,
   definirComissao,
   desfazerBaixa,
+  desfazerBaixaComissaoParcela,
   desfazerBaixaEmLote,
+  gerarParcelasComissao,
   type ModoBaixa,
 } from "@/app/contratos/acoes";
 import CampoNumero from "./CampoNumero";
 import { SeloContrato, SeloParcela } from "./SeloStatus";
 import type { Indexador } from "@/lib/calc/tipos";
+import { descreverFormaPagamento, valorComissaoEmDinheiro } from "@/lib/comissao";
 import { COLUNAS_DOC, TODAS_AS_COLUNAS } from "@/lib/contratos/colunas";
 import { hojeISO, rotuloCompetencia } from "@/lib/contratos/mes";
 import type { ContratoCalculado, ParcelaCalculada } from "@/lib/contratos/tipos";
 import type {
   Cliente,
   ComissaoContrato,
+  ComissaoParcela,
   Contrato,
   ContratoLote,
   Empreendimento,
@@ -66,6 +71,7 @@ export default function ContratoDetalhe({
   autor,
   ehAdmin,
   comissao,
+  parcelasComissao,
 }: {
   contrato: Contrato;
   empreendimento: Empreendimento;
@@ -80,6 +86,7 @@ export default function ContratoDetalhe({
   /** Só admin define ou muda a comissão — a RLS de contrato_comissoes barra o resto. */
   ehAdmin: boolean;
   comissao: ComissaoContrato | null;
+  parcelasComissao: ComissaoParcela[];
 }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
@@ -90,6 +97,10 @@ export default function ContratoDetalhe({
   const [valorPago, setValorPago] = useState<number | null>(null);
   const [forma, setForma] = useState("");
   const [boleto, setBoleto] = useState("");
+
+  const [baixandoComissao, setBaixandoComissao] = useState<string | null>(null);
+  const [pagoEmComissao, setPagoEmComissao] = useState(hojeISO());
+  const [valorPagoComissao, setValorPagoComissao] = useState<number | null>(null);
 
   const [selecionadas, setSelecionadas] = useState<string[]>([]);
   const [modoLote, setModoLote] = useState<ModoBaixa>("no_vencimento");
@@ -128,6 +139,7 @@ export default function ContratoDetalhe({
     juros_mora_mensal: Number(contrato.juros_mora_mensal) * 100 as number | null,
     multa_atraso_pct: Number(contrato.multa_atraso_pct) * 100 as number | null,
     observacoes: contrato.observacoes ?? "",
+    teste: contrato.teste,
   });
 
   const [comissaoAberta, setComissaoAberta] = useState(false);
@@ -136,12 +148,19 @@ export default function ContratoDetalhe({
       comissao?.percentual != null ? (Number(comissao.percentual) * 100 as number | null) : null,
     valor_absoluto:
       comissao?.valor_absoluto != null ? (Number(comissao.valor_absoluto) as number | null) : null,
+    comissao_parcelas: comissao?.comissao_parcelas ?? 1,
+    comissao_primeiro_pagamento_dias: comissao?.comissao_primeiro_pagamento_dias ?? 0,
+    comissao_intervalo_dias: comissao?.comissao_intervalo_dias ?? 30,
     forma_pagamento: comissao?.forma_pagamento ?? "",
     permuta: comissao?.permuta ?? false,
     permuta_descricao: comissao?.permuta_descricao ?? "",
     permuta_valor_mercado:
       comissao?.permuta_valor_mercado != null
         ? (Number(comissao.permuta_valor_mercado) as number | null)
+        : null,
+    permuta_valor_abatido:
+      comissao?.permuta_valor_abatido != null
+        ? (Number(comissao.permuta_valor_abatido) as number | null)
         : null,
   });
 
@@ -271,6 +290,7 @@ export default function ContratoDetalhe({
         juros_mora_mensal: (cfg.juros_mora_mensal ?? 0) / 100,
         multa_atraso_pct: (cfg.multa_atraso_pct ?? 0) / 100,
         observacoes: cfg.observacoes || null,
+        teste: cfg.teste,
       });
       if (!resultado.ok) throw new Error(resultado.erro);
       setAjustes(false);
@@ -282,13 +302,50 @@ export default function ContratoDetalhe({
       const resultado = await definirComissao(contrato.id, {
         percentual: cfgComissao.percentual != null ? cfgComissao.percentual / 100 : null,
         valor_absoluto: cfgComissao.valor_absoluto,
+        comissao_parcelas: cfgComissao.comissao_parcelas || 1,
+        comissao_primeiro_pagamento_dias: cfgComissao.comissao_primeiro_pagamento_dias ?? 0,
+        comissao_intervalo_dias: cfgComissao.comissao_intervalo_dias || 30,
         forma_pagamento: cfgComissao.forma_pagamento.trim() || null,
         permuta: cfgComissao.permuta,
         permuta_descricao: cfgComissao.permuta_descricao.trim() || null,
         permuta_valor_mercado: cfgComissao.permuta_valor_mercado,
+        permuta_valor_abatido: cfgComissao.permuta ? cfgComissao.permuta_valor_abatido : null,
       });
       if (!resultado.ok) throw new Error(resultado.erro);
       setComissaoAberta(false);
+    });
+  }
+
+  function gerarCronogramaComissao() {
+    if (!comissao) return;
+    const temBaixa = parcelasComissao.some((p) => p.pago_em);
+    if (
+      parcelasComissao.length > 0 &&
+      !confirm(
+        temBaixa
+          ? "Já existe baixa dada nesse cronograma. Recriar apaga o histórico de pagamento da comissão. Continuar?"
+          : "Recriar o cronograma de pagamento da comissão?"
+      )
+    ) {
+      return;
+    }
+    agir(() => gerarParcelasComissao(comissao.id));
+  }
+
+  function iniciarBaixaComissao(p: ComissaoParcela) {
+    setBaixandoComissao(p.id);
+    setPagoEmComissao(p.pago_em ?? hojeISO());
+    setValorPagoComissao(p.valor_pago != null ? Number(p.valor_pago) : Number(p.valor));
+  }
+
+  function confirmarBaixaComissao(p: ComissaoParcela) {
+    agir(async () => {
+      const resultado = await darBaixaComissaoParcela(p.id, {
+        pago_em: pagoEmComissao,
+        valor_pago: valorPagoComissao ?? Number(p.valor),
+      });
+      if (!resultado.ok) throw new Error(resultado.erro);
+      setBaixandoComissao(null);
     });
   }
 
@@ -306,6 +363,7 @@ export default function ContratoDetalhe({
           <h1 className="serif text-3xl mt-1 flex items-center gap-3">
             {contrato.codigo}
             <SeloContrato status={contrato.status} />
+            {contrato.teste && <span className="selo selo-neutro">Teste</span>}
           </h1>
           <p className="text-sm text-tinta-suave mt-1">
             {cliente?.nome ?? contrato.titulo ?? "sem comprador vinculado"}
@@ -475,19 +533,26 @@ export default function ContratoDetalhe({
                 </p>
               </div>
               <div>
-                <p className="eyebrow">Valor</p>
+                <p className="eyebrow">
+                  {comissao.permuta ? "Valor total" : "Valor"}
+                </p>
                 <p className="serif text-xl tabular mt-1">
                   {moeda(comissao.valor_absoluto != null ? Number(comissao.valor_absoluto) : null)}
                 </p>
               </div>
               <div className="sm:col-span-2">
-                <p className="eyebrow">Forma de pagamento</p>
-                <p className="text-sm mt-1">{comissao.forma_pagamento || "—"}</p>
+                <p className="eyebrow">Como vai ser pago</p>
+                <p className="text-sm mt-1 font-semibold">
+                  {descreverFormaPagamento(comissao)}
+                </p>
+                {comissao.forma_pagamento && (
+                  <p className="text-xs text-cinza mt-1">{comissao.forma_pagamento}</p>
+                )}
               </div>
               {comissao.permuta && (
-                <div className="sm:col-span-2 lg:col-span-4 rounded-md border border-linha px-3 py-2">
+                <div className="sm:col-span-2 lg:col-span-4 rounded-md border border-linha px-3 py-2 flex flex-col gap-1">
                   <p className="eyebrow">Permuta</p>
-                  <p className="text-sm mt-1">
+                  <p className="text-sm">
                     {comissao.permuta_descricao || "sem descrição"}
                     {comissao.permuta_valor_mercado != null && (
                       <span className="text-cinza">
@@ -495,6 +560,12 @@ export default function ContratoDetalhe({
                         · valor de mercado {moeda(Number(comissao.permuta_valor_mercado))}
                       </span>
                     )}
+                  </p>
+                  <p className="text-sm">
+                    Abate {moeda(Number(comissao.permuta_valor_abatido))} da comissão ·{" "}
+                    <span className="font-semibold">
+                      resta {moeda(valorComissaoEmDinheiro(comissao))} em dinheiro
+                    </span>
                   </p>
                 </div>
               )}
@@ -509,7 +580,18 @@ export default function ContratoDetalhe({
               <label className="rotulo">Percentual</label>
               <CampoNumero
                 valor={cfgComissao.percentual}
-                aoMudar={(v) => setCfgComissao({ ...cfgComissao, percentual: v })}
+                aoMudar={(v) =>
+                  setCfgComissao((atual) => ({
+                    ...atual,
+                    percentual: v,
+                    // sugere o valor a partir do percentual; o campo continua
+                    // editável depois, para quando o combinado não bate exato
+                    valor_absoluto:
+                      v != null
+                        ? Math.round(Number(contrato.valor_total) * (v / 100) * 100) / 100
+                        : atual.valor_absoluto,
+                  }))
+                }
                 sufixo="%"
               />
             </div>
@@ -520,17 +602,73 @@ export default function ContratoDetalhe({
                 aoMudar={(v) => setCfgComissao({ ...cfgComissao, valor_absoluto: v })}
                 prefixo="R$"
               />
+              <p className="text-xs text-cinza mt-1">
+                Sugerido a partir do percentual sobre {moeda(Number(contrato.valor_total))}
+                ; pode ajustar à mão.
+              </p>
             </div>
-            <div className="sm:col-span-2">
-              <label className="rotulo">Forma de pagamento</label>
-              <input
-                className="campo"
-                value={cfgComissao.forma_pagamento}
-                onChange={(e) =>
-                  setCfgComissao({ ...cfgComissao, forma_pagamento: e.target.value })
-                }
-                placeholder="Ex.: 50% na entrada, 50% em 30 dias"
-              />
+            <div className="sm:col-span-2 lg:col-span-4 rounded-md border border-linha px-3 py-3">
+              <p className="rotulo mb-2">Como vai ser pago</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="text-xs text-cinza">Em quantas vezes</label>
+                  <CampoNumero
+                    valor={cfgComissao.comissao_parcelas}
+                    aoMudar={(v) =>
+                      setCfgComissao({ ...cfgComissao, comissao_parcelas: v ?? 1 })
+                    }
+                    casas={0}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-cinza">1º pagamento em (dias)</label>
+                  <CampoNumero
+                    valor={cfgComissao.comissao_primeiro_pagamento_dias}
+                    aoMudar={(v) =>
+                      setCfgComissao({
+                        ...cfgComissao,
+                        comissao_primeiro_pagamento_dias: v ?? 0,
+                      })
+                    }
+                    casas={0}
+                    sufixo=" dias"
+                  />
+                  <p className="text-xs text-cinza mt-1">0 = no ato</p>
+                </div>
+                {cfgComissao.comissao_parcelas > 1 && (
+                  <div>
+                    <label className="text-xs text-cinza">Intervalo entre parcelas</label>
+                    <CampoNumero
+                      valor={cfgComissao.comissao_intervalo_dias}
+                      aoMudar={(v) =>
+                        setCfgComissao({
+                          ...cfgComissao,
+                          comissao_intervalo_dias: v ?? 30,
+                        })
+                      }
+                      casas={0}
+                      sufixo=" dias"
+                    />
+                  </div>
+                )}
+              </div>
+              <p className="text-sm mt-2 text-vinho font-semibold">
+                {descreverFormaPagamento({
+                  ...cfgComissao,
+                  valor_absoluto: cfgComissao.valor_absoluto,
+                })}
+              </p>
+              <div className="mt-3">
+                <label className="rotulo">Observação (opcional)</label>
+                <input
+                  className="campo"
+                  value={cfgComissao.forma_pagamento}
+                  onChange={(e) =>
+                    setCfgComissao({ ...cfgComissao, forma_pagamento: e.target.value })
+                  }
+                  placeholder="Algo que os campos acima não cobrem"
+                />
+              </div>
             </div>
             <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-2">
               <input
@@ -546,7 +684,7 @@ export default function ContratoDetalhe({
               </label>
             </div>
             {cfgComissao.permuta && (
-              <>
+              <div className="sm:col-span-2 lg:col-span-4 rounded-md border border-linha px-3 py-3 grid gap-3 sm:grid-cols-3">
                 <div className="sm:col-span-2">
                   <label className="rotulo">O que é a permuta</label>
                   <input
@@ -559,7 +697,7 @@ export default function ContratoDetalhe({
                   />
                 </div>
                 <div>
-                  <label className="rotulo">Valor de mercado</label>
+                  <label className="rotulo">Valor de mercado do bem</label>
                   <CampoNumero
                     valor={cfgComissao.permuta_valor_mercado}
                     aoMudar={(v) =>
@@ -568,7 +706,32 @@ export default function ContratoDetalhe({
                     prefixo="R$"
                   />
                 </div>
-              </>
+                <div className="sm:col-span-2">
+                  <label className="rotulo">Valor abatido da comissão</label>
+                  <CampoNumero
+                    valor={cfgComissao.permuta_valor_abatido}
+                    aoMudar={(v) =>
+                      setCfgComissao({ ...cfgComissao, permuta_valor_abatido: v })
+                    }
+                    prefixo="R$"
+                  />
+                  <p className="text-xs text-cinza mt-1">
+                    Diferente do valor de mercado — é quanto isso desconta do
+                    dinheiro que o corretor recebe.
+                  </p>
+                </div>
+                <p className="sm:col-span-3 text-sm font-semibold">
+                  Resta{" "}
+                  {moeda(
+                    valorComissaoEmDinheiro({
+                      valor_absoluto: cfgComissao.valor_absoluto,
+                      permuta: true,
+                      permuta_valor_abatido: cfgComissao.permuta_valor_abatido,
+                    })
+                  )}{" "}
+                  em dinheiro.
+                </p>
+              </div>
             )}
             <div className="flex items-end gap-2">
               <button
@@ -585,6 +748,153 @@ export default function ContratoDetalhe({
               >
                 <X size={15} /> Cancelar
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ---------------------------------- cronograma de pagamento */}
+        {comissao && parcelasComissao.length === 0 && ehAdmin && !comissaoAberta && (
+          <div className="border-t border-linha pt-4">
+            <button className="btn btn-secundario" onClick={gerarCronogramaComissao}>
+              <RotateCcw size={15} /> Gerar cronograma de pagamento
+            </button>
+          </div>
+        )}
+
+        {comissao && parcelasComissao.length > 0 && (
+          <div className="border-t border-linha pt-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold">Cronograma de pagamento</h3>
+              {ehAdmin && (
+                <button
+                  className="btn btn-fantasma text-xs"
+                  onClick={gerarCronogramaComissao}
+                >
+                  <RotateCcw size={13} /> Recriar cronograma
+                </button>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="tabela">
+                <thead>
+                  <tr>
+                    <th>Nº</th>
+                    <th>Vencimento</th>
+                    <th className="num">Valor</th>
+                    <th>Situação</th>
+                    <th>Pagamento</th>
+                    {ehAdmin && <th></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {parcelasComissao.map((p) => {
+                    const paga = Boolean(p.pago_em);
+                    const hoje = hojeISO();
+                    const situacao = paga
+                      ? "paga"
+                      : p.vencimento < hoje
+                        ? "vencida"
+                        : p.vencimento === hoje
+                          ? "vence_hoje"
+                          : "a_vencer";
+                    const emBaixa = baixandoComissao === p.id;
+
+                    return (
+                      <Fragment key={p.id}>
+                        <tr className={situacao === "vencida" ? "bg-vermelho-fraco/40" : ""}>
+                          <td className="text-cinza">{p.numero}</td>
+                          <td className="whitespace-nowrap">{dataBR(p.vencimento)}</td>
+                          <td className="num">{moeda(Number(p.valor))}</td>
+                          <td>
+                            <SeloParcela situacao={situacao} />
+                          </td>
+                          <td className="text-cinza text-xs whitespace-nowrap">
+                            {paga
+                              ? `${dataBR(p.pago_em as string)} · ${moeda(Number(p.valor_pago))}`
+                              : "—"}
+                          </td>
+                          {ehAdmin && (
+                            <td className="whitespace-nowrap">
+                              {paga ? (
+                                <button
+                                  className="btn btn-fantasma px-2 text-xs"
+                                  disabled={pendente}
+                                  onClick={() =>
+                                    agir(() => desfazerBaixaComissaoParcela(p.id))
+                                  }
+                                >
+                                  Desfazer
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn btn-fantasma px-2 text-xs"
+                                  onClick={() => iniciarBaixaComissao(p)}
+                                >
+                                  Dar baixa
+                                </button>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                        {emBaixa && (
+                          <tr>
+                            <td colSpan={ehAdmin ? 6 : 5} className="bg-papel-alt">
+                              <div className="flex flex-wrap items-end gap-2 py-2">
+                                <div>
+                                  <label className="rotulo">Pago em</label>
+                                  <input
+                                    type="date"
+                                    className="campo py-1 text-xs"
+                                    value={pagoEmComissao}
+                                    onChange={(e) => setPagoEmComissao(e.target.value)}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="rotulo">Valor pago</label>
+                                  <CampoNumero
+                                    valor={valorPagoComissao}
+                                    aoMudar={setValorPagoComissao}
+                                    prefixo="R$"
+                                  />
+                                </div>
+                                <button
+                                  className="btn btn-primario"
+                                  disabled={pendente}
+                                  onClick={() => confirmarBaixaComissao(p)}
+                                >
+                                  <Check size={14} /> Confirmar
+                                </button>
+                                <button
+                                  className="btn btn-secundario"
+                                  onClick={() => setBaixandoComissao(null)}
+                                >
+                                  <X size={14} /> Cancelar
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-papel-alt font-semibold">
+                    <td colSpan={2}>Total</td>
+                    <td className="num">
+                      {moeda(parcelasComissao.reduce((s, p) => s + Number(p.valor), 0))}
+                    </td>
+                    <td colSpan={ehAdmin ? 3 : 2} className="text-xs text-cinza font-normal">
+                      {moeda(
+                        parcelasComissao
+                          .filter((p) => p.pago_em)
+                          .reduce((s, p) => s + Number(p.valor_pago), 0)
+                      )}{" "}
+                      já recebido
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
         )}
@@ -827,6 +1137,17 @@ export default function ContratoDetalhe({
               value={cfg.observacoes}
               onChange={(e) => setCfg({ ...cfg, observacoes: e.target.value })}
             />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="contrato-teste"
+              checked={cfg.teste}
+              onChange={(e) => setCfg({ ...cfg, teste: e.target.checked })}
+            />
+            <label htmlFor="contrato-teste" className="text-sm cursor-pointer">
+              Isto é teste — fora de &quot;A receber&quot; e dos totais de Contratos
+            </label>
           </div>
           <div className="flex items-end gap-2">
             <button

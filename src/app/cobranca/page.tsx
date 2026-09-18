@@ -30,6 +30,7 @@ interface ContratoLinha {
   juros_mora_mensal: number;
   multa_atraso_pct: number;
   empreendimento_id: string;
+  teste: boolean;
   clientes: { nome: string; email: string | null; telefone: string | null } | null;
   empreendimentos: { nome: string } | null;
   contrato_lotes: { quadra: string; numero: string }[];
@@ -54,9 +55,10 @@ export default async function CobrancaPage({
     supabase
       .from("contratos")
       .select(
-        "id, codigo, titulo, status, data_base, valor_total, indexador, defasagem_indice_meses, corrige_primeira_parcela, juros_mora_mensal, multa_atraso_pct, empreendimento_id, clientes(nome, email, telefone), empreendimentos(nome), contrato_lotes(quadra, numero), contrato_parcelas(*)"
+        "id, codigo, titulo, status, data_base, valor_total, indexador, defasagem_indice_meses, corrige_primeira_parcela, juros_mora_mensal, multa_atraso_pct, empreendimento_id, teste, clientes(nome, email, telefone), empreendimentos(nome), contrato_lotes(quadra, numero), contrato_parcelas(*)"
       )
-      .in("status", ["ativo", "suspenso"]),
+      .in("status", ["ativo", "suspenso"])
+      .eq("teste", false),
     supabase.from("empreendimentos").select("id, nome").eq("ativo", true).order("nome"),
     carregarIndices(),
   ]);
@@ -66,12 +68,16 @@ export default async function CobrancaPage({
   );
 
   // Uma linha por parcela que vence no mês escolhido, mais o que ficou para
-  // trás — quem emite boleto precisa das duas coisas na mesma tela.
+  // trás — quem emite boleto precisa das duas coisas na mesma tela. As já
+  // pagas do mês entram numa lista à parte: continuam aparecendo (não somem
+  // da aba assim que alguém dá baixa), mas não entram na conta do que ainda
+  // falta cobrar.
   const linhas: {
     contrato: ContratoLinha;
     parcela: ParcelaCalculada;
     atrasada: boolean;
   }[] = [];
+  const recebidasDoMes: { contrato: ContratoLinha; parcela: ParcelaCalculada }[] = [];
 
   for (const c of contratos) {
     const { serie, taxa } = serieDe(indices, c.indexador as never);
@@ -91,8 +97,11 @@ export default async function CobrancaPage({
     );
 
     for (const p of calculo.parcelas) {
-      if (p.situacao === "paga") continue;
       const comp = competencia(p.vencimento);
+      if (p.situacao === "paga") {
+        if (comp === mes) recebidasDoMes.push({ contrato: c, parcela: p });
+        continue;
+      }
       if (comp === mes) {
         linhas.push({ contrato: c, parcela: p, atrasada: p.situacao === "vencida" });
       } else if (incluirAtrasadas && comp < mes && p.situacao === "vencida") {
@@ -106,10 +115,19 @@ export default async function CobrancaPage({
       a.parcela.vencimento.localeCompare(b.parcela.vencimento) ||
       a.contrato.codigo.localeCompare(b.contrato.codigo)
   );
+  recebidasDoMes.sort(
+    (a, b) =>
+      a.parcela.vencimento.localeCompare(b.parcela.vencimento) ||
+      a.contrato.codigo.localeCompare(b.contrato.codigo)
+  );
 
   const doMes = linhas.filter((l) => competencia(l.parcela.vencimento) === mes);
   const atrasadas = linhas.filter((l) => competencia(l.parcela.vencimento) < mes);
   const total = linhas.reduce((s, l) => s + l.parcela.valorACobrar, 0);
+  const recebidoDoMes = recebidasDoMes.reduce(
+    (s, l) => s + Number(l.parcela.valor_pago ?? l.parcela.valorCorrigido),
+    0
+  );
   const estimadas = linhas.filter((l) => l.parcela.correcao.estimado);
 
   const params = new URLSearchParams({ mes });
@@ -176,7 +194,16 @@ export default async function CobrancaPage({
           </div>
         </form>
 
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="cartao p-4">
+            <p className="eyebrow">Recebido no mês</p>
+            <p className="serif text-2xl tabular mt-1 text-verde">
+              {moedaCurta(recebidoDoMes)}
+            </p>
+            <p className="text-xs text-cinza mt-1">
+              {recebidasDoMes.length} parcela(s) já paga(s)
+            </p>
+          </div>
           <div className="cartao p-4">
             <p className="eyebrow">Total a cobrar</p>
             <p className="serif text-2xl tabular mt-1 text-vinho">{moedaCurta(total)}</p>
@@ -257,59 +284,79 @@ export default async function CobrancaPage({
               </tr>
             </thead>
             <tbody>
-              {linhas.map(({ contrato: c, parcela: p }) => (
-                <tr
-                  key={p.id}
-                  className={`hover:bg-papel-alt ${
-                    p.situacao === "vencida" ? "bg-vermelho-fraco/40" : ""
-                  }`}
-                >
-                  <td className="whitespace-nowrap font-semibold">
-                    {dataBR(p.vencimento)}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    <Link href={`/contratos/${c.id}`} className="text-vinho font-semibold">
-                      {c.codigo}
-                    </Link>
-                  </td>
-                  <td>{c.clientes?.nome ?? c.titulo ?? "—"}</td>
-                  <td className="text-cinza whitespace-nowrap">
-                    {c.contrato_lotes.map((l) => `${l.quadra}-${l.numero}`).join(", ") ||
-                      "—"}
-                  </td>
-                  <td className="text-cinza whitespace-nowrap">
-                    {p.rotulo}
-                    {p.total_no_grupo > 1 && ` ${p.indice}/${p.total_no_grupo}`}
-                  </td>
-                  <td className="num text-cinza">{moeda(p.valor_original)}</td>
-                  <td className="num text-cinza">
-                    {p.indexada ? (
-                      <>
-                        {fator(p.correcao.fator)}
-                        {p.correcao.estimado && (
-                          <span className="text-ambar font-semibold" title="estimado">
-                            ~
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="num">{moeda(p.valorCorrigido)}</td>
-                  <td className="num text-cinza">
-                    {p.encargos ? moeda(p.encargos.multa + p.encargos.juros) : "—"}
-                  </td>
-                  <td className="num font-semibold">{moeda(p.valorACobrar)}</td>
-                  <td>
-                    <SeloParcela situacao={p.situacao} />
-                  </td>
-                  <td className="text-cinza text-xs whitespace-nowrap">
-                    {c.clientes?.telefone ?? c.clientes?.email ?? "—"}
-                  </td>
-                </tr>
-              ))}
-              {linhas.length === 0 && (
+              {[
+                ...linhas.map((l) => ({ ...l, paga: false })),
+                ...recebidasDoMes.map((l) => ({ ...l, atrasada: false, paga: true })),
+              ]
+                .sort(
+                  (a, b) =>
+                    a.parcela.vencimento.localeCompare(b.parcela.vencimento) ||
+                    a.contrato.codigo.localeCompare(b.contrato.codigo)
+                )
+                .map(({ contrato: c, parcela: p, paga }) => (
+                  <tr
+                    key={p.id}
+                    className={`hover:bg-papel-alt ${
+                      paga
+                        ? "bg-verde-fraco/40"
+                        : p.situacao === "vencida"
+                          ? "bg-vermelho-fraco/40"
+                          : ""
+                    }`}
+                  >
+                    <td className="whitespace-nowrap font-semibold">
+                      {dataBR(p.vencimento)}
+                    </td>
+                    <td className="whitespace-nowrap">
+                      <Link href={`/contratos/${c.id}`} className="text-vinho font-semibold">
+                        {c.codigo}
+                      </Link>
+                    </td>
+                    <td>{c.clientes?.nome ?? c.titulo ?? "—"}</td>
+                    <td className="text-cinza whitespace-nowrap">
+                      {c.contrato_lotes.map((l) => `${l.quadra}-${l.numero}`).join(", ") ||
+                        "—"}
+                    </td>
+                    <td className="text-cinza whitespace-nowrap">
+                      {p.rotulo}
+                      {p.total_no_grupo > 1 && ` ${p.indice}/${p.total_no_grupo}`}
+                    </td>
+                    <td className="num text-cinza">{moeda(p.valor_original)}</td>
+                    <td className="num text-cinza">
+                      {p.indexada ? (
+                        <>
+                          {fator(p.correcao.fator)}
+                          {p.correcao.estimado && (
+                            <span className="text-ambar font-semibold" title="estimado">
+                              ~
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="num">{moeda(p.valorCorrigido)}</td>
+                    <td className="num text-cinza">
+                      {p.encargos ? moeda(p.encargos.multa + p.encargos.juros) : "—"}
+                    </td>
+                    <td className="num font-semibold">
+                      {paga ? moeda(Number(p.valor_pago ?? p.valorCorrigido)) : moeda(p.valorACobrar)}
+                      {paga && p.pago_em && (
+                        <span className="block text-[10px] text-cinza font-normal">
+                          pago em {dataBR(p.pago_em)}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <SeloParcela situacao={p.situacao} />
+                    </td>
+                    <td className="text-cinza text-xs whitespace-nowrap">
+                      {c.clientes?.telefone ?? c.clientes?.email ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              {linhas.length === 0 && recebidasDoMes.length === 0 && (
                 <tr>
                   <td colSpan={12} className="text-center text-cinza py-8">
                     Nada a receber em {competenciaPorExtenso(mes)}.

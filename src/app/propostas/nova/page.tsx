@@ -1,6 +1,8 @@
 import Cabecalho from "@/components/Cabecalho";
 import NovaPropostaForm from "@/components/NovaPropostaForm";
 import { createClient } from "@/lib/supabase/server";
+import { perfilAtual } from "@/lib/supabase/perfil";
+import { obterConfiguracoes } from "@/lib/configuracoes";
 import type {
   Cliente,
   IndexadorRef,
@@ -14,6 +16,9 @@ export const dynamic = "force-dynamic";
 
 export default async function NovaPropostaPage() {
   const supabase = await createClient();
+  const perfil = await perfilAtual();
+  const configuracoes = await obterConfiguracoes();
+  const podeMontarOpcao = (perfil?.ehAdmin ?? false) || configuracoes.corretor_monta_opcao_livre;
 
   const [{ data: empreendimentos }, { data: lotes }, { data: tabelas }, { data: clientes }] =
     await Promise.all([
@@ -44,6 +49,7 @@ export default async function NovaPropostaPage() {
           condicoes={(condicoes ?? []) as unknown as CondicaoPagamento[]}
           clientes={(clientes ?? []) as Cliente[]}
           indexadores={(indexadores ?? []) as IndexadorRef[]}
+          podeMontarOpcao={podeMontarOpcao}
         />
       </main>
     </>

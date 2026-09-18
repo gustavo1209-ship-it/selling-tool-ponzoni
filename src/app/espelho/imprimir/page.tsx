@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import FolhaEspelho from "@/components/FolhaEspelho";
 import { createClient } from "@/lib/supabase/server";
 import { perfilAtual } from "@/lib/supabase/perfil";
+import { obterConfiguracoes } from "@/lib/configuracoes";
 import { ordenarLotes } from "@/lib/ordenacao";
 import type { Empreendimento, Lote } from "@/lib/db/tipos";
 
@@ -15,6 +16,10 @@ export default async function EspelhoImprimirPage({
   const { e: slug } = await searchParams;
   const supabase = await createClient();
   const perfil = await perfilAtual();
+  const configuracoes = await obterConfiguracoes();
+  const ehAdmin = perfil?.ehAdmin ?? false;
+  const mostrarComprador = ehAdmin || configuracoes.corretor_ve_comprador;
+  const mostrarVgv = ehAdmin || configuracoes.corretor_ve_vgv;
 
   const { data: empreendimentos } = await supabase
     .from("empreendimentos")
@@ -35,7 +40,8 @@ export default async function EspelhoImprimirPage({
     <FolhaEspelho
       empreendimento={atual}
       lotes={ordenarLotes((lotes ?? []) as Lote[])}
-      ehAdmin={perfil?.ehAdmin ?? false}
+      mostrarComprador={mostrarComprador}
+      mostrarVgv={mostrarVgv}
     />
   );
 }

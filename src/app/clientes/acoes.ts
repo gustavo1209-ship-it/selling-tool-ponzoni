@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { criarNegociacao } from "@/app/funil/acoes";
-import { avisoDuplicidade } from "@/lib/clientes/duplicidade";
+import { checarDuplicidade } from "@/lib/clientes/duplicidade";
 import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
 
 export interface DadosCliente {
@@ -45,8 +45,17 @@ export async function criarCliente(
 
     const telefone = limpo(formData.get("telefone"));
     const documento = limpo(formData.get("documento"));
+    const email = limpo(formData.get("email"));
 
-    const aviso = await avisoDuplicidade(supabase, { nome, documento, telefone });
+    const duplicidade = await checarDuplicidade(supabase, {
+      nome,
+      documento,
+      telefone,
+      email,
+    });
+    if (duplicidade.duplicado && duplicidade.bloqueado) {
+      throw new Error(duplicidade.mensagem);
+    }
 
     const { data: cliente, error } = await supabase
       .from("clientes")
@@ -54,7 +63,7 @@ export async function criarCliente(
         nome,
         empresa: limpo(formData.get("empresa")),
         documento,
-        email: limpo(formData.get("email")),
+        email,
         telefone,
         criado_por: user.id,
       })
@@ -85,7 +94,7 @@ export async function criarCliente(
     }
 
     revalidatePath("/clientes");
-    return aviso ? { aviso } : {};
+    return duplicidade.duplicado ? { aviso: duplicidade.mensagem } : {};
   });
 }
 
@@ -132,10 +141,45 @@ export async function apagarCliente(id: string): Promise<ResultadoAcao> {
       );
     }
 
+    // Mesma trava das propostas: contrato.cliente_id é "on delete set null"
+    // (migration 24) — sem essa checagem, apagar o cliente apagaria em
+    // silêncio o vínculo de um terreno já vendido com o comprador dele.
+    const { count: contagemContratos } = await supabase
+      .from("contratos")
+      .select("id", { count: "exact", head: true })
+      .eq("cliente_id", id);
+
+    if (contagemContratos && contagemContratos > 0) {
+      throw new Error(
+        `Este cliente tem ${contagemContratos} contrato(s). Reatribua os contratos antes de apagar.`
+      );
+    }
+
+    // O cartão do funil vinculado a este cliente confia no nome dele pra se
+    // identificar — `negociacoes.titulo` fica vazio assim que `cliente_id`
+    // é preenchido (comentário na migration 30). Ao apagar o cliente, a FK
+    // zera `cliente_id` sozinha (`on delete set null`); sem um título de
+    // reserva, a linha vira um cartão sem nome nenhum e a constraint
+    // `negociacoes_tem_nome` recusa esse UPDATE, derrubando o DELETE junto.
+    const { data: cliente } = await supabase
+      .from("clientes")
+      .select("nome")
+      .eq("id", id)
+      .single();
+
+    if (cliente) {
+      await supabase
+        .from("negociacoes")
+        .update({ titulo: cliente.nome })
+        .eq("cliente_id", id)
+        .is("titulo", null);
+    }
+
     const { error } = await supabase.from("clientes").delete().eq("id", id);
     if (error) throw new Error(error.message);
 
     revalidatePath("/clientes");
+    revalidatePath("/funil");
     return {};
   });
 }

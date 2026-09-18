@@ -46,6 +46,8 @@ export default function EspelhoTabela({
   tabela,
   condicoes,
   ehAdmin,
+  mostrarComprador,
+  mostrarVgv,
 }: {
   empreendimentos: Empreendimento[];
   empreendimento: Empreendimento;
@@ -53,15 +55,20 @@ export default function EspelhoTabela({
   tabela: TabelaPreco | null;
   condicoes: CondicaoPagamento[];
   /**
-   * Para o corretor o espelho é o catálogo de venda, em leitura, e sem duas
-   * informações que são da casa: o nome do comprador e o VGV.
-   *
-   * A tela não é o que protege — o comprador já vem nulo da view
-   * `lotes_visiveis` e a RLS recusa a escrita (migrations 26 e 28). O que se
-   * evita aqui é oferecer um campo que falharia ao gravar e uma coluna que
-   * só mostraria travessões.
+   * Edição (status, observação, sincronizar) continua só admin — isso é
+   * escrita de dado da casa, sem interruptor em Configurações.
    */
   ehAdmin: boolean;
+  /**
+   * Nome do comprador: por padrão só admin, mas Admin > Configurações pode
+   * liberar pro corretor também (`corretor_ve_comprador`). A tela não é o
+   * que protege — o comprador já vem nulo da view `lotes_visiveis` quando
+   * a configuração está desligada, e a RLS recusa a escrita de qualquer
+   * jeito (migrations 26 e 28).
+   */
+  mostrarComprador: boolean;
+  /** Mesma ideia, pro cartão de VGV (`corretor_ve_vgv`). */
+  mostrarVgv: boolean;
 }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
@@ -239,7 +246,7 @@ export default function EspelhoTabela({
             <span className={`selo ${classe} mt-2`}>{lotes.length} no total</span>
           </div>
         ))}
-        {ehAdmin && (
+        {mostrarVgv && (
           <div className="cartao p-4">
             <p className="eyebrow">VGV disponível</p>
             <p className="serif text-2xl text-vinho tabular mt-1">{moedaCurta(resumo.vgv)}</p>
@@ -251,7 +258,7 @@ export default function EspelhoTabela({
           <p className="serif text-2xl tabular mt-1">{num(resumo.areaLivre)}</p>
           <p className="text-xs text-cinza mt-1">
             m²
-            {ehAdmin &&
+            {mostrarVgv &&
               ` · média ${precoM2(resumo.areaLivre ? resumo.vgv / resumo.areaLivre : 0)}`}
           </p>
         </div>
@@ -314,7 +321,7 @@ export default function EspelhoTabela({
           <div className="flex items-center gap-2 flex-wrap">
             <input
               className="campo w-44"
-              placeholder={ehAdmin ? "Buscar lote ou comprador" : "Buscar lote"}
+              placeholder={mostrarComprador ? "Buscar lote ou comprador" : "Buscar lote"}
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
             />
@@ -343,7 +350,7 @@ export default function EspelhoTabela({
                 <th className="num">Preço de tabela</th>
                 <th className="num">R$/m²</th>
                 <th>Status</th>
-                {ehAdmin && <th>Comprador</th>}
+                {mostrarComprador && <th>Comprador</th>}
                 <th className="w-56">Observação</th>
               </tr>
             </thead>
@@ -382,7 +389,9 @@ export default function EspelhoTabela({
                       <SeloLote status={l.status} />
                     )}
                   </td>
-                  {ehAdmin && <td className="text-cinza">{l.comprador ?? "—"}</td>}
+                  {mostrarComprador && (
+                    <td className="text-cinza">{l.comprador ?? "—"}</td>
+                  )}
                   <td>
                     {ehAdmin ? (
                       /* grava ao sair do campo, não a cada tecla */
@@ -407,7 +416,7 @@ export default function EspelhoTabela({
               {visiveis.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6 + (temTipo ? 1 : 0) + (ehAdmin ? 1 : 0)}
+                    colSpan={6 + (temTipo ? 1 : 0) + (mostrarComprador ? 1 : 0)}
                     className="text-center text-cinza py-6"
                   >
                     Nenhum lote com esse filtro.

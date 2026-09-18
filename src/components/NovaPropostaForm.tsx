@@ -49,6 +49,7 @@ export default function NovaPropostaForm({
   condicoes,
   clientes,
   indexadores,
+  podeMontarOpcao,
 }: {
   empreendimentos: Empreendimento[];
   lotes: Lote[];
@@ -56,6 +57,8 @@ export default function NovaPropostaForm({
   condicoes: CondicaoPagamento[];
   clientes: Cliente[];
   indexadores: IndexadorRef[];
+  /** Desligado em Configurações, esconde "Montar opção" pro corretor. */
+  podeMontarOpcao: boolean;
 }) {
   const [empreendimentoId, setEmpreendimentoId] = useState(empreendimentos[0]?.id ?? "");
   const [selecionados, setSelecionados] = useState<string[]>([]);
@@ -232,6 +235,31 @@ export default function NovaPropostaForm({
             required={!clienteId}
           />
         </div>
+
+        {!clienteId && (
+          <>
+            <div>
+              <label className="rotulo">Empresa</label>
+              <input className="campo" name="cliente_empresa" />
+            </div>
+            <div>
+              <label className="rotulo">CPF / CNPJ</label>
+              <input className="campo" name="cliente_documento" />
+            </div>
+            <div>
+              <label className="rotulo">Telefone</label>
+              <input className="campo" name="cliente_telefone" />
+            </div>
+            <div>
+              <label className="rotulo">E-mail</label>
+              <input className="campo" name="cliente_email" />
+            </div>
+            <p className="sm:col-span-2 text-xs text-cinza -mt-1">
+              Cadastra o cliente já com esses dados, junto com a proposta — sem
+              precisar passar por /clientes depois.
+            </p>
+          </>
+        )}
       </section>
 
       {/* -------------------------------------------------------- terrenos */}
@@ -341,7 +369,7 @@ export default function NovaPropostaForm({
           <div>
             <div className="flex items-center justify-between gap-3 mb-2">
               <p className="eyebrow">Montada agora</p>
-              {!montando && (
+              {podeMontarOpcao && !montando && (
                 <button
                   type="button"
                   className="btn btn-secundario"
@@ -396,7 +424,7 @@ export default function NovaPropostaForm({
               />
             )}
 
-            {!montando && customs.length === 0 && (
+            {podeMontarOpcao && !montando && customs.length === 0 && (
               <p className="text-sm text-cinza">
                 Monte uma condição do zero — entrada, parcelas, índice e reforços
                 periódicos — sem sair desta tela. Depois de criada, dá para

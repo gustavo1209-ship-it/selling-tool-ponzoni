@@ -171,6 +171,8 @@ export interface Proposta {
   observacoes: string | null;
   /** Snapshot do cenário recomendado — é o que as listagens leem. */
   resultado: Resultado | null;
+  /** Teste/treino, não venda real. O contrato gerado dela copia isto. */
+  teste: boolean;
   criado_por: string | null;
   criado_em: string;
   atualizado_em: string;
@@ -232,6 +234,8 @@ export interface Contrato {
   observacoes: string | null;
   /** Colunas do cronograma que saem no demonstrativo e no XLSX. null = todas. */
   colunas_documento: string[] | null;
+  /** Teste/treino: fora dos totais de /contratos e da lista de /cobranca. */
+  teste: boolean;
   criado_por: string | null;
   criado_em: string;
   atualizado_em: string;
@@ -275,14 +279,64 @@ export interface ComissaoContrato {
   contrato_id: string;
   /** Fração: 0.08 = 8%. Mesmo padrão de `desconto_pct`. */
   percentual: number | null;
+  /** Total da comissão — a permuta abate a partir dele, não o substitui. */
   valor_absoluto: number | null;
+  /** Em quantas vezes. 1 = à vista. */
+  comissao_parcelas: number;
+  /** Dias após a data do contrato até o primeiro pagamento. 0 = no ato. */
+  comissao_primeiro_pagamento_dias: number;
+  /** Dias entre uma parcela e a próxima, quando comissao_parcelas > 1. */
+  comissao_intervalo_dias: number;
+  /** Observação livre, complementar à forma estruturada acima. */
   forma_pagamento: string | null;
   permuta: boolean;
   permuta_descricao: string | null;
+  /** Só informativo: quanto vale o bem permutado. */
   permuta_valor_mercado: number | null;
+  /** Quanto da comissão é quitado via a permuta — abate de valor_absoluto. */
+  permuta_valor_abatido: number | null;
   definido_por: string | null;
   criado_em: string;
   atualizado_em: string;
+}
+
+/**
+ * Uma linha do cronograma de pagamento da comissão. Gerada a partir de
+ * `contrato_comissoes.comissao_*`; dar baixa não mexe na receita.
+ */
+export interface ComissaoParcela {
+  id: string;
+  comissao_id: string;
+  numero: number;
+  vencimento: string;
+  valor: number;
+  pago_em: string | null;
+  valor_pago: number | null;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+export type NivelDuplicidadeCliente = "desligado" | "avisar" | "bloquear";
+
+/** Linha única (id = 1). Opções da casa, em Admin > Configurações. */
+export interface Configuracoes {
+  corretor_ve_valor_contrato: boolean;
+  corretor_ve_recebido: boolean;
+  corretor_ve_saldo_e_atraso: boolean;
+  nivel_duplicidade_cliente: NivelDuplicidadeCliente;
+  /** Fração (0.10 = 10%). null = sem limite. */
+  desconto_maximo_corretor_pct: number | null;
+  corretor_monta_opcao_livre: boolean;
+  clientes_compartilhados: boolean;
+  dia_vencimento_padrao: number;
+  juros_mora_padrao: number;
+  multa_atraso_padrao: number;
+  corretor_ve_vgv: boolean;
+  corretor_ve_comprador: boolean;
+  corretor_ve_preco_vendido: boolean;
+  alertar_parcela_atrasada: boolean;
+  alertar_proposta_vencendo: boolean;
+  dias_aviso_proposta_vencendo: number;
 }
 
 /** Contrato com tudo que a tela de acompanhamento precisa. */

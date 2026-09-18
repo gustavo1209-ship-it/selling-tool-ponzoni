@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import Cabecalho from "@/components/Cabecalho";
 import Simulador from "@/components/Simulador";
-import { mapaDePerfis } from "@/lib/supabase/perfil";
+import { mapaDePerfis, perfilAtual } from "@/lib/supabase/perfil";
 import { createClient } from "@/lib/supabase/server";
+import { obterConfiguracoes } from "@/lib/configuracoes";
 import { compararLote } from "@/lib/ordenacao";
 import type {
   CenarioComBlocos,
@@ -38,6 +39,9 @@ export default async function PropostaPage({
   if (!data) notFound();
 
   const autores = await mapaDePerfis();
+  const perfil = await perfilAtual();
+  const configuracoes = await obterConfiguracoes();
+  const podeMontarOpcao = (perfil?.ehAdmin ?? false) || configuracoes.corretor_monta_opcao_livre;
 
   const {
     empreendimentos: empreendimento,
@@ -96,6 +100,7 @@ export default async function PropostaPage({
           lotesDisponiveis={(disponiveis ?? []) as Lote[]}
           condicoes={(condicoes ?? []) as unknown as CondicaoPagamento[]}
           indexadores={(indexadores ?? []) as IndexadorRef[]}
+          podeMontarOpcao={podeMontarOpcao}
         />
       </main>
     </>
