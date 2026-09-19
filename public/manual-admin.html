@@ -115,9 +115,10 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     <strong>Manual do corretor</strong>.
   </p>
   <p>
-    A aba <strong>Admin</strong> reúne as três telas de configuração —
-    Empreendimentos, Corretores e Etapas do funil. Os índices continuam na aba
-    própria, porque são rotina de todo mês e não configuração.
+    A aba <strong>Admin</strong> reúne as telas de configuração —
+    Empreendimentos, Corretores, Etapas do funil, Campanhas, Desempenho da
+    equipe e Configurações. Os índices continuam na aba própria, porque são
+    rotina de todo mês e não configuração.
   </p>
 
   <h2><span class="n">1</span> A rotina do mês</h2>
@@ -197,23 +198,32 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
 
   <h2><span class="n">3</span> A receber e a emissão dos boletos</h2>
   <p>
-    A tela mostra, para a competência escolhida, <strong>o que vence no mês
-    mais o que ficou em atraso</strong> — quem emite boleto precisa das duas
-    coisas juntas. Cada linha traz o valor original, o fator de correção, os
-    encargos e o valor final.
+    Essa tela <strong>é diferente para você e para o corretor</strong>. Para
+    você, ela mostra o financeiro do comprador: para a janela de tempo
+    escolhida, <strong>o que vence no período mais o que ficou em atraso</strong>
+    &mdash; quem emite boleto precisa das duas coisas juntas. Cada linha traz
+    o valor original, o fator de correção, os encargos e o valor final. Para o
+    corretor, a mesma tela vira a comissão <strong>dele</strong>: veja a seção
+    <strong>Comissão do corretor</strong>, adiante, e a nota no fim dela.
   </p>
   <p>
-    Parcela que já foi paga <strong>não some da lista do mês</strong> &mdash;
-    ela continua aparecendo, marcada como &ldquo;Paga&rdquo;, com fundo verde e
-    o valor que realmente entrou, não mais o valor projetado. O cartão
-    <strong>Recebido no mês</strong> soma só essas; <strong>Total a
+    Antes só dava para ver um mês por vez; agora os campos <strong>De</strong>
+    e <strong>Até</strong> abrem uma janela de vários meses de uma vez, com
+    atalhos de <strong>1/3/6/12 meses</strong>. Os botões <em>anterior</em> e
+    <em>próximo</em> andam mantendo o tamanho da janela escolhida.
+  </p>
+  <p>
+    Parcela que já foi paga <strong>não some da lista do período</strong>
+    &mdash; ela continua aparecendo, marcada como &ldquo;Paga&rdquo;, com
+    fundo verde e o valor que realmente entrou, não mais o valor projetado. O
+    cartão <strong>Recebido no período</strong> soma só essas; <strong>Total a
     cobrar</strong> continua somando só o que falta, e é esse total que vai
     para o XLSX do banco.
   </p>
   <p>
-    <strong>Exportar XLSX</strong> gera a planilha para o banco: sacado,
-    CPF/CNPJ, vencimento e valor, mais as colunas de origem do número, e uma
-    aba com as premissas de correção de cada contrato.
+    <strong>Exportar XLSX</strong> gera a planilha para o banco, para o mesmo
+    período da tela: sacado, CPF/CNPJ, vencimento e valor, mais as colunas de
+    origem do número, e uma aba com as premissas de correção de cada contrato.
   </p>
   <div class="caixa aviso">
     <span class="rot">Nunca emita boleto de linha estimada</span>
@@ -349,26 +359,35 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
 
   <h3>Cronograma de pagamento da comissão</h3>
   <p>
-    Depois de definir a comissão, o botão <strong>Gerar cronograma de
-    pagamento</strong> cria as parcelas sozinho, a partir dos três campos da
-    forma de pagamento. Cada parcela tem <strong>Dar baixa</strong> (data e
-    valor) e <strong>Desfazer</strong> &mdash; uma vez paga, ela continua na
-    lista com o selo <em>Paga</em>, em vez de sumir.
+    Ao <strong>salvar</strong> a comissão, o cronograma de pagamento é gerado
+    sozinho, na hora, a partir dos três campos da forma de pagamento &mdash;
+    não precisa mais clicar num botão à parte. Cada parcela tem <strong>Dar
+    baixa</strong> (data e valor) e <strong>Desfazer</strong> &mdash; uma vez
+    paga, ela continua na lista com o selo <em>Paga</em>, em vez de sumir. O
+    botão <strong>Gerar cronograma de pagamento</strong> continua existindo
+    para comissões antigas que ficaram sem cronograma, e vira <strong>Recriar
+    cronograma</strong> assim que já existe um.
   </p>
   <div class="caixa aviso">
     <span class="rot">Recriar cronograma apaga baixa já dada</span>
     <p>
-      Se o percentual ou a forma de pagamento mudarem depois de já ter baixa
-      registrada, <strong>Recriar cronograma</strong> avisa antes de apagar
-      esse histórico. Use só quando o combinado com o corretor realmente
-      mudou.
+      Se já existe alguma parcela baixada, salvar a comissão de novo
+      <strong>não</strong> regenera sozinho &mdash; o histórico de pagamento
+      fica intacto. Nesse caso, mudar o percentual ou a forma de pagamento só
+      tem efeito depois de clicar em <strong>Recriar cronograma</strong>, que
+      avisa antes de apagar esse histórico. Use só quando o combinado com o
+      corretor realmente mudou.
     </p>
   </div>
   <p>
-    Em <strong>Contratos</strong>, &ldquo;Comissão a receber&rdquo; soma as
-    parcelas ainda não pagas de todos os corretores; &ldquo;Comissão
-    recebida&rdquo; soma as já pagas. Cada corretor vê os mesmos dois números,
-    só que da própria carteira.
+    Em <strong>Contratos</strong>, a coluna e os cartões de comissão são só
+    seus: &ldquo;Comissão a receber&rdquo; soma as parcelas ainda não pagas de
+    todos os corretores, &ldquo;Comissão recebida&rdquo; soma as já pagas. O
+    corretor não vê comissão em Contratos &mdash; ele vê a própria comissão,
+    parcela a parcela, em <strong>A receber</strong> (seção 3). Se você
+    definiu a comissão mas ainda não gerou o cronograma, o corretor vê um
+    aviso lá com o valor total e o link do contrato, até alguém gerar as
+    datas.
   </p>
 
   <h3>Marcar como teste</h3>
@@ -531,7 +550,45 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     índices.
   </p>
 
-  <h2><span class="n">8</span> Configurações</h2>
+  <h2><span class="n">8</span> Campanhas</h2>
+  <p>
+    <strong>Admin &rarr; Campanhas</strong> cria um desconto promocional por
+    tempo determinado, sempre amarrado a <strong>um</strong> empreendimento.
+    Preencha nome, empreendimento, o percentual de desconto, as datas de
+    início e fim, e o modo:
+  </p>
+  <ul>
+    <li>
+      <strong>Substitui o desconto da condição</strong> &mdash; o percentual
+      da campanha vira o desconto do cenário, por cima do parcelamento da
+      condição escolhida; ignora o desconto que a condição já tinha.
+    </li>
+    <li>
+      <strong>Soma com o desconto da condição</strong> &mdash; o percentual da
+      campanha se soma ao desconto que a condição escolhida já tem.
+    </li>
+  </ul>
+  <p>
+    A campanha só fica disponível para o corretor usar enquanto estiver
+    <strong>ativa</strong> e a data de hoje estiver entre início e fim
+    (incluindo as duas pontas). Editar e apagar funcionam como nas outras
+    telas de administração; apagar uma campanha não desfaz nem esconde
+    proposta ou contrato que já a usou &mdash; só perde o rótulo de qual
+    campanha foi.
+  </p>
+  <p>
+    O corretor não vê campanha em <strong>Nova proposta</strong> nem em
+    <strong>Novo contrato</strong> &mdash; ela aparece só dentro do
+    <strong>Simulador</strong> de uma proposta já criada, como uma opção a
+    mais no menu de condições, combinando a condição de pagamento escolhida
+    com o desconto da campanha vigente. O cenário que usa uma campanha ganha
+    um selo <em>Campanha: nome</em>, que segue até o contrato se a proposta
+    fechar. O <strong>limite de desconto do corretor</strong> (seção 9,
+    Comercial) não trava esse desconto &mdash; quem libera o percentual é
+    você, ao criar a campanha.
+  </p>
+
+  <h2><span class="n">9</span> Configurações</h2>
   <p>
     <strong>Admin &rarr; Configurações</strong> reúne o que a ferramenta faz
     por padrão para a casa inteira &mdash; muda o comportamento sem precisar
@@ -543,9 +600,12 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
   <p>
     Três interruptores separados, todos desligados por padrão: <strong>vê o
     valor do contrato</strong>, <strong>vê o recebido</strong> e <strong>vê
-    saldo corrigido e em atraso</strong>. Desligados, o corretor enxerga só a
-    própria comissão em Contratos, não o financeiro do cliente. Ligue cada um
-    à parte, conforme quanto do financeiro da casa a equipe deve ver.
+    saldo corrigido e em atraso</strong>. Desligados, o corretor não enxerga o
+    financeiro do comprador nem em Contratos nem no detalhe do contrato
+    &mdash; só os dados do próprio negócio (lotes, status). A comissão dele
+    não depende desses interruptores: ele sempre vê a própria comissão, em
+    <strong>A receber</strong>. Ligue cada interruptor à parte, conforme
+    quanto do financeiro da casa a equipe deve ver.
   </p>
 
   <h3>Comercial</h3>
@@ -558,7 +618,9 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
           percentual máximo que um corretor (não admin) consegue aplicar numa
           proposta. Vazio = sem limite. Acima do limite, a proposta
           simplesmente <strong>não salva</strong> &mdash; o corretor precisa
-          reduzir o desconto ou pedir para um administrador salvar
+          reduzir o desconto ou pedir para um administrador salvar. Não vale
+          para desconto de <strong>campanha</strong> (seção 8): quem libera o
+          percentual ali já é você, ao criar a campanha
         </td>
       </tr>
       <tr>
@@ -615,7 +677,7 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     antecedência uma proposta entra no aviso de vencimento.
   </p>
 
-  <h2><span class="n">9</span> Usuários e acessos</h2>
+  <h2><span class="n">10</span> Usuários e acessos</h2>
   <table class="t">
     <thead><tr><th>Papel</th><th>Enxerga</th></tr></thead>
     <tbody>
@@ -686,7 +748,7 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     </p>
   </div>
 
-  <h2><span class="n">10</span> Etapas do funil</h2>
+  <h2><span class="n">11</span> Etapas do funil</h2>
   <p>
     As colunas do quadro de negociações são configuráveis em
     <strong>Admin &rarr; Etapas do funil</strong>: nome, cor, ordem e o que cada
@@ -723,7 +785,7 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     </p>
   </div>
 
-  <h2><span class="n">11</span> Quando algo dá errado</h2>
+  <h2><span class="n">12</span> Quando algo dá errado</h2>
   <table class="t">
     <thead><tr><th>Sintoma</th><th>Causa provável</th></tr></thead>
     <tbody>
@@ -779,6 +841,14 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
         <td>
           passou do limite de desconto do corretor, em Configurações; ajuste
           o desconto ou peça para um administrador salvar
+        </td>
+      </tr>
+      <tr>
+        <td>Corretor não vê a campanha no Simulador</td>
+        <td>
+          confira em Admin &rarr; Campanhas se ela está <em>ativa</em>, se a
+          data de hoje está entre início e fim, e se é do mesmo empreendimento
+          da proposta
         </td>
       </tr>
       <tr>

@@ -468,6 +468,42 @@ criar uma "condição da tabela" com o desconto que quisesse.
 Na tela de criação as duas listas aparecem separadas, "Da tabela" e
 "Favoritas do time".
 
+## Campanhas de desconto (`/admin/campanhas`)
+
+`campanhas` (migration 41) é um desconto promocional por tempo determinado,
+sempre de **um** empreendimento: `percentual_desconto`, `inicio`/`fim` e
+`ativa`. RLS no mesmo molde de `indexadores` — leitura para qualquer
+autenticado, escrita só admin. Admin cadastra em `/admin/campanhas`
+(`src/components/AdminCampanhas.tsx`, ações em `src/app/admin/acoes.ts`).
+
+Uma campanha sozinha não tem estrutura de parcelamento — só o percentual.
+Por isso ela não é uma condição independente: o Simulador (`/propostas/[id]`)
+a oferece como opção extra **combinada com uma condição já existente da
+tabela**, enquanto estiver vigente (hoje entre `inicio` e `fim`, `ativa =
+true`, checado por `campanhasVigentes()` em `src/lib/campanhas.ts`). O
+seletor "+ opção a partir da tabela…" ganha um `<optgroup>` "Campanhas
+ativas" com uma opção por combinação condição×campanha; escolher gera um
+cenário com `campanha_id` preenchido e o selo "Campanha: <nome>" ao lado do
+nome da opção.
+
+`modo` decide como o desconto da campanha se combina com o da condição
+escolhida — é campo da campanha, não regra fixa do sistema:
+
+- **`substituir`** — o percentual da campanha vira o desconto do cenário,
+  ignorando o da condição (mas fica com o parcelamento dela).
+- **`somar`** — soma ao `desconto_pct` da condição.
+
+O **limite de desconto do corretor** (`desconto_maximo_corretor_pct`, ver
+"Configurações") não vale para cenário com `campanha_id`: quem libera o
+percentual ali é o admin ao cadastrar a campanha, não o corretor escolhendo
+livre.
+
+`campanha_id` (nullable, `on delete set null`) viaja de `proposta_cenarios`
+até `contratos` quando o cenário vira venda (`gerarContratoDaProposta`), só
+para rastreabilidade — aparece como o mesmo selo no cabeçalho de
+`/contratos/[id]`. Campanha é feature só do Simulador: `/propostas/nova` e
+`/contratos/novo` não a oferecem.
+
 ## Mapa na proposta
 
 A folha traz uma seção "Localização no parque" com a foto aérea, os lotes da
@@ -793,6 +829,7 @@ Três telas, todas atrás de `perfilAtual()?.ehAdmin` **e** da RLS:
 | `/admin/empreendimentos` | cadastrar loteamento, apontar o espelho do Sheets, montar tabela de preço e condições, sincronizar lotes |
 | `/admin/corretores` | promover a admin e restringir empreendimentos |
 | `/admin/funil` | as colunas do kanban |
+| `/admin/campanhas` | desconto promocional por tempo determinado, por empreendimento (ver "Campanhas de desconto") |
 
 O `redirect("/")` nas páginas e o `exigirAdmin()` das ações são cortesia: as
 policies já recusariam. O que `exigirAdmin()` acrescenta é a frase em
@@ -828,7 +865,10 @@ oficial ou montado: isentar condição oficial exigiria guardar o desconto
 "original" da condição pra comparar contra o que foi editado depois, e o
 schema não guarda isso. Se a escada oficial já tiver um degrau maior que o
 limite configurado, é o número que precisa subir, não o cenário que devia
-ser isentado.
+ser isentado. A exceção deliberada é o cenário com `campanha_id` (ver
+"Campanhas de desconto") — ali quem liberou o percentual foi o admin ao
+cadastrar a campanha, não o corretor escolhendo livre, então o limite não
+se aplica.
 
 **`corretor_monta_opcao_livre`** — desligado, esconde o botão "Montar
 opção" (`NovaPropostaForm`, `Simulador`) do corretor. É só cortesia de
@@ -942,7 +982,7 @@ Dois papéis, e a regra é uma só: **vê quem criou; admin vê tudo.**
 
 | Papel | Enxerga |
 |---|---|
-| `corretor` (padrão de todo cadastro novo) | as propostas, os clientes e os contratos que ele mesmo criou. No espelho, tudo menos o nome do comprador e o VGV; em `/contratos`, só a própria comissão, não o financeiro da casa |
+| `corretor` (padrão de todo cadastro novo) | as propostas, os clientes e os contratos que ele mesmo criou. No espelho, tudo menos o nome do comprador e o VGV; a própria comissão em `/cobranca`, não o financeiro da casa em `/contratos` (ver "`/cobranca` é telas diferentes por papel") |
 | `admin` | tudo, e é o único que edita tabela de preço, espelho e índices |
 
 O financeiro do corretor, o comprador, o VGV e o preço de lote vendido têm
@@ -1254,7 +1294,7 @@ data, valor ou forma sem ter de desfazer e refazer.
 | `/contratos/novo` | venda antiga, montada como o papel: entrada + mensais + reforços |
 | `/contratos/[id]` | cronograma, correção parcela a parcela e baixa de pagamento |
 | `/contratos/[id]/demonstrativo` | folha A4 para o cliente, com o fator de cada parcela |
-| `/cobranca` | **o que cobrar no mês** — a lista dos boletos |
+| `/cobranca` | admin: **o que cobrar** — a lista dos boletos. Corretor: a própria comissão a receber (ver "`/cobranca` é telas diferentes por papel") |
 | `/indices` | a série mensal, grade ano × mês |
 
 A lista de lotes em `/contratos/novo` traz **todos os status**, inclusive
@@ -1270,22 +1310,50 @@ Simulador e ao "Montar opção", em vez de um campo aberto em R$; e o card
 de cada lote mostra o preço e o selo de status colorido, no mesmo padrão
 de `/propostas/nova`.
 
-`/cobranca` mostra os vencimentos do mês **mais o que ficou em atraso antes**
-— quem emite boleto precisa das duas coisas na mesma tela. O filtro que tira
+`/cobranca` mostra os vencimentos da janela escolhida **mais o que ficou em
+atraso antes** — quem emite boleto precisa das duas coisas na mesma tela. A
+janela é "De"/"Até" (não só um mês): sem "Até" preenchido diferente de "De" é
+um mês só, igual sempre foi; com ele, soma vários meses de uma vez (atalhos
+de 1/3/6/12 meses, e "anterior"/"próximo" preservam o tamanho da janela —
+`mesesEntre`/`somarMeses` de `src/lib/contratos/mes.ts`). O filtro que tira
 as atrasadas é `so_mes=1`, e não um `atrasadas=0`, porque checkbox de GET não
 manda nada quando é desmarcado: a informação tem de viajar na exceção.
 
-Uma parcela paga **continua na lista do mês** em vez de sumir assim que
+Uma parcela paga **continua na lista do período** em vez de sumir assim que
 alguém dá baixa — antes, dar baixa também tirava a parcela da tela, e não
-dava pra ver junto o que já entrou e o que ainda falta no mesmo mês. Agora
-ela aparece com selo "Paga", fundo verde e o valor realmente pago (não o
-projetado), e o cartão "Recebido no mês" soma essas à parte de "Total a
-cobrar" — que continua só com o que falta receber, igual à exportação
+dava pra ver junto o que já entrou e o que ainda falta no mesmo período.
+Agora ela aparece com selo "Paga", fundo verde e o valor realmente pago (não
+o projetado), e o cartão "Recebido no período" soma essas à parte de "Total
+a cobrar" — que continua só com o que falta receber, igual à exportação
 XLSX (nada de boleto pra quem já pagou).
 
-O XLSX de `/cobranca` é a planilha que vai para o banco: uma linha por
-boleto, com sacado, documento, vencimento e valor, mais as colunas de origem
-do número. A coluna **"índice estimado"** é a que impede o erro caro.
+O XLSX de `/cobranca` (só admin) é a planilha que vai para o banco: uma
+linha por boleto, com sacado, documento, vencimento e valor, mais as
+colunas de origem do número, para o mesmo período da tela. A coluna
+**"índice estimado"** é a que impede o erro caro.
+
+### `/cobranca` é telas diferentes por papel
+
+Pro admin, `/cobranca` sempre foi a tabela de boletos do comprador —
+financeiro da casa, sem mudança. Pro corretor, virou a tela da **comissão
+dele**: parcela por parcela de `contrato_comissao_parcelas`, na mesma
+janela De/Até e mesmo filtro de empreendimento, com cartões "Recebido no
+período" / "Comissão a receber" / "Do período" / "Em atraso de antes". Ele
+não vê o financeiro do comprador ali — é o mesmo espírito de "Financeiro do
+corretor, granular" (ver "Configurações"), só que pra comissão em vez do
+contrato.
+
+Contratos com comissão **definida mas sem cronograma gerado ainda** entram
+num aviso à parte (nome, valor, link pro contrato) em vez de sumir da tela
+— antes disso existir, o corretor simplesmente não via nada sobre uma
+comissão que já tinha valor certo.
+
+`src/app/cobranca/page.tsx` implementa as duas com funções separadas —
+`TabelaDeBoletos` (admin) e `TabelaDeComissao` (corretor) — escolhidas por
+`perfilAtual()?.ehAdmin` dentro da mesma rota. A coluna e os cartões de
+"Comissão" saíram de `/contratos` pro corretor nessa mudança (viraram
+admin-only em `ContratosTabela.tsx`) — antes ficavam duplicados nas duas
+telas.
 
 ### Quais colunas saem no documento
 
@@ -1357,18 +1425,23 @@ um só.
 
 `contrato_comissao_parcelas` (migration 40) é a mesma ideia de
 `contrato_parcelas`, sem correção nem encargos — a comissão não é
-indexada. Admin clica "Gerar cronograma de pagamento" e a ferramenta cria
-as linhas a partir dos três campos estruturados acima, aplicados sobre
-`contrato.data_contrato`; cada parcela tem baixa própria
+indexada. As linhas nascem a partir dos três campos estruturados acima,
+aplicados sobre `contrato.data_contrato`; cada parcela tem baixa própria
 (`darBaixaComissaoParcela`/`desfazerBaixaComissaoParcela`, em
 `src/app/contratos/acoes.ts`), e uma parcela paga **continua aparecendo**
 na lista, com selo "Paga", em vez de sumir.
 
-**"Recriar cronograma" é ação explícita, não automática.** Editar o
-percentual ou a forma de pagamento depois de já ter dado baixa numa
-parcela não regenera as linhas sozinho — isso apagaria histórico de
-pagamento sem avisar. A tela confirma antes, com uma frase diferente
-quando já existe baixa dada.
+**`definirComissao` gera o cronograma sozinha logo depois de salvar** —
+não precisa mais do clique separado em "Gerar cronograma de pagamento"
+(um passo fácil de esquecer, que deixava a comissão "sem data nenhuma" até
+alguém lembrar). A geração só é pulada quando já existe alguma parcela
+baixada: editar o percentual ou a forma de pagamento depois de já ter
+recebido de verdade não pode apagar esse histórico sem avisar. Nesse caso
+continua exigindo o clique explícito em **"Recriar cronograma"**, que
+confirma antes, com uma frase diferente quando já existe baixa dada. A
+lógica de gerar as linhas é uma função interna só
+(`gerarLinhasDeComissao`), chamada tanto por `definirComissao` quanto pela
+action `gerarParcelasComissao` do botão manual.
 
 Em `/contratos`, "Comissão a receber" soma as parcelas ainda não pagas (ou
 o valor em dinheiro inteiro, pra comissão que ainda não tem cronograma

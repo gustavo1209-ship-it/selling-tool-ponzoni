@@ -337,6 +337,32 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     </p>
   </div>
 
+  <h3>Campanhas de desconto</h3>
+  <p>
+    Quando a administração cria uma campanha promocional vigente para o
+    empreendimento da proposta, ela aparece como opção extra no menu
+    <strong>+ opção a partir da tabela&hellip;</strong>, dentro de um grupo
+    <strong>Campanhas ativas</strong>: a condição de pagamento normal já
+    combinada com o desconto da campanha. Escolher essa opção cria uma aba
+    nova com o desconto aplicado, marcada com o selo <strong>Campanha:
+    &lt;nome&gt;</strong> &mdash; para ficar claro, para você e para quem
+    revisar depois, que aquele desconto veio de uma campanha e não de uma
+    negociação manual.
+  </p>
+  <p>
+    Dependendo de como a administração configurou a campanha, o desconto
+    dela <strong>substitui</strong> o da condição escolhida ou
+    <strong>soma</strong> a ele. E esse desconto não entra no seu limite de
+    desconto, quando a casa tiver um configurado: quem libera o percentual
+    ali é a administração, ao criar a campanha &mdash; não é uma negociação
+    sua.
+  </p>
+  <p>
+    A campanha só aparece nesse menu enquanto estiver dentro do período que
+    a administração definiu. Fora da vigência, ela some da lista sozinha,
+    sem precisar desmarcar nada.
+  </p>
+
   <h3>Salvar antes de gerar</h3>
   <p>
     O PDF e a planilha leem o que está <strong>salvo</strong>, não o que está na
@@ -398,7 +424,7 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     apague ou reatribua as propostas e os contratos antes.
   </p>
 
-  <h2><span class="n">9</span> Contratos e o que há a receber</h2>
+  <h2><span class="n">9</span> Contratos</h2>
   <p>
     Quando a venda fecha, ela vira um <strong>contrato</strong>, que acompanha
     os pagamentos. Você vê os contratos que cadastrou.
@@ -407,10 +433,11 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     <span class="rot">O que aparece em Contratos pode variar</span>
     <p>
       Por padrão, você <strong>não</strong> vê o valor do contrato, o quanto
-      já foi recebido, nem o saldo e o atraso — só a sua própria comissão. A
-      administração pode habilitar qualquer um desses números em
-      Configurações, então isso pode ser diferente do que este manual
-      descreve, dependendo de como a casa configurou.
+      já foi recebido, nem o saldo e o atraso — a administração pode
+      habilitar qualquer um desses números em Configurações, então isso pode
+      ser diferente do que este manual descreve, dependendo de como a casa
+      configurou. A sua comissão não aparece aqui: ela tem página própria,
+      <strong>A receber</strong> (seção seguinte).
     </p>
   </div>
   <p>
@@ -447,12 +474,12 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     &ldquo;Pendente de definição&rdquo;.
   </p>
   <p>
-    Depois de definida, a administração gera o <strong>cronograma de
-    pagamento</strong> da comissão, e você passa a ver as parcelas dela, com
-    vencimento e se já foi paga (a baixa também é só da administração). Em
-    <strong>Contratos</strong>, os cartões <strong>Comissão a receber</strong>
-    e <strong>Comissão recebida</strong> separam o que já entrou do que ainda
-    falta, sempre só da sua própria carteira.
+    Assim que a administração salva a definição, o <strong>cronograma de
+    pagamento</strong> da comissão é gerado sozinho — não é um passo à
+    parte — e você já passa a ver as parcelas dela, com vencimento e se já
+    foi paga (a baixa também é só da administração). Elas aparecem
+    reunidas, de todos os seus contratos, na página <strong>A receber</strong>
+    (seção seguinte).
   </p>
 
   <p>
@@ -469,7 +496,33 @@ footer{ border-top:.4mm solid var(--linha-forte); padding-top:3mm; margin-top:9m
     igual à via que o cliente já tem na mão.
   </p>
 
-  <h2><span class="n">10</span> Quando algo dá errado</h2>
+  <h2><span class="n">10</span> A receber</h2>
+  <p>
+    É a página da <strong>sua comissão</strong>: todas as parcelas, de todos
+    os seus contratos, reunidas num lugar só &mdash; quanto já caiu, quanto
+    ainda vem e o que está em atraso.
+  </p>
+  <p>
+    Os campos <strong>De</strong> e <strong>Até</strong> escolhem a janela de
+    tempo (com atalhos de 1, 3, 6 e 12 meses, e os botões
+    &ldquo;anterior&rdquo;/&ldquo;próximo&rdquo; andam mantendo o mesmo
+    tamanho de janela), e o seletor de <strong>empreendimento</strong> filtra
+    por obra. Os cartões do topo separam o <strong>recebido no
+    período</strong>, o <strong>total a receber</strong>, o que vence
+    <strong>dentro do período</strong> e o que já está <strong>em atraso de
+    antes</strong>.
+  </p>
+  <div class="caixa">
+    <span class="rot">Comissão combinada, cronograma ainda sem data</span>
+    <p>
+      Se algum contrato já tem a comissão definida com a administração mas o
+      cronograma de pagamento ainda não foi gerado, ele aparece num aviso à
+      parte nesta mesma página, com o valor total e um link direto para o
+      contrato &mdash; em vez de simplesmente não aparecer em lugar nenhum.
+    </p>
+  </div>
+
+  <h2><span class="n">11</span> Quando algo dá errado</h2>
   <table class="t">
     <thead><tr><th>O que aparece</th><th>O que fazer</th></tr></thead>
     <tbody>
