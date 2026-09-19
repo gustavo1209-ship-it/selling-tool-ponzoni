@@ -441,10 +441,71 @@ export interface DadosComissao {
 }
 
 /**
+ * O corpo de `gerarParcelasComissao`, sem o `comoResultado`/revalidate — para
+ * poder ser chamado tanto pela ação explícita quanto de dentro de
+ * `definirComissao` (que dispara sozinha quando é seguro, ver comentário lá).
+ * Apaga as linhas antigas e recria do zero.
+ */
+async function gerarLinhasDeComissao(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  comissaoId: string
+): Promise<string> {
+  const { data: comissao, error } = await supabase
+    .from("contrato_comissoes")
+    .select(
+      "id, contrato_id, valor_absoluto, permuta, permuta_valor_abatido, comissao_parcelas, comissao_primeiro_pagamento_dias, comissao_intervalo_dias, contratos(data_contrato)"
+    )
+    .eq("id", comissaoId)
+    .single();
+  if (error) throw new Error(error.message);
+
+  const contrato = comissao.contratos as unknown as { data_contrato: string } | null;
+  const dataBase = contrato?.data_contrato ?? hojeISO();
+  const total = valorComissaoEmDinheiro({
+    valor_absoluto: comissao.valor_absoluto,
+    permuta: comissao.permuta,
+    permuta_valor_abatido: comissao.permuta_valor_abatido,
+  });
+  const parcelas = Math.max(comissao.comissao_parcelas ?? 1, 1);
+  const valorParcela = Math.round((total / parcelas) * 100) / 100;
+  // a última parcela absorve o resíduo de centavos, mesmo idioma do
+  // cronograma do contrato — ver cronogramaManual em src/lib/contratos
+  const residuo = Math.round((total - valorParcela * parcelas) * 100) / 100;
+
+  await supabase.from("contrato_comissao_parcelas").delete().eq("comissao_id", comissaoId);
+
+  const linhas = Array.from({ length: parcelas }, (_, i) => ({
+    comissao_id: comissaoId,
+    numero: i + 1,
+    vencimento: somarDias(
+      dataBase,
+      (comissao.comissao_primeiro_pagamento_dias ?? 0) +
+        i * (comissao.comissao_intervalo_dias ?? 30)
+    ),
+    valor: i === parcelas - 1 ? valorParcela + residuo : valorParcela,
+  }));
+
+  const { error: erroInsert } = await supabase
+    .from("contrato_comissao_parcelas")
+    .insert(linhas);
+  if (erroInsert) throw new Error(erroInsert.message);
+
+  return comissao.contrato_id as string;
+}
+
+/**
  * Só admin chega até aqui de verdade — a RLS de `contrato_comissoes`
  * (migration 33) recusa a escrita de quem não é admin. A interface só evita
  * oferecer o botão a quem não é; não checamos `ehAdmin` aqui, mesmo idioma
  * de `/indices`.
+ *
+ * Depois de gravar, já gera o cronograma sozinha — sem o admin precisar
+ * clicar em "Gerar cronograma" à parte, que era um passo fácil de esquecer
+ * (o corretor então via a comissão como "sem data nenhuma" até alguém
+ * lembrar de clicar). Só pula esse passo quando já existe alguma parcela
+ * baixada: mexer no percentual depois de já ter recebido de verdade não pode
+ * apagar esse histórico de pagamento sem avisar — aí continua exigindo o
+ * clique explícito em "Recriar cronograma", que confirma antes.
  */
 export async function definirComissao(
   contratoId: string,
@@ -457,11 +518,24 @@ export async function definirComissao(
     } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado.");
 
-    const { error } = await supabase.from("contrato_comissoes").upsert(
-      { contrato_id: contratoId, ...dados, definido_por: user.id },
-      { onConflict: "contrato_id" }
-    );
+    const { data: comissao, error } = await supabase
+      .from("contrato_comissoes")
+      .upsert(
+        { contrato_id: contratoId, ...dados, definido_por: user.id },
+        { onConflict: "contrato_id" }
+      )
+      .select("id")
+      .single();
     if (error) throw new Error(error.message);
+
+    const { data: parcelasExistentes } = await supabase
+      .from("contrato_comissao_parcelas")
+      .select("pago_em")
+      .eq("comissao_id", comissao.id);
+    const temBaixa = (parcelasExistentes ?? []).some((p) => p.pago_em);
+    if (!temBaixa) {
+      await gerarLinhasDeComissao(supabase, comissao.id);
+    }
 
     revalidatePath("/contratos");
     revalidatePath(`/contratos/${contratoId}`);
@@ -472,58 +546,16 @@ export async function definirComissao(
 /**
  * (Re)gera o cronograma de pagamento da comissão a partir de
  * `comissao_parcelas`/`comissao_primeiro_pagamento_dias`/`comissao_intervalo_dias`.
- *
- * Apaga as linhas antigas e recria do zero — inclusive as já baixadas. É
- * ação explícita do admin (a tela confirma antes de chamar quando já existe
- * baixa), não algo que `definirComissao` dispara sozinho: mudar o
- * percentual depois de já ter dado baixa numa parcela não deveria apagar
- * esse histórico sem avisar.
+ * Usada pelo botão "Gerar"/"Recriar cronograma" — para comissões definidas
+ * antes desta mudança (sem cronograma ainda) ou para recriar de propósito
+ * mesmo já havendo baixa (a tela confirma antes nesse caso).
  */
 export async function gerarParcelasComissao(comissaoId: string): Promise<ResultadoAcao> {
   return comoResultado(async () => {
     const supabase = await createClient();
+    const contratoId = await gerarLinhasDeComissao(supabase, comissaoId);
 
-    const { data: comissao, error } = await supabase
-      .from("contrato_comissoes")
-      .select(
-        "id, contrato_id, valor_absoluto, permuta, permuta_valor_abatido, comissao_parcelas, comissao_primeiro_pagamento_dias, comissao_intervalo_dias, contratos(data_contrato)"
-      )
-      .eq("id", comissaoId)
-      .single();
-    if (error) throw new Error(error.message);
-
-    const contrato = comissao.contratos as unknown as { data_contrato: string } | null;
-    const dataBase = contrato?.data_contrato ?? hojeISO();
-    const total = valorComissaoEmDinheiro({
-      valor_absoluto: comissao.valor_absoluto,
-      permuta: comissao.permuta,
-      permuta_valor_abatido: comissao.permuta_valor_abatido,
-    });
-    const parcelas = Math.max(comissao.comissao_parcelas ?? 1, 1);
-    const valorParcela = Math.round((total / parcelas) * 100) / 100;
-    // a última parcela absorve o resíduo de centavos, mesmo idioma do
-    // cronograma do contrato — ver cronogramaManual em src/lib/contratos
-    const residuo = Math.round((total - valorParcela * parcelas) * 100) / 100;
-
-    await supabase.from("contrato_comissao_parcelas").delete().eq("comissao_id", comissaoId);
-
-    const linhas = Array.from({ length: parcelas }, (_, i) => ({
-      comissao_id: comissaoId,
-      numero: i + 1,
-      vencimento: somarDias(
-        dataBase,
-        (comissao.comissao_primeiro_pagamento_dias ?? 0) +
-          i * (comissao.comissao_intervalo_dias ?? 30)
-      ),
-      valor: i === parcelas - 1 ? valorParcela + residuo : valorParcela,
-    }));
-
-    const { error: erroInsert } = await supabase
-      .from("contrato_comissao_parcelas")
-      .insert(linhas);
-    if (erroInsert) throw new Error(erroInsert.message);
-
-    revalidatePath(`/contratos/${comissao.contrato_id}`);
+    revalidatePath(`/contratos/${contratoId}`);
     revalidatePath("/contratos");
     return {};
   });

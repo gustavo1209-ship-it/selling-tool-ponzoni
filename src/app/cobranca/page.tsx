@@ -15,6 +15,7 @@ import {
 import { carregarIndices, serieDe } from "@/lib/contratos/servidor";
 import type { ParcelaCalculada } from "@/lib/contratos/tipos";
 import type { ContratoParcela } from "@/lib/db/tipos";
+import { valorComissaoEmDinheiro } from "@/lib/comissao";
 import { dataBR, fator, moeda, moedaCurta } from "@/lib/formato";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +56,21 @@ interface ParcelaComissaoLinha {
       empreendimento_id: string;
       cliente: { nome: string } | null;
     } | null;
+  } | null;
+}
+
+interface ComissaoSemCronogramaLinha {
+  valor_absoluto: number | null;
+  permuta: boolean;
+  permuta_valor_abatido: number | null;
+  parcelas: { id: string }[];
+  contrato: {
+    id: string;
+    codigo: string;
+    titulo: string | null;
+    teste: boolean;
+    empreendimento_id: string;
+    cliente: { nome: string } | null;
   } | null;
 }
 
@@ -533,14 +549,33 @@ async function TabelaDeComissao({
   incluirAtrasadas: boolean;
 }) {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("contrato_comissao_parcelas")
-    .select(
-      "id, numero, vencimento, valor, pago_em, valor_pago, comissao:contrato_comissoes(contrato:contratos(id, codigo, titulo, teste, empreendimento_id, cliente:clientes(nome)))"
-    );
+  const [{ data }, { data: comissoesData }] = await Promise.all([
+    supabase
+      .from("contrato_comissao_parcelas")
+      .select(
+        "id, numero, vencimento, valor, pago_em, valor_pago, comissao:contrato_comissoes(contrato:contratos(id, codigo, titulo, teste, empreendimento_id, cliente:clientes(nome)))"
+      ),
+    supabase
+      .from("contrato_comissoes")
+      .select(
+        "valor_absoluto, permuta, permuta_valor_abatido, parcelas:contrato_comissao_parcelas(id), contrato:contratos(id, codigo, titulo, teste, empreendimento_id, cliente:clientes(nome))"
+      ),
+  ]);
 
   const parcelas = (data ?? []) as unknown as ParcelaComissaoLinha[];
   const hoje = hojeISO();
+
+  // Comissão definida pelo admin, mas cujo cronograma de pagamento ainda não
+  // foi gerado — sem isso, o corretor não teria como saber que aquele
+  // dinheiro existe (não aparece em `parcelas` porque não há nenhuma linha).
+  const semCronograma = ((comissoesData ?? []) as unknown as ComissaoSemCronogramaLinha[]).filter(
+    (c) =>
+      c.valor_absoluto != null &&
+      c.parcelas.length === 0 &&
+      c.contrato &&
+      !c.contrato.teste &&
+      (!emp || c.contrato.empreendimento_id === emp)
+  );
 
   const linhas: { parcela: ParcelaComissaoLinha; atrasada: boolean }[] = [];
   const recebidasDoPeriodo: { parcela: ParcelaComissaoLinha }[] = [];
@@ -610,6 +645,34 @@ async function TabelaDeComissao({
           <p className="text-xs text-cinza mt-1">{atrasadas.length} parcela(s)</p>
         </div>
       </section>
+
+      {semCronograma.length > 0 && (
+        <section className="cartao p-4 flex flex-col gap-2">
+          <p className="text-sm text-ambar bg-ambar-fraco rounded-md px-3 py-2 flex items-start gap-2">
+            <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+            <span>
+              {semCronograma.length} contrato(s) já tem comissão definida, mas
+              o cronograma de pagamento ainda não foi gerado — peça para a
+              administração gerar em cada contrato para ver as datas.
+            </span>
+          </p>
+          <ul className="text-sm flex flex-col gap-1">
+            {semCronograma.map((c, i) => (
+              <li key={c.contrato!.id ?? i} className="flex justify-between gap-2">
+                <span>
+                  <Link href={`/contratos/${c.contrato!.id}`} className="text-vinho font-semibold">
+                    {c.contrato!.codigo}
+                  </Link>{" "}
+                  <span className="text-cinza">
+                    {c.contrato!.cliente?.nome ?? c.contrato!.titulo ?? "—"}
+                  </span>
+                </span>
+                <span className="font-semibold">{moeda(valorComissaoEmDinheiro(c))}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="cartao overflow-x-auto">
         <table className="tabela">
