@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { calcularContrato } from "@/lib/contratos/correcao";
 import { carregarIndices, serieDe } from "@/lib/contratos/servidor";
 import { mapaDePerfis, perfilAtual } from "@/lib/supabase/perfil";
+import { obterConfiguracoes } from "@/lib/configuracoes";
 import type {
   Cliente,
   ComissaoContrato,
@@ -26,12 +27,18 @@ export default async function ContratoPage({
   const supabase = await createClient();
   const perfil = await perfilAtual();
   const ehAdmin = perfil?.ehAdmin ?? false;
+  const configuracoes = await obterConfiguracoes();
+  // mesmo interruptor granular da listagem — faltava aplicar aqui, e o
+  // corretor via o financeiro do contrato inteiro assim que abria um
+  const verValor = ehAdmin || configuracoes.corretor_ve_valor_contrato;
+  const verRecebido = ehAdmin || configuracoes.corretor_ve_recebido;
+  const verSaldoEAtraso = ehAdmin || configuracoes.corretor_ve_saldo_e_atraso;
 
   const [{ data }, { data: indexadores }, indices, { data: comissao }] = await Promise.all([
     supabase
       .from("contratos")
       .select(
-        "*, empreendimento:empreendimentos(*), cliente:clientes(*), lotes:contrato_lotes(*), parcelas:contrato_parcelas(*)"
+        "*, empreendimento:empreendimentos(*), cliente:clientes(*), lotes:contrato_lotes(*), parcelas:contrato_parcelas(*), campanha:campanhas(nome)"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -48,7 +55,9 @@ export default async function ContratoPage({
   const { data: clientes } = await supabase.from("clientes").select("*").order("nome");
 
   if (!data) notFound();
-  const contrato = data as unknown as ContratoCompleto;
+  const contrato = data as unknown as ContratoCompleto & {
+    campanha: { nome: string } | null;
+  };
 
   const { serie, taxa } = serieDe(indices, contrato.indexador);
   const calculo = calcularContrato(
@@ -94,8 +103,12 @@ export default async function ContratoPage({
           clientes={(clientes ?? []) as Cliente[]}
           autor={autores.get(contrato.criado_por ?? "") ?? null}
           ehAdmin={ehAdmin}
+          verValor={verValor}
+          verRecebido={verRecebido}
+          verSaldoEAtraso={verSaldoEAtraso}
           comissao={comissaoCompleta}
           parcelasComissao={parcelasComissao}
+          campanhaNome={contrato.campanha?.nome ?? null}
         />
       </main>
     </>

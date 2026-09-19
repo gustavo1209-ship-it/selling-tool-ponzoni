@@ -505,6 +505,9 @@ export async function salvarProposta(
 
     if (!ehAdminAtor && limite != null) {
       for (const c of payload.cenarios) {
+        // desconto de campanha é liberado pelo admin na própria campanha —
+        // o limite de desconto do corretor não se aplica a ele
+        if (c.campanha_id) continue;
         const efetivo = resultados.get(c.id)?.descontoEfetivoPct ?? 0;
         if (efetivo > limite) {
           throw new Error(
@@ -611,6 +614,7 @@ export async function salvarProposta(
         ordem: i,
         nome: c.nome,
         condicao_origem: c.condicao_origem,
+        campanha_id: c.campanha_id ?? null,
         desconto_pct: c.desconto_pct,
         desconto_valor: c.desconto_valor,
         desconto_motivo: c.desconto_motivo,

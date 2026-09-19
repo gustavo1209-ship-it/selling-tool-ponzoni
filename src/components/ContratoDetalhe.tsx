@@ -70,8 +70,12 @@ export default function ContratoDetalhe({
   clientes,
   autor,
   ehAdmin,
+  verValor,
+  verRecebido,
+  verSaldoEAtraso,
   comissao,
   parcelasComissao,
+  campanhaNome,
 }: {
   contrato: Contrato;
   empreendimento: Empreendimento;
@@ -85,8 +89,14 @@ export default function ContratoDetalhe({
   autor: string | null;
   /** Só admin define ou muda a comissão — a RLS de contrato_comissoes barra o resto. */
   ehAdmin: boolean;
+  /** Financeiro do contrato (não a comissão) — admin sempre; corretor, só se ligado em Configurações. */
+  verValor: boolean;
+  verRecebido: boolean;
+  verSaldoEAtraso: boolean;
   comissao: ComissaoContrato | null;
   parcelasComissao: ComissaoParcela[];
+  /** Nome da campanha usada no cenário que virou este contrato, se alguma. */
+  campanhaNome: string | null;
 }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
@@ -364,6 +374,9 @@ export default function ContratoDetalhe({
             {contrato.codigo}
             <SeloContrato status={contrato.status} />
             {contrato.teste && <span className="selo selo-neutro">Teste</span>}
+            {campanhaNome && (
+              <span className="selo selo-ouro">Campanha: {campanhaNome}</span>
+            )}
           </h1>
           <p className="text-sm text-tinta-suave mt-1">
             {cliente?.nome ?? contrato.titulo ?? "sem comprador vinculado"}
@@ -426,7 +439,7 @@ export default function ContratoDetalhe({
         </p>
       )}
 
-      {calculo.residuo !== 0 && (
+      {verSaldoEAtraso && calculo.residuo !== 0 && (
         <p className="text-sm text-ambar bg-ambar-fraco rounded-md px-3 py-2">
           A soma das parcelas ({moeda(calculo.totalOriginal)}) não fecha com o
           valor do contrato ({moeda(Number(contrato.valor_total))}) — diferença de{" "}
@@ -435,7 +448,7 @@ export default function ContratoDetalhe({
         </p>
       )}
 
-      {calculo.temEstimativa && (
+      {verSaldoEAtraso && calculo.temEstimativa && (
         <p className="text-sm text-tinta-suave bg-papel-alt rounded-md px-3 py-2">
           Parcelas marcadas com <span className="text-cinza font-semibold">~</span>{" "}
           dependem de meses sem índice lançado e estão estimadas pela taxa de
@@ -448,59 +461,69 @@ export default function ContratoDetalhe({
       )}
 
       {/* ------------------------------------------------------- números */}
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="cartao p-4">
-          <p className="eyebrow">Valor do contrato</p>
-          <p className="serif text-xl tabular mt-1">
-            {moeda(Number(contrato.valor_total))}
-          </p>
-          <p className="text-xs text-cinza mt-1">
-            base {dataBR(contrato.data_base)}
-          </p>
-        </div>
-        <div className="cartao p-4">
-          <p className="eyebrow">Recebido</p>
-          <p className="serif text-xl tabular mt-1 text-verde">
-            {moeda(calculo.totalPago)}
-          </p>
-          <p className="text-xs text-cinza mt-1">
-            {calculo.parcelasPagas} de {calculo.parcelasTotal} parcelas
-          </p>
-        </div>
-        <div className="cartao p-4">
-          <p className="eyebrow">Saldo corrigido</p>
-          <p className="serif text-xl tabular mt-1 text-vinho">
-            {moeda(calculo.saldoCorrigido)}
-          </p>
-          <p className="text-xs text-cinza mt-1">
-            {semCorrecao
-              ? "sem correção"
-              : `${moedaCurta(calculo.totalCorrecao)} de correção`}
-          </p>
-        </div>
-        <div className="cartao p-4">
-          <p className="eyebrow">Em atraso</p>
-          <p
-            className={`serif text-xl tabular mt-1 ${
-              calculo.totalVencido > 0 ? "text-vermelho" : ""
-            }`}
-          >
-            {moeda(calculo.totalVencido)}
-          </p>
-          <p className="text-xs text-cinza mt-1">
-            {calculo.vencidas.length} parcela(s) vencida(s)
-          </p>
-        </div>
-        <div className="cartao p-4">
-          <p className="eyebrow">Próximo vencimento</p>
-          <p className="serif text-xl tabular mt-1">
-            {calculo.proxima ? moeda(calculo.proxima.valorCorrigido) : "—"}
-          </p>
-          <p className="text-xs text-cinza mt-1">
-            {calculo.proxima ? dataBR(calculo.proxima.vencimento) : "contrato quitado"}
-          </p>
-        </div>
-      </section>
+      {(verValor || verRecebido || verSaldoEAtraso) && (
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {verValor && (
+            <div className="cartao p-4">
+              <p className="eyebrow">Valor do contrato</p>
+              <p className="serif text-xl tabular mt-1">
+                {moeda(Number(contrato.valor_total))}
+              </p>
+              <p className="text-xs text-cinza mt-1">
+                base {dataBR(contrato.data_base)}
+              </p>
+            </div>
+          )}
+          {verRecebido && (
+            <div className="cartao p-4">
+              <p className="eyebrow">Recebido</p>
+              <p className="serif text-xl tabular mt-1 text-verde">
+                {moeda(calculo.totalPago)}
+              </p>
+              <p className="text-xs text-cinza mt-1">
+                {calculo.parcelasPagas} de {calculo.parcelasTotal} parcelas
+              </p>
+            </div>
+          )}
+          {verSaldoEAtraso && (
+            <>
+              <div className="cartao p-4">
+                <p className="eyebrow">Saldo corrigido</p>
+                <p className="serif text-xl tabular mt-1 text-vinho">
+                  {moeda(calculo.saldoCorrigido)}
+                </p>
+                <p className="text-xs text-cinza mt-1">
+                  {semCorrecao
+                    ? "sem correção"
+                    : `${moedaCurta(calculo.totalCorrecao)} de correção`}
+                </p>
+              </div>
+              <div className="cartao p-4">
+                <p className="eyebrow">Em atraso</p>
+                <p
+                  className={`serif text-xl tabular mt-1 ${
+                    calculo.totalVencido > 0 ? "text-vermelho" : ""
+                  }`}
+                >
+                  {moeda(calculo.totalVencido)}
+                </p>
+                <p className="text-xs text-cinza mt-1">
+                  {calculo.vencidas.length} parcela(s) vencida(s)
+                </p>
+              </div>
+              <div className="cartao p-4">
+                <p className="eyebrow">Próximo vencimento</p>
+                <p className="serif text-xl tabular mt-1">
+                  {calculo.proxima ? moeda(calculo.proxima.valorCorrigido) : "—"}
+                </p>
+                <p className="text-xs text-cinza mt-1">
+                  {calculo.proxima ? dataBR(calculo.proxima.vencimento) : "contrato quitado"}
+                </p>
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       {/* ------------------------------------------ comissão do corretor */}
       <section className="cartao p-5 flex flex-col gap-4">
@@ -1188,6 +1211,7 @@ export default function ContratoDetalhe({
       )}
 
       {/* ------------------------------------------------------- parcelas */}
+      {verSaldoEAtraso && (
       <section className="cartao overflow-x-auto">
         <div className="cartao-titulo flex-wrap">
           <h2 className="serif text-lg">Cronograma</h2>
@@ -1593,6 +1617,7 @@ export default function ContratoDetalhe({
           </tbody>
         </table>
       </section>
+      )}
 
       {contrato.observacoes && (
         <p className="text-sm text-cinza">{contrato.observacoes}</p>

@@ -40,6 +40,7 @@ import type {
 } from "@/lib/calc/tipos";
 import type {
   BlocoTemplate,
+  Campanha,
   CenarioComBlocos,
   Cliente,
   IndexadorRef,
@@ -106,6 +107,7 @@ export default function Simulador({
   cenariosIniciais,
   lotesDisponiveis,
   condicoes,
+  campanhas,
   indexadores,
   autor,
   podeMontarOpcao,
@@ -118,6 +120,8 @@ export default function Simulador({
   cenariosIniciais: CenarioComBlocos[];
   lotesDisponiveis: Lote[];
   condicoes: CondicaoPagamento[];
+  /** Campanhas vigentes hoje para o empreendimento desta proposta. */
+  campanhas: Campanha[];
   indexadores: IndexadorRef[];
   /** Quem criou a proposta — com corretores, deixa de ser óbvio. */
   autor: string | null;
@@ -240,21 +244,29 @@ export default function Simulador({
 
   function adicionarCenario(
     condicao?: CondicaoPagamento,
-    montada?: { nome: string; blocos: BlocoTemplate[] }
+    montada?: { nome: string; blocos: BlocoTemplate[] },
+    campanha?: Campanha
   ) {
     const modelo = montada?.blocos ?? condicao?.template ?? [];
+    const descontoBase = condicao ? Number(condicao.desconto_pct) : 0;
+    const descontoPct = campanha
+      ? campanha.modo === "substituir"
+        ? Number(campanha.percentual_desconto)
+        : descontoBase + Number(campanha.percentual_desconto)
+      : descontoBase;
     const novo: CenarioComBlocos = {
       id: idLocal(),
       proposta_id: proposta.id,
       ordem: cenarios.length,
       nome:
         montada?.nome ??
-        condicao?.nome ??
+        (campanha && condicao ? `${condicao.nome} + ${campanha.nome}` : condicao?.nome) ??
         `Opção ${LETRAS[cenarios.length] ?? cenarios.length + 1}`,
       condicao_origem: condicao?.nome ?? null,
-      desconto_pct: condicao ? Number(condicao.desconto_pct) : 0,
+      campanha_id: campanha?.id ?? null,
+      desconto_pct: descontoPct,
       desconto_valor: 0,
-      desconto_motivo: null,
+      desconto_motivo: campanha ? `Campanha: ${campanha.nome}` : null,
       recomendado: cenarios.length === 0,
       resultado: null,
       blocos: modelo.map((b, i) => ({
@@ -859,7 +871,15 @@ export default function Simulador({
               className="campo w-auto text-xs"
               value=""
               onChange={(e) => {
-                const c = condicoes.find((x) => x.id === e.target.value);
+                const valor = e.target.value;
+                if (valor.startsWith("campanha:")) {
+                  const [, condicaoId, campanhaId] = valor.split(":");
+                  const c = condicoes.find((x) => x.id === condicaoId);
+                  const camp = campanhas.find((x) => x.id === campanhaId);
+                  if (c && camp) adicionarCenario(c, undefined, camp);
+                  return;
+                }
+                const c = condicoes.find((x) => x.id === valor);
                 if (c) adicionarCenario(c);
               }}
             >
@@ -869,6 +889,17 @@ export default function Simulador({
                   {c.nome}
                 </option>
               ))}
+              {campanhas.length > 0 && (
+                <optgroup label="Campanhas ativas">
+                  {condicoes.flatMap((c) =>
+                    campanhas.map((camp) => (
+                      <option key={`${c.id}:${camp.id}`} value={`campanha:${c.id}:${camp.id}`}>
+                        {c.nome} + {camp.nome}
+                      </option>
+                    ))
+                  )}
+                </optgroup>
+              )}
             </select>
             {podeMontarOpcao && (
               <button
@@ -906,6 +937,11 @@ export default function Simulador({
                   value={ativo.nome}
                   onChange={(e) => mudarCenario(ativo.id, { nome: e.target.value })}
                 />
+                {ativo.campanha_id && (
+                  <span className="selo selo-ouro mt-1">
+                    Campanha: {campanhas.find((c) => c.id === ativo.campanha_id)?.nome ?? "aplicada"}
+                  </span>
+                )}
               </div>
               <div className="w-36">
                 <label className="rotulo" title="Negativo vira acréscimo sobre o preço de tabela">

@@ -29,6 +29,10 @@ export interface ContratoLinha {
   teste: boolean;
   comissaoPercentual: number | null;
   comissaoValor: number | null;
+  /** Próxima parcela pendente do cronograma da comissão, se já foi gerado. */
+  comissaoProximaValor: number | null;
+  comissaoProximaNumero: number | null;
+  comissaoParcelasTotal: number | null;
 }
 
 export default function ContratosTabela({
@@ -132,7 +136,7 @@ export default function ContratosTabela({
                 <th className="num">Em atraso</th>
               </>
             )}
-            <th className="num">Comissão</th>
+            {ehAdmin && <th className="num">Comissão</th>}
             <th>Cadastrado por</th>
             <th>Status</th>
           </tr>
@@ -201,18 +205,35 @@ export default function ContratosTabela({
                   </td>
                 </>
               )}
-              <td className="num whitespace-nowrap">
-                {c.comissaoValor != null ? (
-                  <>
-                    {moeda(c.comissaoValor)}
-                    {c.comissaoPercentual != null && (
-                      <span className="text-cinza"> · {pct(c.comissaoPercentual)}</span>
-                    )}
-                  </>
-                ) : (
-                  <span className="text-cinza">Pendente</span>
-                )}
-              </td>
+              {ehAdmin && (
+                <td className="num whitespace-nowrap">
+                  {c.comissaoValor != null ? (
+                    c.comissaoProximaValor != null ? (
+                      <>
+                        {moeda(c.comissaoProximaValor)}
+                        <span className="text-cinza">
+                          {" "}
+                          · {c.comissaoProximaNumero}/{c.comissaoParcelasTotal}
+                        </span>
+                        <span className="block text-[10px] text-cinza font-normal">
+                          {moeda(c.comissaoValor)} no total
+                          {c.comissaoPercentual != null &&
+                            ` · ${pct(c.comissaoPercentual)}`}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {moeda(c.comissaoValor)}
+                        {c.comissaoPercentual != null && (
+                          <span className="text-cinza"> · {pct(c.comissaoPercentual)}</span>
+                        )}
+                      </>
+                    )
+                  ) : (
+                    <span className="text-cinza">Pendente</span>
+                  )}
+                </td>
+              )}
               <td className="text-cinza whitespace-nowrap">{c.autorNome}</td>
               <td>
                 <span className="flex items-center gap-1.5 flex-wrap">
@@ -230,7 +251,8 @@ export default function ContratosTabela({
                   (verValor ? 1 : 0) +
                   (verRecebido ? 1 : 0) +
                   (verSaldoEAtraso ? 4 : 0) +
-                  6
+                  (ehAdmin ? 1 : 0) +
+                  5
                 }
                 className="text-center text-cinza py-8"
               >

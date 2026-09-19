@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Building2,
   KanbanSquare,
+  Percent,
   Settings,
   Trophy,
   Users,
@@ -11,6 +12,7 @@ import {
 import Cabecalho from "@/components/Cabecalho";
 import { createClient } from "@/lib/supabase/server";
 import { perfilAtual } from "@/lib/supabase/perfil";
+import { hojeISO } from "@/lib/contratos/mes";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +21,8 @@ export default async function AdminPage() {
   if (!perfil?.ehAdmin) redirect("/");
 
   const supabase = await createClient();
-  const [{ count: empreendimentos }, { count: pessoas }, { count: etapas }] =
+  const hoje = hojeISO();
+  const [{ count: empreendimentos }, { count: pessoas }, { count: etapas }, { count: campanhas }] =
     await Promise.all([
       supabase.from("empreendimentos").select("id", { count: "exact", head: true }),
       supabase.from("perfis").select("id", { count: "exact", head: true }),
@@ -27,6 +30,12 @@ export default async function AdminPage() {
         .from("funil_etapas")
         .select("id", { count: "exact", head: true })
         .eq("ativa", true),
+      supabase
+        .from("campanhas")
+        .select("id", { count: "exact", head: true })
+        .eq("ativa", true)
+        .lte("inicio", hoje)
+        .gte("fim", hoje),
     ]);
 
   const telas = [
@@ -61,6 +70,14 @@ export default async function AdminPage() {
       texto:
         "Clientes cadastrados, propostas criadas, contratos firmados e negociações perdidas por corretor, numa janela de tempo escolhida.",
       rodape: "ver painel",
+    },
+    {
+      href: "/admin/campanhas",
+      icone: Percent,
+      titulo: "Campanhas",
+      texto:
+        "Descontos promocionais por tempo determinado, por empreendimento. O corretor escolhe aplicar no Simulador enquanto estiverem vigentes.",
+      rodape: `${campanhas ?? 0} vigente(s) agora`,
     },
     {
       href: "/admin/configuracoes",

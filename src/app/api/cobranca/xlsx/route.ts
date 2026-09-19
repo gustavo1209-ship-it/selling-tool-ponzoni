@@ -59,6 +59,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const paramMes = url.searchParams.get("mes");
   const mes = paramMes && /^\d{4}-\d{2}$/.test(paramMes) ? paramMes : competencia(hojeISO());
+  const paramAte = url.searchParams.get("ate");
+  const ate = paramAte && /^\d{4}-\d{2}$/.test(paramAte) && paramAte >= mes ? paramAte : mes;
   const emp = url.searchParams.get("emp");
   const incluirAtrasadas = url.searchParams.get("so_mes") !== "1";
 
@@ -97,7 +99,10 @@ export async function GET(request: Request) {
     for (const p of calculo.parcelas) {
       if (p.situacao === "paga") continue;
       const comp = competencia(p.vencimento);
-      if (comp === mes || (incluirAtrasadas && comp < mes && p.situacao === "vencida")) {
+      if (
+        (comp >= mes && comp <= ate) ||
+        (incluirAtrasadas && comp < mes && p.situacao === "vencida")
+      ) {
         linhas.push({ contrato: c, parcela: p });
       }
     }
@@ -113,7 +118,13 @@ export async function GET(request: Request) {
   wb.creator = "Ponzoni — ferramenta de vendas";
   const ws = wb.addWorksheet("A receber");
 
-  const titulo = ws.addRow([`A receber — ${competenciaPorExtenso(mes)}`]);
+  const titulo = ws.addRow([
+    `A receber — ${
+      ate === mes
+        ? competenciaPorExtenso(mes)
+        : `${competenciaPorExtenso(mes)} a ${competenciaPorExtenso(ate)}`
+    }`,
+  ]);
   ws.mergeCells(titulo.number, 1, titulo.number, 15);
   titulo.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" }, name: "Arial" };
   titulo.fill = { type: "pattern", pattern: "solid", fgColor: { argb: VINHO } };
@@ -254,7 +265,7 @@ export async function GET(request: Request) {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="a-receber-${mes}.xlsx"`,
+      "Content-Disposition": `attachment; filename="a-receber-${mes}${ate !== mes ? `_a_${ate}` : ""}.xlsx"`,
       "Cache-Control": "no-store",
     },
   });

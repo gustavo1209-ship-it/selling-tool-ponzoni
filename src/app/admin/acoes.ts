@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { BlocoTemplate, Configuracoes } from "@/lib/db/tipos";
+import type { BlocoTemplate, CampanhaModo, Configuracoes } from "@/lib/db/tipos";
 import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
 
 /**
@@ -473,6 +473,85 @@ export async function apagarEtapa(id: string): Promise<ResultadoAcao> {
 
     revalidatePath("/admin/funil");
     revalidatePath("/funil");
+    return {};
+  });
+}
+
+// -------------------------------------------------------------- campanhas
+
+export interface DadosCampanha {
+  empreendimento_id: string;
+  nome: string;
+  percentual_desconto: number;
+  modo: CampanhaModo;
+  inicio: string;
+  fim: string;
+  ativa: boolean;
+}
+
+export async function criarCampanha(dados: DadosCampanha): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase, userId } = await exigirAdmin();
+
+    const nome = dados.nome.trim();
+    if (!nome) throw new Error("A campanha precisa de um nome.");
+    if (dados.percentual_desconto <= 0) {
+      throw new Error("O desconto da campanha precisa ser maior que zero.");
+    }
+    if (dados.fim < dados.inicio) {
+      throw new Error("A data de fim não pode vir antes da data de início.");
+    }
+
+    const { error } = await supabase
+      .from("campanhas")
+      .insert({ ...dados, nome, criado_por: userId });
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/campanhas");
+    return {};
+  });
+}
+
+export async function atualizarCampanha(
+  id: string,
+  dados: DadosCampanha
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
+
+    const nome = dados.nome.trim();
+    if (!nome) throw new Error("A campanha precisa de um nome.");
+    if (dados.percentual_desconto <= 0) {
+      throw new Error("O desconto da campanha precisa ser maior que zero.");
+    }
+    if (dados.fim < dados.inicio) {
+      throw new Error("A data de fim não pode vir antes da data de início.");
+    }
+
+    const { error } = await supabase
+      .from("campanhas")
+      .update({ ...dados, nome })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/campanhas");
+    return {};
+  });
+}
+
+/**
+ * Apagar campanha não tem o mesmo perigo do funil: `campanha_id` em
+ * `proposta_cenarios`/`contratos` é `on delete set null` — a propostas e
+ * contratos já fechados não somem, só perdem o rótulo de qual campanha usaram.
+ */
+export async function apagarCampanha(id: string): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
+
+    const { error } = await supabase.from("campanhas").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/campanhas");
     return {};
   });
 }

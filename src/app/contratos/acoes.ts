@@ -251,7 +251,7 @@ export async function gerarContratoDaProposta(
     const { data: proposta, error } = await supabase
       .from("propostas")
       .select(
-        "id, empreendimento_id, cliente_id, data_base, incc_mensal, correcao_primeira_parcela, observacoes, teste, proposta_lotes(*), proposta_cenarios(id, nome, recomendado, resultado)"
+        "id, empreendimento_id, cliente_id, data_base, incc_mensal, correcao_primeira_parcela, observacoes, teste, proposta_lotes(*), proposta_cenarios(id, nome, recomendado, resultado, campanha_id)"
       )
       .eq("id", propostaId)
       .single();
@@ -273,6 +273,7 @@ export async function gerarContratoDaProposta(
       nome: string;
       recomendado: boolean;
       resultado: Resultado | null;
+      campanha_id: string | null;
     }[];
 
     const cenario =
@@ -301,6 +302,7 @@ export async function gerarContratoDaProposta(
         cliente_id: proposta.cliente_id,
         proposta_id: proposta.id,
         cenario_origem: cenario.nome,
+        campanha_id: cenario.campanha_id ?? null,
         data_contrato: hojeISO(),
         data_base: dataBase,
         dia_vencimento: diaVencimentoPadrao,

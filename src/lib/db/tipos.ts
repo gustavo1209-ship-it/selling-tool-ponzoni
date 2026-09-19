@@ -39,6 +39,28 @@ export interface Empreendimento {
   ativo: boolean;
 }
 
+export type CampanhaModo = "substituir" | "somar";
+
+/**
+ * Desconto promocional por tempo determinado, de um empreendimento. O
+ * corretor escolhe aplicar ou não, dentro do Simulador, combinando com uma
+ * condição de pagamento já existente.
+ */
+export interface Campanha {
+  id: string;
+  empreendimento_id: string;
+  nome: string;
+  percentual_desconto: number;
+  /** substituir = vira o desconto do cenário; somar = soma ao da condição. */
+  modo: CampanhaModo;
+  inicio: string;
+  fim: string;
+  ativa: boolean;
+  criado_por: string | null;
+  criado_em: string;
+  atualizado_em: string;
+}
+
 export interface Lote {
   id: string;
   empreendimento_id: string;
@@ -188,6 +210,8 @@ export interface PropostaCenario {
   ordem: number;
   nome: string;
   condicao_origem: string | null;
+  /** Campanha aplicada neste cenário, se alguma. */
+  campanha_id: string | null;
   desconto_pct: number;
   desconto_valor: number;
   desconto_motivo: string | null;
@@ -217,6 +241,8 @@ export interface Contrato {
   /** De onde veio, quando veio de uma proposta aceita. */
   proposta_id: string | null;
   cenario_origem: string | null;
+  /** Campanha usada no cenário que virou este contrato, se alguma. */
+  campanha_id: string | null;
   titulo: string | null;
   status: ContratoStatus;
   data_contrato: string;

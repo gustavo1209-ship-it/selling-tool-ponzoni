@@ -4,6 +4,7 @@ import Simulador from "@/components/Simulador";
 import { mapaDePerfis, perfilAtual } from "@/lib/supabase/perfil";
 import { createClient } from "@/lib/supabase/server";
 import { obterConfiguracoes } from "@/lib/configuracoes";
+import { campanhasVigentes } from "@/lib/campanhas";
 import { compararLote } from "@/lib/ordenacao";
 import type {
   CenarioComBlocos,
@@ -61,6 +62,7 @@ export default async function PropostaPage({
     { data: condicoes },
     { data: clientes },
     { data: indexadores },
+    campanhas,
   ] = await Promise.all([
       supabase
         .from("lotes_visiveis")
@@ -76,6 +78,7 @@ export default async function PropostaPage({
       : Promise.resolve({ data: [] }),
       supabase.from("clientes").select("*").order("nome"),
       supabase.from("indexadores").select("*").order("ordem"),
+      campanhasVigentes(supabase, proposta.empreendimento_id),
     ]);
 
   const cenariosOrdenados: CenarioComBlocos[] = [...(cenarios ?? [])]
@@ -99,6 +102,7 @@ export default async function PropostaPage({
           cenariosIniciais={cenariosOrdenados}
           lotesDisponiveis={(disponiveis ?? []) as Lote[]}
           condicoes={(condicoes ?? []) as unknown as CondicaoPagamento[]}
+          campanhas={campanhas}
           indexadores={(indexadores ?? []) as IndexadorRef[]}
           podeMontarOpcao={podeMontarOpcao}
         />
