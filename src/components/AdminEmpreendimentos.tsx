@@ -408,25 +408,44 @@ function EditorEmpreendimento({
     ativo: empreendimento.ativo,
   });
   const [sincronizando, setSincronizando] = useState(false);
+  const [colarAberto, setColarAberto] = useState(false);
+  const [textoColado, setTextoColado] = useState("");
+  const [colando, setColando] = useState(false);
+
+  async function chamarSync(corpoExtra: Record<string, unknown>) {
+    const r = await fetch("/api/espelho/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ empreendimentoId: empreendimento.id, ...corpoExtra }),
+    });
+    const corpo = await r.json();
+    aoSincronizar(
+      r.ok
+        ? `${corpo.lidos} lotes lidos, ${corpo.novos} novo(s), ${corpo.alteracoes.length} alteração(ões).`
+        : (corpo.erro ?? "Falha ao sincronizar.")
+    );
+    return r.ok as boolean;
+  }
 
   async function sincronizar() {
     setSincronizando(true);
     try {
-      const r = await fetch("/api/espelho/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ empreendimentoId: empreendimento.id }),
-      });
-      const corpo = await r.json();
-      aoSincronizar(
-        r.ok
-          ? `${corpo.lidos} lotes lidos, ${corpo.novos} novo(s), ${corpo.alteracoes.length} alteração(ões).`
-          : (corpo.erro ?? "Falha ao sincronizar.")
-      );
+      await chamarSync({});
     } catch (e) {
       aoSincronizar(mensagemDeFalha(e));
     }
     setSincronizando(false);
+  }
+
+  async function colar() {
+    setColando(true);
+    try {
+      const ok = await chamarSync({ csv: textoColado });
+      if (ok) setTextoColado("");
+    } catch (e) {
+      aoSincronizar(mensagemDeFalha(e));
+    }
+    setColando(false);
   }
 
   return (
@@ -454,7 +473,42 @@ function EditorEmpreendimento({
           <RefreshCw size={15} className={sincronizando ? "animate-spin" : ""} />
           {sincronizando ? "Sincronizando…" : "Sincronizar lotes com o Sheets"}
         </button>
+        <button
+          type="button"
+          className="btn btn-fantasma"
+          onClick={() => setColarAberto((v) => !v)}
+        >
+          {colarAberto ? "Fechar" : "Sem Google Sheets? Colar lista de lotes"}
+        </button>
       </div>
+
+      {colarAberto && (
+        <div className="border-t border-linha pt-3 flex flex-col gap-2">
+          <p className="text-xs text-cinza">
+            Cole aqui uma tabela com as colunas <strong>Quadra</strong>, <strong>Lote</strong>,{" "}
+            <strong>Área</strong>, <strong>Valor</strong> e <strong>Status</strong> (livre,
+            reservado, vendido) — direto do Excel/Google Sheets (selecione as células, Ctrl+C,
+            Ctrl+V aqui) ou como CSV. Rodar de novo só atualiza o que mudou; nenhum lote existente
+            é apagado.
+          </p>
+          <textarea
+            className="campo font-mono text-xs"
+            rows={6}
+            placeholder={"Quadra\tLote\tÁrea\tValor\tStatus\nA\t1\t300\t250000\tlivre\nA\t2\t320\t260000\tvendido"}
+            value={textoColado}
+            onChange={(e) => setTextoColado(e.target.value)}
+          />
+          <button
+            type="button"
+            className="btn btn-secundario self-start"
+            disabled={colando || !textoColado.trim()}
+            onClick={colar}
+          >
+            <RefreshCw size={15} className={colando ? "animate-spin" : ""} />
+            {colando ? "Lendo…" : "Criar/atualizar lotes com este texto"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

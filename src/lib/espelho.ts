@@ -1,7 +1,15 @@
 import type { LoteStatus } from "@/lib/calc/tipos";
 
-/** CSV com aspas e vírgulas dentro de campo — o Sheets produz os dois. */
+/**
+ * CSV com aspas e vírgulas dentro de campo — o Sheets produz os dois. Quem
+ * cola direto de uma planilha (Excel, Google Sheets) copia célula a célula
+ * separado por TAB, não vírgula — por isso o delimitador é detectado pela
+ * primeira linha em vez de fixo em vírgula.
+ */
 export function lerCSV(texto: string): string[][] {
+  const delimitador = texto.slice(0, texto.indexOf("\n") + 1 || undefined).includes("\t")
+    ? "\t"
+    : ",";
   const linhas: string[][] = [];
   let campo = "";
   let linha: string[] = [];
@@ -23,7 +31,7 @@ export function lerCSV(texto: string): string[][] {
       continue;
     }
     if (c === '"') aspas = true;
-    else if (c === ",") {
+    else if (c === delimitador) {
       linha.push(campo);
       campo = "";
     } else if (c === "\n") {

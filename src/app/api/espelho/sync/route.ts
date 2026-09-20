@@ -29,36 +29,43 @@ export async function POST(request: Request) {
     );
   }
 
-  const { empreendimentoId } = (await request.json().catch(() => ({}))) as {
+  const { empreendimentoId, csv: csvColado } = (await request.json().catch(() => ({}))) as {
     empreendimentoId?: string;
+    csv?: string;
   };
   if (!empreendimentoId) {
     return NextResponse.json({ erro: "Informe o empreendimento" }, { status: 400 });
   }
 
-  const { data: emp } = await supabase
-    .from("empreendimentos")
-    .select("id, nome, espelho_csv_url")
-    .eq("id", empreendimentoId)
-    .single();
-
-  if (!emp?.espelho_csv_url) {
-    return NextResponse.json(
-      { erro: "Este empreendimento não tem URL de espelho configurada." },
-      { status: 400 }
-    );
-  }
-
+  // Sem Google Sheets, o admin cola a lista direto na tela — mesmo parser,
+  // mesma reconciliação; só a origem do texto muda.
   let csv: string;
-  try {
-    const resposta = await fetch(emp.espelho_csv_url, { cache: "no-store" });
-    if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
-    csv = await resposta.text();
-  } catch (e) {
-    return NextResponse.json(
-      { erro: `Não consegui ler a planilha: ${(e as Error).message}` },
-      { status: 502 }
-    );
+  if (csvColado?.trim()) {
+    csv = csvColado;
+  } else {
+    const { data: emp } = await supabase
+      .from("empreendimentos")
+      .select("id, nome, espelho_csv_url")
+      .eq("id", empreendimentoId)
+      .single();
+
+    if (!emp?.espelho_csv_url) {
+      return NextResponse.json(
+        { erro: "Este empreendimento não tem URL de espelho configurada." },
+        { status: 400 }
+      );
+    }
+
+    try {
+      const resposta = await fetch(emp.espelho_csv_url, { cache: "no-store" });
+      if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
+      csv = await resposta.text();
+    } catch (e) {
+      return NextResponse.json(
+        { erro: `Não consegui ler a planilha: ${(e as Error).message}` },
+        { status: 502 }
+      );
+    }
   }
 
   const linhas = lerEspelho(csv);
