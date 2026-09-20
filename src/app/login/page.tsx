@@ -215,10 +215,11 @@ export default function LoginPage() {
         <div className="cartao overflow-hidden">
           <div className="faixa-topo" />
           <div className="p-7">
-            <p className="eyebrow">Industrial Ponzoni</p>
-            <h1 className="serif text-3xl mt-1 mb-1">Ferramenta de vendas</h1>
+            <p className="eyebrow">Ferramenta de vendas</p>
+            <h1 className="serif text-3xl mt-1 mb-1">Espelho, propostas e contratos</h1>
             <p className="text-sm text-cinza mb-6">
-              Espelho de lotes, simulação de condições e proposta pronta para o cliente.
+              Espelho de lotes, simulação de condições e proposta pronta para o cliente. Crie
+              uma conta e comece com 30 dias grátis.
             </p>
             <Suspense fallback={null}>
               <Formulario />

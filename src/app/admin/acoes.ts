@@ -25,14 +25,14 @@ async function exigirAdmin() {
 
   const { data } = await supabase
     .from("perfis")
-    .select("papel")
+    .select("papel, organizacao_id")
     .eq("id", user.id)
     .maybeSingle();
 
   if (data?.papel !== "admin") {
     throw new Error("Só a administração pode fazer isso.");
   }
-  return { supabase, userId: user.id };
+  return { supabase, userId: user.id, organizacaoId: data.organizacao_id as string };
 }
 
 const limpo = (v: string | null | undefined) => {
@@ -77,7 +77,7 @@ export async function criarEmpreendimento(
   dados: DadosEmpreendimento
 ): Promise<ResultadoAcao<{ id: string; slug: string }>> {
   return comoResultado(async () => {
-    const { supabase } = await exigirAdmin();
+    const { supabase, organizacaoId } = await exigirAdmin();
 
     const nome = dados.nome.trim();
     if (!nome) throw new Error("O empreendimento precisa de um nome.");
@@ -96,7 +96,7 @@ export async function criarEmpreendimento(
 
     const { data, error } = await supabase
       .from("empreendimentos")
-      .insert({ ...normalizar(dados), nome, slug })
+      .insert({ ...normalizar(dados), nome, slug, organizacao_id: organizacaoId })
       .select("id, slug")
       .single();
     if (error) throw new Error(error.message);
@@ -310,7 +310,7 @@ export async function definirAcessoEmpreendimentos(
   empreendimentoIds: string[]
 ): Promise<ResultadoAcao> {
   return comoResultado(async () => {
-    const { supabase } = await exigirAdmin();
+    const { supabase, organizacaoId } = await exigirAdmin();
 
     const { error: erroPerfil } = await supabase
       .from("perfis")
@@ -329,6 +329,7 @@ export async function definirAcessoEmpreendimentos(
         empreendimentoIds.map((empreendimento_id) => ({
           perfil_id: perfilId,
           empreendimento_id,
+          organizacao_id: organizacaoId,
         }))
       );
       if (error) throw new Error(error.message);
@@ -407,12 +408,14 @@ export interface DadosEtapa {
 
 export async function criarEtapa(dados: DadosEtapa): Promise<ResultadoAcao> {
   return comoResultado(async () => {
-    const { supabase } = await exigirAdmin();
+    const { supabase, organizacaoId } = await exigirAdmin();
 
     const nome = dados.nome.trim();
     if (!nome) throw new Error("A etapa precisa de um nome.");
 
-    const { error } = await supabase.from("funil_etapas").insert({ ...dados, nome });
+    const { error } = await supabase
+      .from("funil_etapas")
+      .insert({ ...dados, nome, organizacao_id: organizacaoId });
     if (error) throw new Error(error.message);
 
     revalidatePath("/admin/funil");
@@ -491,7 +494,7 @@ export interface DadosCampanha {
 
 export async function criarCampanha(dados: DadosCampanha): Promise<ResultadoAcao> {
   return comoResultado(async () => {
-    const { supabase, userId } = await exigirAdmin();
+    const { supabase, userId, organizacaoId } = await exigirAdmin();
 
     const nome = dados.nome.trim();
     if (!nome) throw new Error("A campanha precisa de um nome.");
@@ -504,7 +507,7 @@ export async function criarCampanha(dados: DadosCampanha): Promise<ResultadoAcao
 
     const { error } = await supabase
       .from("campanhas")
-      .insert({ ...dados, nome, criado_por: userId });
+      .insert({ ...dados, nome, criado_por: userId, organizacao_id: organizacaoId });
     if (error) throw new Error(error.message);
 
     revalidatePath("/admin/campanhas");
@@ -562,16 +565,97 @@ export async function atualizarConfiguracoes(
   dados: Configuracoes
 ): Promise<ResultadoAcao> {
   return comoResultado(async () => {
-    const { supabase } = await exigirAdmin();
+    const { supabase, organizacaoId } = await exigirAdmin();
 
     const { error } = await supabase
       .from("configuracoes")
       .update(dados)
-      .eq("id", 1);
+      .eq("organizacao_id", organizacaoId);
     if (error) throw new Error(error.message);
 
     revalidatePath("/admin/configuracoes");
     revalidatePath("/contratos");
+    return {};
+  });
+}
+
+// ---------------------------------------------------------- convites
+//
+// Substitui "criar conta pelo painel do Supabase": o admin gera um link
+// com token (o `default` da coluna, migration 42) e manda por fora (e-mail,
+// WhatsApp) — não há provedor de e-mail transacional configurado ainda.
+// Quem abre o link vê o convite via a RPC `info_convite` (aberta a `anon`
+// de propósito) e entra na organização com `aceitar_convite`.
+
+export interface DadosConvite {
+  email: string;
+  papel: "corretor" | "admin";
+}
+
+export async function convidarUsuario(
+  dados: DadosConvite
+): Promise<ResultadoAcao<{ token: string }>> {
+  return comoResultado(async () => {
+    const { supabase, userId, organizacaoId } = await exigirAdmin();
+
+    const email = dados.email.trim().toLowerCase();
+    if (!email) throw new Error("Informe o e-mail de quem você quer convidar.");
+
+    const { data, error } = await supabase
+      .from("convites")
+      .insert({
+        organizacao_id: organizacaoId,
+        email,
+        papel: dados.papel,
+        criado_por: userId,
+      })
+      .select("token")
+      .single();
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/corretores");
+    return { token: data.token as string };
+  });
+}
+
+// ---------------------------------------------------------- marca
+//
+// `organizacoes` só concede update de nome/logo_url/cor_primaria/
+// cor_secundaria para authenticated (migration 42) — plano e status de
+// assinatura não aparecem aqui porque a coluna nem está liberada para
+// update direto; só o webhook do Stripe grava aquilo.
+
+export async function atualizarMarca(formData: FormData): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase, organizacaoId } = await exigirAdmin();
+
+    const nome = String(formData.get("nome") ?? "").trim();
+    if (!nome) throw new Error("O nome da organização não pode ficar vazio.");
+    const cor_primaria = String(formData.get("cor_primaria") ?? "#5B2166");
+    const cor_secundaria = String(formData.get("cor_secundaria") ?? "#C4A550");
+
+    const arquivo = formData.get("logo") as File | null;
+    let logo_url: string | undefined;
+    if (arquivo && arquivo.size > 0) {
+      const ext = arquivo.name.split(".").pop() || "png";
+      const caminho = `${organizacaoId}/logo.${ext}`;
+      const { error: erroUpload } = await supabase.storage
+        .from("marca")
+        .upload(caminho, arquivo, { upsert: true, contentType: arquivo.type });
+      if (erroUpload) throw new Error(erroUpload.message);
+      const { data: publica } = supabase.storage.from("marca").getPublicUrl(caminho);
+      // sem isso o navegador serviria a imagem antiga do cache até expirar
+      logo_url = `${publica.publicUrl}?v=${Date.now()}`;
+    }
+
+    const { error } = await supabase
+      .from("organizacoes")
+      .update({ nome, cor_primaria, cor_secundaria, ...(logo_url ? { logo_url } : {}) })
+      .eq("id", organizacaoId);
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/marca");
     return {};
   });
 }

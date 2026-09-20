@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { organizacaoIdDoUsuario } from "@/lib/supabase/perfil";
 import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
 
 /**
@@ -83,6 +84,7 @@ export async function criarNegociacao(
       ordem: Number(primeiro?.ordem ?? 0) - 10,
       fechada_em: await carimbo(supabase, dados.etapa_id, null),
       criado_por: user.id,
+      organizacao_id: await organizacaoIdDoUsuario(supabase, user.id),
     });
     if (error) throw new Error(error.message);
 
@@ -231,6 +233,7 @@ export async function promoverACliente(
         telefone: negociacao.telefone,
         observacao: negociacao.observacao,
         criado_por: user.id,
+        organizacao_id: await organizacaoIdDoUsuario(supabase, user.id),
       })
       .select("id")
       .single();

@@ -5,8 +5,6 @@ import { COOKIE_TEMA, lerTema } from "@/lib/tema";
 import SairBotao from "./SairBotao";
 import TemaBotao from "./TemaBotao";
 
-const MARCA = "industrial-ponzoni";
-
 /**
  * `soAdmin` esconde do corretor o que ele não administra. A RLS é quem de
  * fato barra o acesso (migration 26) — isto evita oferecer uma tela que
@@ -37,19 +35,24 @@ export default async function Cabecalho() {
 
   const tema = lerTema((await cookies()).get(COOKIE_TEMA)?.value);
 
-  const [{ data: perfil }, { data: marca }] = await Promise.all([
-    user
-      ? supabase.from("perfis").select("nome, papel").eq("id", user.id).maybeSingle()
-      : Promise.resolve({ data: null }),
-    // A ferramenta é da casa e atende vários empreendimentos, então o topo
-    // carrega sempre a marca Ponzoni — o logo do empreendimento aparece nas
-    // páginas dele e na folha da proposta.
-    supabase
-      .from("empreendimentos")
-      .select("nome, logo_url")
-      .eq("slug", MARCA)
-      .maybeSingle(),
-  ]);
+  const { data: perfil } = user
+    ? await supabase
+        .from("perfis")
+        .select("nome, papel, organizacao_id")
+        .eq("id", user.id)
+        .maybeSingle()
+    : { data: null };
+
+  // A ferramenta é multi-cliente: o topo carrega a marca da organização de
+  // quem está logado, não de um empreendimento fixo — cada organização vê
+  // o próprio nome e logo (organizacoes.nome/logo_url).
+  const { data: marca } = perfil?.organizacao_id
+    ? await supabase
+        .from("organizacoes")
+        .select("nome, logo_url")
+        .eq("id", perfil.organizacao_id)
+        .maybeSingle()
+    : { data: null };
 
   return (
     <header className="bg-superficie border-b border-linha sticky top-0 z-30">
@@ -78,7 +81,7 @@ export default async function Cabecalho() {
           )}
           <span className="flex items-baseline gap-2">
             <span className="serif text-lg leading-none text-vinho font-semibold">
-              Ponzoni
+              {marca?.nome ?? "Ferramenta de vendas"}
             </span>
             <span className="eyebrow hidden sm:inline">Vendas</span>
           </span>

@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Building2,
   KanbanSquare,
+  Palette,
   Percent,
   Settings,
   Trophy,
@@ -78,6 +79,13 @@ export default async function AdminPage() {
       texto:
         "Descontos promocionais por tempo determinado, por empreendimento. O corretor escolhe aplicar no Simulador enquanto estiverem vigentes.",
       rodape: `${campanhas ?? 0} vigente(s) agora`,
+    },
+    {
+      href: "/admin/marca",
+      icone: Palette,
+      titulo: "Marca",
+      texto: "Nome, logo e cores da sua organização — o que aparece no topo para o seu time.",
+      rodape: "ver marca",
     },
     {
       href: "/admin/configuracoes",

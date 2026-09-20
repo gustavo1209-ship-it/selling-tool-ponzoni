@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { organizacaoIdDoUsuario } from "@/lib/supabase/perfil";
 import { calcular } from "@/lib/calc";
 import type { Bloco, MetricaParcela, Resultado } from "@/lib/calc/tipos";
 import type {
@@ -80,6 +81,7 @@ export async function criarProposta(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const organizacaoId = await organizacaoIdDoUsuario(supabase, user.id);
 
   const empreendimentoId = String(formData.get("empreendimento_id") ?? "");
   const condicaoIds = formData.getAll("condicao_id").map(String).filter(Boolean);
@@ -197,6 +199,7 @@ export async function criarProposta(
         telefone: telefoneCliente,
         email: emailCliente,
         criado_por: user.id,
+        organizacao_id: organizacaoId,
       })
       .select("id")
       .single();
@@ -214,6 +217,7 @@ export async function criarProposta(
       incc_mensal: tabela?.incc_mensal ?? 0.005,
       juros_vp_mensal: tabela?.juros_vp_mensal ?? 0.01,
       criado_por: user.id,
+      organizacao_id: organizacaoId,
     })
     .select("id")
     .single();
@@ -551,7 +555,11 @@ export async function salvarProposta(
 
       const { data: novo, error } = await supabase
         .from("clientes")
-        .insert({ ...campos, criado_por: user.id })
+        .insert({
+          ...campos,
+          criado_por: user.id,
+          organizacao_id: await organizacaoIdDoUsuario(supabase, user.id),
+        })
         .select("id")
         .single();
       if (error) throw new Error(error.message);

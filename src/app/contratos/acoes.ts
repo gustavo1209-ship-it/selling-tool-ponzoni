@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { organizacaoIdDoUsuario } from "@/lib/supabase/perfil";
 import type { Indexador, Resultado } from "@/lib/calc/tipos";
 import {
   cronogramaDeResultado,
@@ -93,6 +94,7 @@ export async function criarContrato(
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) redirect("/login");
+    const organizacaoId = await organizacaoIdDoUsuario(supabase, user.id);
 
     const empreendimentoId = String(formData.get("empreendimento_id") ?? "");
     const loteIds = formData.getAll("lote_id").map(String).filter(Boolean);
@@ -163,6 +165,7 @@ export async function criarContrato(
           telefone: telefoneCliente,
           email: emailCliente,
           criado_por: user.id,
+          organizacao_id: organizacaoId,
         })
         .select("id")
         .single();
@@ -191,6 +194,7 @@ export async function criarContrato(
         multa_atraso_pct: numero(formData.get("multa_atraso_pct"), 2) / 100,
         observacoes: texto(formData.get("observacoes")),
         criado_por: user.id,
+        organizacao_id: organizacaoId,
       })
       .select("id")
       .single();
@@ -323,6 +327,7 @@ export async function gerarContratoDaProposta(
         // copia da proposta: se ela nasceu de teste, o contrato também é
         teste: proposta.teste ?? false,
         criado_por: user.id,
+        organizacao_id: await organizacaoIdDoUsuario(supabase, user.id),
       })
       .select("id")
       .single();

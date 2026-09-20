@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLICAS = ["/login", "/auth"];
+const PUBLICAS = ["/login", "/convite", "/auth"];
 
 export async function atualizarSessao(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -45,6 +45,26 @@ export async function atualizarSessao(request: NextRequest) {
     url.pathname = "/";
     url.search = "";
     return NextResponse.redirect(url);
+  }
+
+  // Quem acabou de assinar (signUp) ainda não tem organização — o perfil
+  // nasce com organizacao_id nulo (migration 43) até passar por
+  // /onboarding (organização nova) ou /convite/<token> (entrar numa
+  // existente). Sem essa trava a pessoa cairia em "/" e toda consulta
+  // com RLS por organização voltaria vazia, sem explicar por quê.
+  if (user && !publica && pathname !== "/onboarding") {
+    const { data: perfil } = await supabase
+      .from("perfis")
+      .select("organizacao_id")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (perfil && perfil.organizacao_id === null) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/onboarding";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

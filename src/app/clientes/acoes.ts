@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { organizacaoIdDoUsuario } from "@/lib/supabase/perfil";
 import { criarNegociacao } from "@/app/funil/acoes";
 import { checarDuplicidade } from "@/lib/clientes/duplicidade";
 import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
@@ -66,6 +67,7 @@ export async function criarCliente(
         email,
         telefone,
         criado_por: user.id,
+        organizacao_id: await organizacaoIdDoUsuario(supabase, user.id),
       })
       .select("id")
       .single();
