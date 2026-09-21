@@ -369,6 +369,8 @@ export interface Configuracoes {
   alertar_parcela_atrasada: boolean;
   alertar_proposta_vencendo: boolean;
   dias_aviso_proposta_vencendo: number;
+  /** Hrefs escondidos do menu (ex.: ["/mapa"]) — cortesia de interface. */
+  menu_oculto: string[];
 }
 
 /** Contrato com tudo que a tela de acompanhamento precisa. */

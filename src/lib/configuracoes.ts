@@ -22,6 +22,7 @@ const PADRAO: Configuracoes = {
   alertar_parcela_atrasada: true,
   alertar_proposta_vencendo: true,
   dias_aviso_proposta_vencendo: 7,
+  menu_oculto: [],
 };
 
 const COLUNAS = Object.keys(PADRAO).join(", ");

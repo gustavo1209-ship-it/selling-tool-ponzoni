@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { COOKIE_TEMA, lerTema } from "@/lib/tema";
+import { ITENS_MENU_OPCIONAIS } from "@/lib/menu";
 import SairBotao from "./SairBotao";
 import TemaBotao from "./TemaBotao";
 
@@ -14,16 +15,9 @@ import TemaBotao from "./TemaBotao";
  * precisa caber sem rolagem. "Mapa" e "Espelho" já dizem o que são dentro da
  * própria ferramenta — o "de lotes" e o "de vendas" só ocupavam largura.
  */
-const LINKS = [
+const LINKS: { href: string; rotulo: string; soAdmin?: boolean }[] = [
   { href: "/", rotulo: "Início" },
-  { href: "/mapa", rotulo: "Mapa" },
-  { href: "/espelho", rotulo: "Espelho" },
-  { href: "/funil", rotulo: "Funil" },
-  { href: "/propostas", rotulo: "Propostas" },
-  { href: "/contratos", rotulo: "Contratos" },
-  { href: "/cobranca", rotulo: "A receber" },
-  { href: "/clientes", rotulo: "Clientes" },
-  { href: "/indices", rotulo: "Índices" },
+  ...ITENS_MENU_OPCIONAIS,
   { href: "/admin", rotulo: "Admin", soAdmin: true },
 ];
 
@@ -53,6 +47,13 @@ export default async function Cabecalho() {
         .eq("id", perfil.organizacao_id)
         .maybeSingle()
     : { data: null };
+
+  // Cada organização esconde o que não usa (Admin > Configurações > Menu) —
+  // cortesia de interface, a RLS continua sendo quem separa de verdade.
+  const { data: config } = perfil?.organizacao_id
+    ? await supabase.from("configuracoes").select("menu_oculto").maybeSingle()
+    : { data: null };
+  const ocultos = new Set(config?.menu_oculto ?? []);
 
   return (
     <header className="bg-superficie border-b border-linha sticky top-0 z-30">
@@ -88,7 +89,9 @@ export default async function Cabecalho() {
         </Link>
 
         <nav className="order-3 w-full lg:order-none lg:w-auto lg:flex-1 flex flex-wrap items-center gap-x-0.5 gap-y-1">
-          {LINKS.filter((l) => !l.soAdmin || perfil?.papel === "admin").map((l) => (
+          {LINKS.filter(
+            (l) => (!l.soAdmin || perfil?.papel === "admin") && !ocultos.has(l.href)
+          ).map((l) => (
             <Link
               key={l.href}
               href={l.href}

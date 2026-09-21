@@ -6,6 +6,7 @@ import { Check } from "lucide-react";
 import { atualizarConfiguracoes } from "@/app/admin/acoes";
 import CampoNumero from "./CampoNumero";
 import { mensagemDeFalha } from "@/lib/erros";
+import { ITENS_MENU_OPCIONAIS } from "@/lib/menu";
 import type { Configuracoes, NivelDuplicidadeCliente } from "@/lib/db/tipos";
 
 function Toggle({
@@ -232,6 +233,35 @@ export default function ConfiguracoesForm({
           marcado={cfg.corretor_ve_preco_vendido}
           aoMudar={(v) => setCfg({ ...cfg, corretor_ve_preco_vendido: v })}
         />
+      </Secao>
+
+      <Secao titulo="Menu">
+        <p className="text-xs text-cinza -mt-1 mb-1">
+          Some do menu de todo mundo (admin e corretor) — quem já tem o link salvo, ou
+          digita a URL direto, continua entrando normalmente.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {ITENS_MENU_OPCIONAIS.map((item) => (
+            <label
+              key={item.href}
+              className="flex items-center gap-2 text-sm rounded-md border border-linha px-3 py-2 cursor-pointer hover:bg-papel-alt"
+            >
+              <input
+                type="checkbox"
+                checked={!cfg.menu_oculto.includes(item.href)}
+                onChange={(e) =>
+                  setCfg({
+                    ...cfg,
+                    menu_oculto: e.target.checked
+                      ? cfg.menu_oculto.filter((h) => h !== item.href)
+                      : [...cfg.menu_oculto, item.href],
+                  })
+                }
+              />
+              {item.rotulo}
+            </label>
+          ))}
+        </div>
       </Secao>
 
       <Secao titulo="Alertas dentro do app">
