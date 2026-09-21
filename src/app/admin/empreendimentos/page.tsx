@@ -7,6 +7,7 @@ import type {
   CondicaoPagamento,
   Empreendimento,
   IndexadorRef,
+  Lote,
   TabelaPreco,
 } from "@/lib/db/tipos";
 
@@ -45,6 +46,15 @@ export default async function AdminEmpreendimentosPage() {
     if (!vigentes.has(t.empreendimento_id)) vigentes.set(t.empreendimento_id, t);
   }
 
+  // imóvel único não passa pelo espelho — o lote (só um) é editado direto
+  // nesta tela, então precisa vir junto.
+  const idsImovelUnico = (empreendimentos ?? [])
+    .filter((e) => e.imovel_unico)
+    .map((e) => e.id);
+  const { data: lotesUnicos } = idsImovelUnico.length
+    ? await supabase.from("lotes").select("*").in("empreendimento_id", idsImovelUnico)
+    : { data: [] };
+
   return (
     <>
       <Cabecalho />
@@ -54,6 +64,7 @@ export default async function AdminEmpreendimentosPage() {
           tabelas={[...vigentes.values()]}
           condicoes={(condicoes ?? []) as unknown as CondicaoPagamento[]}
           indexadores={(indexadores ?? []) as unknown as IndexadorRef[]}
+          lotesUnicos={(lotesUnicos ?? []) as Lote[]}
         />
       </main>
     </>

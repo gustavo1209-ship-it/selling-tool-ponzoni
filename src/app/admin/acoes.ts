@@ -65,6 +65,20 @@ export interface DadosEmpreendimento {
   cor_primaria: string;
   cor_secundaria: string;
   ativo: boolean;
+  /** true = casa/apartamento único; false (padrão) = loteamento com espelho. */
+  imovel_unico: boolean;
+}
+
+/**
+ * Área, área construída, preço e descrição de um empreendimento
+ * `imovel_unico` — os únicos campos que fariam sentido preencher pela
+ * planilha do Sheets num loteamento, aqui vêm direto na tela.
+ */
+export interface DadosLoteUnico {
+  area_m2: number;
+  area_construida_m2: number | null;
+  preco_tabela: number | null;
+  descricao: string | null;
 }
 
 /**
@@ -74,7 +88,8 @@ export interface DadosEmpreendimento {
  * quebrar o link que alguém salvou.
  */
 export async function criarEmpreendimento(
-  dados: DadosEmpreendimento
+  dados: DadosEmpreendimento,
+  loteUnico?: DadosLoteUnico
 ): Promise<ResultadoAcao<{ id: string; slug: string }>> {
   return comoResultado(async () => {
     const { supabase, organizacaoId } = await exigirAdmin();
@@ -101,9 +116,91 @@ export async function criarEmpreendimento(
       .single();
     if (error) throw new Error(error.message);
 
+    // imóvel único já nasce com o lote que ele é — sem isso a proposta não
+    // teria o que vender até alguém passar por /espelho, que nem existe
+    // pra esse caso.
+    if (dados.imovel_unico && loteUnico) {
+      const { error: erroLote } = await supabase.from("lotes").insert({
+        empreendimento_id: data.id,
+        quadra: "ÚNICO",
+        numero: "1",
+        area_m2: loteUnico.area_m2,
+        area_construida_m2: loteUnico.area_construida_m2,
+        preco_tabela: loteUnico.preco_tabela,
+        descricao: loteUnico.descricao,
+        status: "livre",
+      });
+      if (erroLote) throw new Error(erroLote.message);
+    }
+
     revalidatePath("/admin/empreendimentos");
     revalidatePath("/");
     return { id: data.id as string, slug: data.slug as string };
+  });
+}
+
+/**
+ * Edita o lote único de um empreendimento `imovel_unico`. Não existe
+ * escolha de qual lote — por definição só tem um.
+ */
+export async function atualizarLoteUnico(
+  empreendimentoId: string,
+  dados: DadosLoteUnico
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
+
+    const { error } = await supabase
+      .from("lotes")
+      .update({
+        area_m2: dados.area_m2,
+        area_construida_m2: dados.area_construida_m2,
+        preco_tabela: dados.preco_tabela,
+        descricao: dados.descricao,
+      })
+      .eq("empreendimento_id", empreendimentoId);
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/empreendimentos");
+    revalidatePath("/espelho");
+    return {};
+  });
+}
+
+/**
+ * Foto do imóvel, no mesmo campo que a folha da proposta já desenha
+ * (`mapa_imagem_url`) — pro loteamento é a foto aérea; pra imóvel único, a
+ * foto da fachada/imóvel. Sobe pro bucket `empreendimentos`, mesmo
+ * mecanismo do upload de marca (migration 42/48).
+ */
+export async function atualizarFotoEmpreendimento(
+  empreendimentoId: string,
+  formData: FormData
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase, organizacaoId } = await exigirAdmin();
+
+    const arquivo = formData.get("foto") as File | null;
+    if (!arquivo || arquivo.size === 0) throw new Error("Escolha um arquivo de imagem.");
+
+    const ext = arquivo.name.split(".").pop() || "jpg";
+    const caminho = `${organizacaoId}/${empreendimentoId}/foto.${ext}`;
+    const { error: erroUpload } = await supabase.storage
+      .from("empreendimentos")
+      .upload(caminho, arquivo, { upsert: true, contentType: arquivo.type });
+    if (erroUpload) throw new Error(erroUpload.message);
+
+    const { data: publica } = supabase.storage.from("empreendimentos").getPublicUrl(caminho);
+    const mapa_imagem_url = `${publica.publicUrl}?v=${Date.now()}`;
+
+    const { error } = await supabase
+      .from("empreendimentos")
+      .update({ mapa_imagem_url })
+      .eq("id", empreendimentoId);
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/empreendimentos");
+    return {};
   });
 }
 
@@ -144,6 +241,7 @@ function normalizar(d: DadosEmpreendimento) {
     cor_primaria: d.cor_primaria,
     cor_secundaria: d.cor_secundaria,
     ativo: d.ativo,
+    imovel_unico: d.imovel_unico,
   };
 }
 

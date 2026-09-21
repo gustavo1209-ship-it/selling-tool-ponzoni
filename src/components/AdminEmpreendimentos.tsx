@@ -17,10 +17,13 @@ import {
   apagarCondicao,
   atualizarCondicao,
   atualizarEmpreendimento,
+  atualizarFotoEmpreendimento,
+  atualizarLoteUnico,
   criarCondicao,
   criarEmpreendimento,
   salvarTabelaPreco,
   type DadosEmpreendimento,
+  type DadosLoteUnico,
 } from "@/app/admin/acoes";
 import { hojeISO } from "@/lib/contratos/mes";
 import type {
@@ -28,6 +31,7 @@ import type {
   CondicaoPagamento,
   Empreendimento,
   IndexadorRef,
+  Lote,
   TabelaPreco,
 } from "@/lib/db/tipos";
 import { mensagemDeFalha } from "@/lib/erros";
@@ -47,6 +51,14 @@ const VAZIO: DadosEmpreendimento = {
   cor_primaria: "#7C2A28",
   cor_secundaria: "#E0A221",
   ativo: true,
+  imovel_unico: false,
+};
+
+const LOTE_UNICO_VAZIO: DadosLoteUnico = {
+  area_m2: 0,
+  area_construida_m2: null,
+  preco_tabela: null,
+  descricao: null,
 };
 
 /**
@@ -65,11 +77,13 @@ export default function AdminEmpreendimentos({
   tabelas,
   condicoes,
   indexadores,
+  lotesUnicos,
 }: {
   empreendimentos: Empreendimento[];
   tabelas: TabelaPreco[];
   condicoes: CondicaoPagamento[];
   indexadores: IndexadorRef[];
+  lotesUnicos: Lote[];
 }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
@@ -78,6 +92,7 @@ export default function AdminEmpreendimentos({
 
   const [novo, setNovo] = useState(false);
   const [rascunho, setRascunho] = useState<DadosEmpreendimento>(VAZIO);
+  const [loteUnico, setLoteUnico] = useState<DadosLoteUnico>(LOTE_UNICO_VAZIO);
   const [aberto, setAberto] = useState<string | null>(null);
 
   function agir(fn: () => Promise<unknown>) {
@@ -107,6 +122,7 @@ export default function AdminEmpreendimentos({
           className="btn btn-primario"
           onClick={() => {
             setRascunho(VAZIO);
+            setLoteUnico(LOTE_UNICO_VAZIO);
             setNovo((n) => !n);
           }}
         >
@@ -133,18 +149,78 @@ export default function AdminEmpreendimentos({
               <X size={15} />
             </button>
           </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={rascunho.imovel_unico}
+              onChange={(e) =>
+                setRascunho({ ...rascunho, imovel_unico: e.target.checked })
+              }
+            />
+            Imóvel único (casa, apartamento) — sem espelho de vendas, cadastro direto
+          </label>
+
           <CamposEmpreendimento dados={rascunho} aoMudar={setRascunho} />
+
+          {rascunho.imovel_unico && (
+            <div className="border-t border-linha pt-4 flex flex-col gap-3">
+              <h3 className="eyebrow">O imóvel</h3>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div>
+                  <label className="rotulo">Área do terreno (m²)</label>
+                  <CampoNumero
+                    valor={loteUnico.area_m2}
+                    aoMudar={(v) => setLoteUnico({ ...loteUnico, area_m2: v ?? 0 })}
+                    casas={2}
+                  />
+                </div>
+                <div>
+                  <label className="rotulo">Área construída (m²)</label>
+                  <CampoNumero
+                    valor={loteUnico.area_construida_m2 ?? 0}
+                    aoMudar={(v) => setLoteUnico({ ...loteUnico, area_construida_m2: v })}
+                    casas={2}
+                  />
+                </div>
+                <div>
+                  <label className="rotulo">Preço</label>
+                  <CampoNumero
+                    valor={loteUnico.preco_tabela ?? 0}
+                    aoMudar={(v) => setLoteUnico({ ...loteUnico, preco_tabela: v })}
+                    casas={2}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="rotulo">Descrição (características, acabamentos)</label>
+                <textarea
+                  className="campo"
+                  rows={3}
+                  value={loteUnico.descricao ?? ""}
+                  onChange={(e) =>
+                    setLoteUnico({ ...loteUnico, descricao: e.target.value || null })
+                  }
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-2">
             <button
               className="btn btn-primario"
               disabled={pendente}
               onClick={() =>
                 agir(async () => {
-                  const resultado = await criarEmpreendimento(rascunho);
+                  const resultado = await criarEmpreendimento(
+                    rascunho,
+                    rascunho.imovel_unico ? loteUnico : undefined
+                  );
                   if (!resultado.ok) throw new Error(resultado.erro);
                   setNovo(false);
                   setRecado(
-                    `Empreendimento criado com o endereço "${resultado.slug}". Falta a tabela de preço, as condições e o primeiro Sincronizar.`
+                    rascunho.imovel_unico
+                      ? `Empreendimento criado com o endereço "${resultado.slug}". Falta a tabela de preço e as condições.`
+                      : `Empreendimento criado com o endereço "${resultado.slug}". Falta a tabela de preço, as condições e o primeiro Sincronizar.`
                   );
                 })
               }
@@ -197,6 +273,7 @@ export default function AdminEmpreendimentos({
               <div className="border-t border-linha p-5 flex flex-col gap-6">
                 <EditorEmpreendimento
                   empreendimento={e}
+                  loteUnico={lotesUnicos.find((l) => l.empreendimento_id === e.id) ?? null}
                   pendente={pendente}
                   agir={agir}
                   aoSincronizar={setRecado}
@@ -358,15 +435,10 @@ function CamposEmpreendimento({
           placeholder="/logo-meu-empreendimento.png"
         />
       </div>
-      <div className="sm:col-span-2">
-        <label className="rotulo">Foto aérea da proposta (arquivo em public/)</label>
-        <input
-          className="campo"
-          value={dados.mapa_imagem_url ?? ""}
-          onChange={(ev) => mudar({ mapa_imagem_url: ev.target.value })}
-          placeholder="/mapa-meu-empreendimento.jpg"
-        />
-      </div>
+      <p className="sm:col-span-2 text-xs text-cinza -mt-1">
+        A foto do empreendimento (aérea ou do imóvel) se sobe depois de criar o cadastro —
+        o upload aparece na tela de edição.
+      </p>
 
       <label className="flex items-center gap-2 text-sm">
         <input
@@ -384,11 +456,13 @@ function CamposEmpreendimento({
 
 function EditorEmpreendimento({
   empreendimento,
+  loteUnico,
   pendente,
   agir,
   aoSincronizar,
 }: {
   empreendimento: Empreendimento;
+  loteUnico: Lote | null;
   pendente: boolean;
   agir: (fn: () => Promise<unknown>) => void;
   aoSincronizar: (texto: string) => void;
@@ -406,11 +480,27 @@ function EditorEmpreendimento({
     cor_primaria: empreendimento.cor_primaria,
     cor_secundaria: empreendimento.cor_secundaria,
     ativo: empreendimento.ativo,
+    imovel_unico: empreendimento.imovel_unico,
+  });
+  const [imovel, setImovel] = useState<DadosLoteUnico>({
+    area_m2: loteUnico?.area_m2 ?? 0,
+    area_construida_m2: loteUnico?.area_construida_m2 ?? null,
+    preco_tabela: loteUnico?.preco_tabela ?? null,
+    descricao: loteUnico?.descricao ?? null,
   });
   const [sincronizando, setSincronizando] = useState(false);
   const [colarAberto, setColarAberto] = useState(false);
   const [textoColado, setTextoColado] = useState("");
   const [colando, setColando] = useState(false);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+
+  async function enviarFoto(arquivo: File) {
+    setEnviandoFoto(true);
+    const formData = new FormData();
+    formData.append("foto", arquivo);
+    agir(() => atualizarFotoEmpreendimento(empreendimento.id, formData));
+    setEnviandoFoto(false);
+  }
 
   async function chamarSync(corpoExtra: Record<string, unknown>) {
     const r = await fetch("/api/espelho/sync", {
@@ -452,6 +542,33 @@ function EditorEmpreendimento({
     <div className="flex flex-col gap-3">
       <h3 className="eyebrow">Cadastro</h3>
       <CamposEmpreendimento dados={dados} aoMudar={setDados} />
+
+      <div className="sm:col-span-2">
+        <label className="rotulo">
+          {dados.imovel_unico ? "Foto do imóvel" : "Foto aérea da proposta"}
+        </label>
+        <div className="flex items-center gap-3">
+          {empreendimento.mapa_imagem_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={empreendimento.mapa_imagem_url}
+              alt=""
+              className="w-16 h-16 rounded object-cover"
+            />
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            className="campo"
+            disabled={enviandoFoto || pendente}
+            onChange={(e) => {
+              const arquivo = e.target.files?.[0];
+              if (arquivo) enviarFoto(arquivo);
+            }}
+          />
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <button
           className="btn btn-primario"
@@ -460,29 +577,81 @@ function EditorEmpreendimento({
         >
           <Check size={15} /> Salvar cadastro
         </button>
-        <button
-          className="btn btn-secundario"
-          disabled={sincronizando || !empreendimento.espelho_csv_url}
-          onClick={sincronizar}
-          title={
-            empreendimento.espelho_csv_url
-              ? "Lê a planilha e cria ou atualiza os lotes"
-              : "Salve o CSV do espelho antes"
-          }
-        >
-          <RefreshCw size={15} className={sincronizando ? "animate-spin" : ""} />
-          {sincronizando ? "Sincronizando…" : "Sincronizar lotes com o Sheets"}
-        </button>
-        <button
-          type="button"
-          className="btn btn-fantasma"
-          onClick={() => setColarAberto((v) => !v)}
-        >
-          {colarAberto ? "Fechar" : "Sem Google Sheets? Colar lista de lotes"}
-        </button>
+        {!dados.imovel_unico && (
+          <>
+            <button
+              className="btn btn-secundario"
+              disabled={sincronizando || !empreendimento.espelho_csv_url}
+              onClick={sincronizar}
+              title={
+                empreendimento.espelho_csv_url
+                  ? "Lê a planilha e cria ou atualiza os lotes"
+                  : "Salve o CSV do espelho antes"
+              }
+            >
+              <RefreshCw size={15} className={sincronizando ? "animate-spin" : ""} />
+              {sincronizando ? "Sincronizando…" : "Sincronizar lotes com o Sheets"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-fantasma"
+              onClick={() => setColarAberto((v) => !v)}
+            >
+              {colarAberto ? "Fechar" : "Sem Google Sheets? Colar lista de lotes"}
+            </button>
+          </>
+        )}
       </div>
 
-      {colarAberto && (
+      {dados.imovel_unico && (
+        <div className="border-t border-linha pt-4 flex flex-col gap-3">
+          <h3 className="eyebrow">O imóvel</h3>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div>
+              <label className="rotulo">Área do terreno (m²)</label>
+              <CampoNumero
+                valor={imovel.area_m2}
+                aoMudar={(v) => setImovel({ ...imovel, area_m2: v ?? 0 })}
+                casas={2}
+              />
+            </div>
+            <div>
+              <label className="rotulo">Área construída (m²)</label>
+              <CampoNumero
+                valor={imovel.area_construida_m2 ?? 0}
+                aoMudar={(v) => setImovel({ ...imovel, area_construida_m2: v })}
+                casas={2}
+              />
+            </div>
+            <div>
+              <label className="rotulo">Preço</label>
+              <CampoNumero
+                valor={imovel.preco_tabela ?? 0}
+                aoMudar={(v) => setImovel({ ...imovel, preco_tabela: v })}
+                casas={2}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="rotulo">Descrição (características, acabamentos)</label>
+            <textarea
+              className="campo"
+              rows={3}
+              value={imovel.descricao ?? ""}
+              onChange={(e) => setImovel({ ...imovel, descricao: e.target.value || null })}
+            />
+          </div>
+          <button
+            className="btn btn-primario self-start"
+            disabled={pendente}
+            onClick={() => agir(() => atualizarLoteUnico(empreendimento.id, imovel))}
+          >
+            <Check size={15} /> Salvar o imóvel
+          </button>
+        </div>
+      )}
+
+      {colarAberto && !dados.imovel_unico && (
         <div className="border-t border-linha pt-3 flex flex-col gap-2">
           <p className="text-xs text-cinza">
             Cole aqui uma tabela com as colunas <strong>Quadra</strong>, <strong>Lote</strong>,{" "}

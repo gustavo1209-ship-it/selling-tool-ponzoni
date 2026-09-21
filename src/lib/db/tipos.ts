@@ -37,6 +37,8 @@ export interface Empreendimento {
   cor_primaria: string;
   cor_secundaria: string;
   ativo: boolean;
+  /** true = casa/apartamento único, cadastro direto sem espelho. false = loteamento. */
+  imovel_unico: boolean;
 }
 
 export type CampanhaModo = "substituir" | "somar";
@@ -67,12 +69,16 @@ export interface Lote {
   quadra: string;
   numero: string;
   area_m2: number;
+  /** Área construída, distinta do terreno (area_m2). Só usada em imóvel único. */
+  area_construida_m2: number | null;
   preco_tabela: number | null;
   status: LoteStatus;
   /** Zoneamento do lote no espelho: "Residencial", "Misto I", "Misto II". */
   tipo: string | null;
   comprador: string | null;
   observacao: string | null;
+  /** Texto livre de marketing (características, acabamentos). */
+  descricao: string | null;
   atualizado_em: string;
 }
 
