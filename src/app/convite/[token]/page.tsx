@@ -30,6 +30,7 @@ export default function ConvitePage({
 
   const [info, setInfo] = useState<InfoConvite | null | undefined>(undefined);
   const [logado, setLogado] = useState<boolean | null>(null);
+  const [modo, setModo] = useState<"cadastro" | "entrar">("cadastro");
   const [nome, setNome] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -67,6 +68,15 @@ export default function ConvitePage({
       options: { data: { nome } },
     });
     if (erroCadastro) {
+      // Conta já existe (comum enquanto o e-mail de confirmação não está de
+      // pé: a conta nasce criada na mão, pelo painel do Supabase) — em vez
+      // de travar aqui, oferece entrar com a senha que já foi combinada.
+      if (/User already registered/i.test(erroCadastro.message)) {
+        setModo("entrar");
+        setErro("Essa conta já existe. Entre com a senha que você recebeu.");
+        setEnviando(false);
+        return;
+      }
       setErro(traduzir(erroCadastro.message));
       setEnviando(false);
       return;
@@ -78,6 +88,23 @@ export default function ConvitePage({
       setErro(
         "Conta criada. Confirme seu e-mail e volte a abrir este mesmo link para entrar na organização."
       );
+      setEnviando(false);
+      return;
+    }
+    await aceitar();
+  }
+
+  async function entrarEAceitar(e: React.FormEvent) {
+    e.preventDefault();
+    if (!info) return;
+    setErro(null);
+    setEnviando(true);
+    const { error: erroLogin } = await supabase.auth.signInWithPassword({
+      email: info.email,
+      password: senha,
+    });
+    if (erroLogin) {
+      setErro(traduzir(erroLogin.message));
       setEnviando(false);
       return;
     }
@@ -137,6 +164,37 @@ export default function ConvitePage({
               >
                 {enviando ? "Entrando…" : `Entrar em ${info.organizacao_nome}`}
               </button>
+            ) : modo === "entrar" ? (
+              <form onSubmit={entrarEAceitar} className="flex flex-col gap-4">
+                <div>
+                  <label className="rotulo" htmlFor="senha-entrar">
+                    Senha
+                  </label>
+                  <input
+                    id="senha-entrar"
+                    type="password"
+                    className="campo"
+                    value={senha}
+                    onChange={(e) => setSenha(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                    autoFocus
+                  />
+                </div>
+                <button className="btn btn-primario w-full" disabled={enviando}>
+                  {enviando ? "Entrando…" : `Entrar em ${info.organizacao_nome}`}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-fantasma w-full"
+                  onClick={() => {
+                    setModo("cadastro");
+                    setErro(null);
+                  }}
+                >
+                  Na verdade, ainda não tenho conta
+                </button>
+              </form>
             ) : (
               <form onSubmit={cadastrarEAceitar} className="flex flex-col gap-4">
                 <div>
@@ -170,6 +228,16 @@ export default function ConvitePage({
                 <button className="btn btn-primario w-full" disabled={enviando}>
                   {enviando ? "Aguarde…" : "Criar conta e entrar"}
                 </button>
+                <button
+                  type="button"
+                  className="btn btn-fantasma w-full"
+                  onClick={() => {
+                    setModo("entrar");
+                    setErro(null);
+                  }}
+                >
+                  Já tenho conta com esse e-mail
+                </button>
               </form>
             )}
           </div>
@@ -183,6 +251,10 @@ function traduzir(mensagem: string): string {
   if (/Password should be/i.test(mensagem)) return "A senha precisa de ao menos 6 caracteres.";
   if (/User already registered/i.test(mensagem)) {
     return "Já existe conta com esse e-mail — entre em /login e volte a abrir este link.";
+  }
+  if (/Invalid login credentials/i.test(mensagem)) return "Senha incorreta.";
+  if (/Email not confirmed/i.test(mensagem)) {
+    return "Essa conta ainda não teve o e-mail confirmado. Peça pra quem administra confirmar pelo painel do Supabase.";
   }
   if (/já pertence a uma organiza/i.test(mensagem)) return mensagem;
   if (/Convite/i.test(mensagem)) return mensagem;

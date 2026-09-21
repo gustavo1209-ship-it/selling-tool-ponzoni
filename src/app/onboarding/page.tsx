@@ -1,11 +1,21 @@
 import { redirect } from "next/navigation";
 import { perfilAtual } from "@/lib/supabase/perfil";
+import { createClient } from "@/lib/supabase/server";
 import OnboardingForm from "./OnboardingForm";
 
 export default async function OnboardingPage() {
   const perfil = await perfilAtual();
   if (!perfil) redirect("/login");
   if (perfil.organizacaoId) redirect("/");
+
+  // Quem tem convite pendente vai direto aceitar ele, nunca vê o formulário
+  // de "criar organização" — sem essa checagem, alguém que loga direto em
+  // vez de abrir o link do convite (aconteceu na prática) cria uma
+  // organização própria por engano em vez de entrar na do time que a
+  // convidou.
+  const supabase = await createClient();
+  const { data: token } = await supabase.rpc("meu_convite_pendente");
+  if (token) redirect(`/convite/${token}`);
 
   return (
     <main className="min-h-dvh grid place-items-center px-5 py-12">
