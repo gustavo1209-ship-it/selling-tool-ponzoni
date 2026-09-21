@@ -217,10 +217,11 @@ export default function AdminEmpreendimentos({
                   );
                   if (!resultado.ok) throw new Error(resultado.erro);
                   setNovo(false);
+                  setAberto(resultado.id);
                   setRecado(
                     rascunho.imovel_unico
-                      ? `Empreendimento criado com o endereço "${resultado.slug}". Falta a tabela de preço e as condições.`
-                      : `Empreendimento criado com o endereço "${resultado.slug}". Falta a tabela de preço, as condições e o primeiro Sincronizar.`
+                      ? `Empreendimento criado com o endereço "${resultado.slug}" — já aberto abaixo, é onde fica o upload da foto. Falta a tabela de preço e as condições.`
+                      : `Empreendimento criado com o endereço "${resultado.slug}" — já aberto abaixo, é onde fica o upload da foto. Falta a tabela de preço, as condições e o primeiro Sincronizar.`
                   );
                 })
               }
@@ -436,8 +437,8 @@ function CamposEmpreendimento({
         />
       </div>
       <p className="sm:col-span-2 text-xs text-cinza -mt-1">
-        A foto do empreendimento (aérea ou do imóvel) se sobe depois de criar o cadastro —
-        o upload aparece na tela de edição.
+        A foto do empreendimento (aérea ou do imóvel) se sobe depois de criar o cadastro:
+        clique no nome dele na lista abaixo pra abrir o card e o upload aparece lá.
       </p>
 
       <label className="flex items-center gap-2 text-sm">
