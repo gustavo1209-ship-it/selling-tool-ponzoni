@@ -100,11 +100,39 @@ export default function MapaDaProposta({
   proporcao?: number;
 }) {
   const mapa = mapaDe(slug);
-  if (!mapa) return null;
+
+  // Sem geometria extraída (`npm run mapa:extrair`) — caso de todo
+  // empreendimento novo, e o único caso possível pra imóvel único, que não
+  // tem "destacar um lote entre vários" — mostra a foto direta, sem SVG.
+  if (!mapa) {
+    return (
+      <div className="mapa-proposta">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imagem}
+          alt="Foto do empreendimento"
+          className="mapa-principal"
+          style={{ objectFit: "cover" }}
+        />
+      </div>
+    );
+  }
 
   const ids = new Set(lotes.map((l) => idDoMapa(l.quadra, l.numero)));
   const destacados = mapa.lotes.filter((l) => ids.has(l.id));
-  if (destacados.length === 0) return null;
+  if (destacados.length === 0) {
+    return (
+      <div className="mapa-proposta">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imagem}
+          alt="Foto do empreendimento"
+          className="mapa-principal"
+          style={{ objectFit: "cover" }}
+        />
+      </div>
+    );
+  }
 
   const caixa = enquadrar(destacados, proporcao, mapa);
   // o rótulo tem de continuar legível depois do recorte, então acompanha o zoom
