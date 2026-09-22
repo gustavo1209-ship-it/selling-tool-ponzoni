@@ -170,10 +170,11 @@ export async function atualizarLoteUnico(
 const MAX_FOTOS = 5;
 
 /**
- * Galeria de fotos do empreendimento — até 5, cada uma podendo virar "a
- * foto da proposta" e/ou "a foto do contrato" (empreendimentos.foto_
- * proposta_id/foto_contrato_id). Sem escolha nenhuma feita, a folha usa a
- * primeira por ordem — ver os selects nas páginas de impressão.
+ * Galeria de fotos do empreendimento — até 5, cada uma podendo entrar na
+ * lista de até 3 fotos da proposta e/ou do contrato
+ * (empreendimentos.fotos_proposta_ids/fotos_contrato_ids). Sem escolha
+ * nenhuma feita, a folha usa só a primeira por ordem — ver os selects nas
+ * páginas de impressão.
  */
 export async function adicionarFotoEmpreendimento(
   empreendimentoId: string,
@@ -219,7 +220,7 @@ export async function adicionarFotoEmpreendimento(
     if ((count ?? 0) === 0) {
       await supabase
         .from("empreendimentos")
-        .update({ foto_proposta_id: data.id, foto_contrato_id: data.id })
+        .update({ fotos_proposta_ids: [data.id], fotos_contrato_ids: [data.id] })
         .eq("id", empreendimentoId);
     }
 
@@ -241,12 +242,32 @@ export async function apagarFotoEmpreendimento(fotoId: string): Promise<Resultad
 
     const { data: foto } = await supabase
       .from("empreendimento_fotos")
-      .select("url")
+      .select("url, empreendimento_id")
       .eq("id", fotoId)
       .maybeSingle();
 
     const { error } = await supabase.from("empreendimento_fotos").delete().eq("id", fotoId);
     if (error) throw new Error(error.message);
+
+    // arrays não têm FK — sem isso, um id apagado ficaria apontado em
+    // fotos_proposta_ids/fotos_contrato_ids e a folha tentaria mostrar uma
+    // foto que não existe mais.
+    if (foto?.empreendimento_id) {
+      const { data: emp } = await supabase
+        .from("empreendimentos")
+        .select("fotos_proposta_ids, fotos_contrato_ids")
+        .eq("id", foto.empreendimento_id)
+        .maybeSingle();
+      if (emp) {
+        await supabase
+          .from("empreendimentos")
+          .update({
+            fotos_proposta_ids: (emp.fotos_proposta_ids ?? []).filter((id: string) => id !== fotoId),
+            fotos_contrato_ids: (emp.fotos_contrato_ids ?? []).filter((id: string) => id !== fotoId),
+          })
+          .eq("id", foto.empreendimento_id);
+      }
+    }
 
     // best-effort: se o arquivo não sumir do storage não é motivo pra
     // reportar falha — a linha (que é o que importa pra tela) já foi.
@@ -258,15 +279,20 @@ export async function apagarFotoEmpreendimento(fotoId: string): Promise<Resultad
   });
 }
 
-export async function definirFotoProposta(
+const MAX_FOTOS_DOCUMENTO = 3;
+
+export async function definirFotosProposta(
   empreendimentoId: string,
-  fotoId: string | null
+  fotoIds: string[]
 ): Promise<ResultadoAcao> {
   return comoResultado(async () => {
     const { supabase } = await exigirAdmin();
+    if (fotoIds.length > MAX_FOTOS_DOCUMENTO) {
+      throw new Error(`No máximo ${MAX_FOTOS_DOCUMENTO} fotos na proposta.`);
+    }
     const { error } = await supabase
       .from("empreendimentos")
-      .update({ foto_proposta_id: fotoId })
+      .update({ fotos_proposta_ids: fotoIds })
       .eq("id", empreendimentoId);
     if (error) throw new Error(error.message);
     revalidatePath("/admin/empreendimentos");
@@ -274,15 +300,18 @@ export async function definirFotoProposta(
   });
 }
 
-export async function definirFotoContrato(
+export async function definirFotosContrato(
   empreendimentoId: string,
-  fotoId: string | null
+  fotoIds: string[]
 ): Promise<ResultadoAcao> {
   return comoResultado(async () => {
     const { supabase } = await exigirAdmin();
+    if (fotoIds.length > MAX_FOTOS_DOCUMENTO) {
+      throw new Error(`No máximo ${MAX_FOTOS_DOCUMENTO} fotos no contrato.`);
+    }
     const { error } = await supabase
       .from("empreendimentos")
-      .update({ foto_contrato_id: fotoId })
+      .update({ fotos_contrato_ids: fotoIds })
       .eq("id", empreendimentoId);
     if (error) throw new Error(error.message);
     revalidatePath("/admin/empreendimentos");

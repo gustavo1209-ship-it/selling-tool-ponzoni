@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, Printer } from "lucide-react";
-import MapaDaProposta from "./MapaDaProposta";
+import FotosDoDocumento from "./FotosDoDocumento";
 import type { MetricaParcela, Resultado } from "@/lib/calc/tipos";
 import type {
   Cliente,
@@ -165,15 +165,15 @@ export default function FolhaProposta({
   cliente,
   lotes,
   opcoes,
-  fotoUrl,
+  fotoUrls,
 }: {
   proposta: Proposta;
   empreendimento: Empreendimento;
   cliente: Cliente | null;
   lotes: PropostaLote[];
   opcoes: Opcao[];
-  /** Foto escolhida em Admin > Empreendimentos (empreendimentos.foto_proposta_id), ou a primeira da galeria. */
-  fotoUrl: string | null;
+  /** Até 3 fotos escolhidas em Admin > Empreendimentos (fotos_proposta_ids), ou a primeira da galeria. */
+  fotoUrls: string[];
 }) {
   const validade = new Date(`${proposta.data_base}T12:00:00`);
   validade.setDate(validade.getDate() + proposta.validade_dias);
@@ -308,24 +308,27 @@ export default function FolhaProposta({
           </table>
         </section>
 
-        {/* ----------------------------------------------------------- mapa */}
-        {fotoUrl && (
+        {/* ----------------------------------------------------------- fotos */}
+        {fotoUrls.length > 0 && (
           <section>
             <h2>
-              <span className="num-secao">{n()}</span> Localização no parque
+              <span className="num-secao">{n()}</span>{" "}
+              {fotoUrls.length === 1 ? "Localização no parque" : "Fotos"}
             </h2>
-            <MapaDaProposta
+            <FotosDoDocumento
               slug={empreendimento.slug}
               lotes={lotes}
-              imagem={fotoUrl}
+              urls={fotoUrls}
               corPreenchimento={empreendimento.cor_primaria}
               corContorno={empreendimento.cor_secundaria}
             />
-            <p className="texto nota" style={{ marginTop: "2.5mm" }}>
-              Em destaque, {lotes.length === 1 ? "o lote desta proposta" : "os lotes desta proposta"}.
-              Os demais contornos são as divisas do parque e não indicam
-              disponibilidade.
-            </p>
+            {fotoUrls.length === 1 && (
+              <p className="texto nota" style={{ marginTop: "2.5mm" }}>
+                Em destaque, {lotes.length === 1 ? "o lote desta proposta" : "os lotes desta proposta"}.
+                Os demais contornos são as divisas do parque e não indicam
+                disponibilidade.
+              </p>
+            )}
           </section>
         )}
 

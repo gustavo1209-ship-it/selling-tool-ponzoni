@@ -6,7 +6,7 @@ import { clarear, escurecer } from "@/lib/cores";
 import { colunasAtivas } from "@/lib/contratos/colunas";
 import { rotuloCompetencia } from "@/lib/contratos/mes";
 import type { ContratoCalculado, ParcelaCalculada } from "@/lib/contratos/tipos";
-import MapaDaProposta from "./MapaDaProposta";
+import FotosDoDocumento from "./FotosDoDocumento";
 import type {
   Cliente,
   Contrato,
@@ -44,15 +44,15 @@ export default function FolhaDemonstrativo({
   cliente,
   lotes,
   calculo,
-  fotoUrl,
+  fotoUrls,
 }: {
   contrato: Contrato;
   empreendimento: Empreendimento;
   cliente: Cliente | null;
   lotes: ContratoLote[];
   calculo: ContratoCalculado;
-  /** Foto escolhida em Admin > Empreendimentos (empreendimentos.foto_contrato_id), ou a primeira da galeria. */
-  fotoUrl: string | null;
+  /** Até 3 fotos escolhidas em Admin > Empreendimentos (fotos_contrato_ids), ou a primeira da galeria. */
+  fotoUrls: string[];
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR");
   const semCorrecao = contrato.indexador === "nenhum";
@@ -168,15 +168,16 @@ export default function FolhaDemonstrativo({
         </section>
 
         {/* -------------------------------------------------------- foto */}
-        {fotoUrl && (
+        {fotoUrls.length > 0 && (
           <section>
             <h2>
-              <span className="num-secao">2</span> Localização
+              <span className="num-secao">2</span>{" "}
+              {fotoUrls.length === 1 ? "Localização" : "Fotos"}
             </h2>
-            <MapaDaProposta
+            <FotosDoDocumento
               slug={empreendimento.slug}
               lotes={lotes}
-              imagem={fotoUrl}
+              urls={fotoUrls}
               corPreenchimento={empreendimento.cor_primaria}
               corContorno={empreendimento.cor_secundaria}
             />
@@ -186,7 +187,7 @@ export default function FolhaDemonstrativo({
         {/* ------------------------------------------------------ posição */}
         <section>
           <h2>
-            <span className="num-secao">{fotoUrl ? 3 : 2}</span> Posição atual
+            <span className="num-secao">{fotoUrls.length > 0 ? 3 : 2}</span> Posição atual
           </h2>
           <div className="totais">
             <div>
@@ -232,7 +233,7 @@ export default function FolhaDemonstrativo({
         {/* --------------------------------------------------- cronograma */}
         <section>
           <h2>
-            <span className="num-secao">{fotoUrl ? 4 : 3}</span> Cronograma
+            <span className="num-secao">{fotoUrls.length > 0 ? 4 : 3}</span> Cronograma
           </h2>
 
           {!semCorrecao && (

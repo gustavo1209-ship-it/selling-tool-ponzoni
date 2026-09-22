@@ -37,10 +37,10 @@ export interface Empreendimento {
   ativo: boolean;
   /** true = casa/apartamento único, cadastro direto sem espelho. false = loteamento. */
   imovel_unico: boolean;
-  /** Qual foto da galeria (empreendimento_fotos) sai na proposta. null = a primeira por ordem. */
-  foto_proposta_id: string | null;
-  /** Qual foto da galeria sai no demonstrativo de contrato. null = a primeira por ordem. */
-  foto_contrato_id: string | null;
+  /** Até 3 fotos da galeria (empreendimento_fotos), lado a lado na proposta. Vazio = a primeira por ordem. */
+  fotos_proposta_ids: string[];
+  /** Até 3 fotos da galeria, lado a lado no demonstrativo de contrato. Vazio = a primeira por ordem. */
+  fotos_contrato_ids: string[];
 }
 
 /** Uma foto da galeria de um empreendimento — até 5, escolhidas na tela de cadastro. */

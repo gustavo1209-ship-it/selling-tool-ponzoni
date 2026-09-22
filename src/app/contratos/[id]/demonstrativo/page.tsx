@@ -29,17 +29,21 @@ export default async function DemonstrativoPage({
   if (!data) notFound();
   const contrato = data as unknown as ContratoCompleto;
 
-  // Sem escolha em Admin > Empreendimentos (foto_contrato_id), cai na
+  // Sem escolha em Admin > Empreendimentos (fotos_contrato_ids), cai na
   // primeira foto da galeria por ordem.
   const { data: fotos } = await supabase
     .from("empreendimento_fotos")
     .select("id, url")
     .eq("empreendimento_id", contrato.empreendimento.id)
     .order("ordem");
-  const fotoUrl =
-    (fotos ?? []).find((f) => f.id === contrato.empreendimento.foto_contrato_id)?.url ??
-    fotos?.[0]?.url ??
-    null;
+  const escolhidas = contrato.empreendimento.fotos_contrato_ids.length
+    ? contrato.empreendimento.fotos_contrato_ids
+    : fotos?.[0]
+      ? [fotos[0].id]
+      : [];
+  const fotoUrls = escolhidas
+    .map((id) => (fotos ?? []).find((f) => f.id === id)?.url)
+    .filter((url): url is string => !!url);
 
   const { serie, taxa } = serieDe(indices, contrato.indexador);
   const calculo = calcularContrato(
@@ -64,7 +68,7 @@ export default async function DemonstrativoPage({
       cliente={contrato.cliente}
       lotes={[...contrato.lotes].sort((a, b) => a.ordem - b.ordem)}
       calculo={calculo}
-      fotoUrl={fotoUrl}
+      fotoUrls={fotoUrls}
     />
   );
 }

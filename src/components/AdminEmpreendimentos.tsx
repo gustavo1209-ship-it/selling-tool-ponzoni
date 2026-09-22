@@ -22,8 +22,8 @@ import {
   atualizarLoteUnico,
   criarCondicao,
   criarEmpreendimento,
-  definirFotoContrato,
-  definirFotoProposta,
+  definirFotosContrato,
+  definirFotosProposta,
   salvarTabelaPreco,
   type DadosEmpreendimento,
   type DadosLoteUnico,
@@ -562,8 +562,8 @@ function EditorEmpreendimento({
       <GaleriaFotos
         empreendimentoId={empreendimento.id}
         fotos={fotos}
-        fotoPropostaId={empreendimento.foto_proposta_id}
-        fotoContratoId={empreendimento.foto_contrato_id}
+        fotosPropostaIds={empreendimento.fotos_proposta_ids}
+        fotosContratoIds={empreendimento.fotos_contrato_ids}
         enviandoFoto={enviandoFoto}
         pendente={pendente}
         agir={agir}
@@ -685,17 +685,20 @@ function EditorEmpreendimento({
 
 /* --------------------------------------------------- galeria de fotos */
 
+const MAX_FOTOS_DOCUMENTO = 3;
+
 /**
- * Até 5 fotos por empreendimento. Cada uma pode virar "a foto da proposta"
- * e/ou "a foto do contrato" — os dois documentos podem usar fotos
- * diferentes, ou a mesma. Sem escolha nenhuma, a folha usa a primeira por
- * ordem (mesmo comportamento de antes, só que agora explícito na tela).
+ * Até 5 fotos por empreendimento. Cada uma pode entrar na lista de até 3
+ * fotos da proposta e/ou do contrato — os dois documentos podem usar fotos
+ * diferentes, as mesmas, ou qualquer combinação. Sem escolha nenhuma, a
+ * folha usa só a primeira por ordem (mesmo comportamento de antes, agora
+ * explícito na tela). Mais de uma foto sai lado a lado no documento.
  */
 function GaleriaFotos({
   empreendimentoId,
   fotos,
-  fotoPropostaId,
-  fotoContratoId,
+  fotosPropostaIds,
+  fotosContratoIds,
   enviandoFoto,
   pendente,
   agir,
@@ -703,20 +706,29 @@ function GaleriaFotos({
 }: {
   empreendimentoId: string;
   fotos: EmpreendimentoFoto[];
-  fotoPropostaId: string | null;
-  fotoContratoId: string | null;
+  fotosPropostaIds: string[];
+  fotosContratoIds: string[];
   enviandoFoto: boolean;
   pendente: boolean;
   agir: (fn: () => Promise<unknown>) => void;
   aoEnviar: (arquivo: File) => void;
 }) {
-  const padrao = fotos[0]?.id ?? null;
-  const propostaAtual = fotoPropostaId ?? padrao;
-  const contratoAtual = fotoContratoId ?? padrao;
+  const padrao = fotos[0] ? [fotos[0].id] : [];
+  const proposta = fotosPropostaIds.length ? fotosPropostaIds : padrao;
+  const contrato = fotosContratoIds.length ? fotosContratoIds : padrao;
+
+  function alternar(lista: string[], id: string): string[] | null {
+    if (lista.includes(id)) return lista.filter((x) => x !== id);
+    if (lista.length >= MAX_FOTOS_DOCUMENTO) return null; // no máximo, ignora o clique
+    return [...lista, id];
+  }
 
   return (
     <div className="sm:col-span-2 flex flex-col gap-2">
       <label className="rotulo">Fotos ({fotos.length}/5)</label>
+      <p className="text-xs text-cinza -mt-1">
+        Marque até {MAX_FOTOS_DOCUMENTO} pra cada documento — mais de uma sai lado a lado.
+      </p>
       {fotos.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {fotos.map((f) => (
@@ -726,21 +738,25 @@ function GaleriaFotos({
               <div className="flex flex-col gap-1 text-xs">
                 <label className="flex items-center gap-1.5 cursor-pointer">
                   <input
-                    type="radio"
-                    name={`foto-proposta-${empreendimentoId}`}
-                    checked={propostaAtual === f.id}
-                    onChange={() => agir(() => definirFotoProposta(empreendimentoId, f.id))}
-                    disabled={pendente}
+                    type="checkbox"
+                    checked={proposta.includes(f.id)}
+                    disabled={pendente || (!proposta.includes(f.id) && proposta.length >= MAX_FOTOS_DOCUMENTO)}
+                    onChange={() => {
+                      const nova = alternar(proposta, f.id);
+                      if (nova) agir(() => definirFotosProposta(empreendimentoId, nova));
+                    }}
                   />
                   Usar na proposta
                 </label>
                 <label className="flex items-center gap-1.5 cursor-pointer">
                   <input
-                    type="radio"
-                    name={`foto-contrato-${empreendimentoId}`}
-                    checked={contratoAtual === f.id}
-                    onChange={() => agir(() => definirFotoContrato(empreendimentoId, f.id))}
-                    disabled={pendente}
+                    type="checkbox"
+                    checked={contrato.includes(f.id)}
+                    disabled={pendente || (!contrato.includes(f.id) && contrato.length >= MAX_FOTOS_DOCUMENTO)}
+                    onChange={() => {
+                      const nova = alternar(contrato, f.id);
+                      if (nova) agir(() => definirFotosContrato(empreendimentoId, nova));
+                    }}
                   />
                   Usar no contrato
                 </label>
