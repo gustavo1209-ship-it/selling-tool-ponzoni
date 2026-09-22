@@ -582,6 +582,18 @@ h2 .num-secao{ color:var(--ouro); }
 .t-mini .indice{ color:var(--cinza); }
 .t-mini tr.vencida td{ background:#F5E0E0; color:var(--verm); }
 
+.mapa-proposta{ position:relative; }
+.mapa-principal{
+  display:block; width:100%; height:auto; aspect-ratio:16/9;
+  border-radius:1.5mm; overflow:hidden; background:var(--papel);
+}
+.mapa-mini{
+  position:absolute; right:3mm; bottom:3mm;
+  width:34mm; height:auto; aspect-ratio:3192/1858;
+  border:.5mm solid #fff; border-radius:1mm;
+  box-shadow:0 1mm 3mm rgba(0,0,0,.35);
+}
+
 .totais{ display:flex; gap:3mm; margin-top:1mm; }
 .totais > div{
   flex:1; border:.25mm solid var(--linha-forte); border-radius:1.5mm;
