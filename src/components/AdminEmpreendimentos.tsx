@@ -17,9 +17,11 @@ import {
   adicionarFotoEmpreendimento,
   apagarCondicao,
   apagarFotoEmpreendimento,
+  apagarMapaLocalizacao,
   atualizarCondicao,
   atualizarEmpreendimento,
   atualizarLoteUnico,
+  atualizarMapaLocalizacao,
   criarCondicao,
   criarEmpreendimento,
   definirFotosContrato,
@@ -56,6 +58,7 @@ const VAZIO: DadosEmpreendimento = {
   ativo: true,
   imovel_unico: false,
   mostrar_descricao_documento: true,
+  mostrar_localizacao_documento: true,
 };
 
 const LOTE_UNICO_VAZIO: DadosLoteUnico = {
@@ -481,8 +484,9 @@ function CamposEmpreendimento({
         />
       </div>
       <p className="sm:col-span-2 text-xs text-cinza -mt-1">
-        As fotos do empreendimento (até 5, aérea ou do imóvel) se sobem depois de criar o
-        cadastro: clique no nome dele na lista abaixo pra abrir o card e a galeria aparece lá.
+        As fotos do empreendimento (até 5, aérea ou do imóvel) e o mapa de localização (print
+        do Google Maps ou Apple Maps) se sobem depois de criar o cadastro: clique no nome dele
+        na lista abaixo pra abrir o card.
       </p>
 
       <label className="flex items-center gap-2 text-sm">
@@ -529,6 +533,7 @@ function EditorEmpreendimento({
     ativo: empreendimento.ativo,
     imovel_unico: empreendimento.imovel_unico,
     mostrar_descricao_documento: empreendimento.mostrar_descricao_documento,
+    mostrar_localizacao_documento: empreendimento.mostrar_localizacao_documento,
   });
   const [imovel, setImovel] = useState<DadosLoteUnico>({
     quadra: loteUnico?.quadra ?? "ÚNICO",
@@ -555,6 +560,21 @@ function EditorEmpreendimento({
       aoSincronizar(mensagemDeFalha(e));
     }
     setEnviandoFoto(false);
+  }
+
+  const [enviandoMapa, setEnviandoMapa] = useState(false);
+
+  async function enviarMapaLocalizacao(arquivo: File) {
+    setEnviandoMapa(true);
+    try {
+      const formData = new FormData();
+      formData.append("mapa", arquivo);
+      verificarResultado(await atualizarMapaLocalizacao(empreendimento.id, formData));
+      router.refresh();
+    } catch (e) {
+      aoSincronizar(mensagemDeFalha(e));
+    }
+    setEnviandoMapa(false);
   }
 
   async function chamarSync(corpoExtra: Record<string, unknown>) {
@@ -608,6 +628,55 @@ function EditorEmpreendimento({
         agir={agir}
         aoEnviar={enviarFoto}
       />
+
+      <div className="sm:col-span-2 flex flex-col gap-2 border-t border-linha pt-4">
+        <label className="rotulo">Mapa de localização (print do Google Maps ou Apple Maps)</label>
+        <div className="flex items-center gap-3">
+          {empreendimento.mapa_localizacao_url && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={empreendimento.mapa_localizacao_url}
+                alt=""
+                className="w-24 h-16 rounded object-cover"
+              />
+              <button
+                type="button"
+                className="btn btn-fantasma text-vermelho"
+                disabled={pendente}
+                onClick={() => agir(() => apagarMapaLocalizacao(empreendimento.id))}
+              >
+                <Trash2 size={13} /> Apagar
+              </button>
+            </>
+          )}
+        </div>
+        <input
+          type="file"
+          accept="image/*"
+          className="campo"
+          disabled={enviandoMapa || pendente}
+          onChange={(e) => {
+            const arquivo = e.target.files?.[0];
+            if (arquivo) enviarMapaLocalizacao(arquivo);
+            e.target.value = "";
+          }}
+        />
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={dados.mostrar_localizacao_documento}
+            onChange={(e) =>
+              setDados({ ...dados, mostrar_localizacao_documento: e.target.checked })
+            }
+          />
+          Mostrar o mapa de localização na proposta e no contrato
+        </label>
+        <p className="text-xs text-cinza -mt-1">
+          Esse checkbox salva com &ldquo;Salvar cadastro&rdquo;; o mapa em si sobe na hora,
+          sem precisar clicar em nada.
+        </p>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <button

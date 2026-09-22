@@ -353,6 +353,26 @@ export default function FolhaProposta({
           </section>
         )}
 
+        {/* ------------------------------------------------- mapa de local */}
+        {empreendimento.mostrar_localizacao_documento && empreendimento.mapa_localizacao_url && (
+          <section>
+            <h2>
+              <span className="num-secao">{n()}</span> Mapa de localização
+            </h2>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={empreendimento.mapa_localizacao_url}
+              alt="Mapa de localização"
+              style={{
+                width: "100%",
+                maxHeight: "90mm",
+                objectFit: "contain",
+                borderRadius: "1.5mm",
+              }}
+            />
+          </section>
+        )}
+
         {/* --------------------------------------------------- comparativo */}
         {varias && (
           <section>

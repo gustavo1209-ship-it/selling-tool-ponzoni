@@ -43,6 +43,10 @@ export interface Empreendimento {
   fotos_contrato_ids: string[];
   /** true (padrão) = lotes.descricao sai na proposta e no contrato. */
   mostrar_descricao_documento: boolean;
+  /** Print do Google Maps/Apple Maps com a localização — separado da galeria de fotos. */
+  mapa_localizacao_url: string | null;
+  /** true (padrão) = mapa_localizacao_url sai na proposta e no contrato. */
+  mostrar_localizacao_documento: boolean;
 }
 
 /** Uma foto da galeria de um empreendimento — até 5, escolhidas na tela de cadastro. */

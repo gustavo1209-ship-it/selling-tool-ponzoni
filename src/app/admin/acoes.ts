@@ -69,6 +69,8 @@ export interface DadosEmpreendimento {
   imovel_unico: boolean;
   /** true (padrão) = lotes.descricao sai na proposta e no contrato. */
   mostrar_descricao_documento: boolean;
+  /** true (padrão) = mapa_localizacao_url sai na proposta e no contrato. */
+  mostrar_localizacao_documento: boolean;
 }
 
 /**
@@ -351,6 +353,55 @@ export async function definirFotosContrato(
   });
 }
 
+/**
+ * Print do Google Maps/Apple Maps com a localização — um slot só, separado
+ * da galeria de fotos do imóvel. Mesmo bucket `empreendimentos`, caminho
+ * fixo (upsert), então subir de novo substitui em vez de acumular.
+ */
+export async function atualizarMapaLocalizacao(
+  empreendimentoId: string,
+  formData: FormData
+): Promise<ResultadoAcao<{ url: string }>> {
+  return comoResultado(async () => {
+    const { supabase, organizacaoId } = await exigirAdmin();
+
+    const arquivo = formData.get("mapa") as File | null;
+    if (!arquivo || arquivo.size === 0) throw new Error("Escolha um arquivo de imagem.");
+
+    const ext = arquivo.name.split(".").pop() || "jpg";
+    const caminho = `${organizacaoId}/${empreendimentoId}/localizacao.${ext}`;
+    const { error: erroUpload } = await supabase.storage
+      .from("empreendimentos")
+      .upload(caminho, arquivo, { upsert: true, contentType: arquivo.type });
+    if (erroUpload) throw new Error(erroUpload.message);
+
+    const { data: publica } = supabase.storage.from("empreendimentos").getPublicUrl(caminho);
+    const mapa_localizacao_url = `${publica.publicUrl}?v=${Date.now()}`;
+
+    const { error } = await supabase
+      .from("empreendimentos")
+      .update({ mapa_localizacao_url })
+      .eq("id", empreendimentoId);
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/empreendimentos");
+    return { url: mapa_localizacao_url };
+  });
+}
+
+export async function apagarMapaLocalizacao(empreendimentoId: string): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
+    const { error } = await supabase
+      .from("empreendimentos")
+      .update({ mapa_localizacao_url: null })
+      .eq("id", empreendimentoId);
+    if (error) throw new Error(error.message);
+    revalidatePath("/admin/empreendimentos");
+    return {};
+  });
+}
+
 export async function atualizarEmpreendimento(
   id: string,
   dados: DadosEmpreendimento
@@ -389,6 +440,7 @@ function normalizar(d: DadosEmpreendimento) {
     ativo: d.ativo,
     imovel_unico: d.imovel_unico,
     mostrar_descricao_documento: d.mostrar_descricao_documento,
+    mostrar_localizacao_documento: d.mostrar_localizacao_documento,
   };
 }
 

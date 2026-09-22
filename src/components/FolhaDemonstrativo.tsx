@@ -59,6 +59,9 @@ export default function FolhaDemonstrativo({
   const areaTotal = lotes.reduce((s, l) => s + Number(l.area_m2), 0);
   const temAreaConstruida = lotes.some((l) => l.area_construida_m2 != null);
 
+  let secao = 0;
+  const n = () => ++secao;
+
   // `rotulo` e `grupo` são duas chaves do catálogo mas uma coluna só na
   // folha: "Mensais 3/36" cabe numa célula e economiza largura que o A4 não
   // tem sobrando.
@@ -126,7 +129,7 @@ export default function FolhaDemonstrativo({
         {/* ------------------------------------------------------- objeto */}
         <section>
           <h2>
-            <span className="num-secao">1</span> Objeto
+            <span className="num-secao">{n()}</span> Objeto
           </h2>
           <table className="t">
             <thead>
@@ -192,7 +195,7 @@ export default function FolhaDemonstrativo({
         {fotoUrls.length > 0 && (
           <section>
             <h2>
-              <span className="num-secao">2</span>{" "}
+              <span className="num-secao">{n()}</span>{" "}
               {fotoUrls.length === 1 ? "Localização" : "Fotos"}
             </h2>
             <FotosDoDocumento
@@ -205,10 +208,31 @@ export default function FolhaDemonstrativo({
           </section>
         )}
 
+        {/* ------------------------------------------------- mapa de local */}
+        {empreendimento.mostrar_localizacao_documento &&
+          empreendimento.mapa_localizacao_url && (
+            <section>
+              <h2>
+                <span className="num-secao">{n()}</span> Mapa de localização
+              </h2>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={empreendimento.mapa_localizacao_url}
+                alt="Mapa de localização"
+                style={{
+                  width: "100%",
+                  maxHeight: "90mm",
+                  objectFit: "contain",
+                  borderRadius: "1.5mm",
+                }}
+              />
+            </section>
+          )}
+
         {/* ------------------------------------------------------ posição */}
         <section>
           <h2>
-            <span className="num-secao">{fotoUrls.length > 0 ? 3 : 2}</span> Posição atual
+            <span className="num-secao">{n()}</span> Posição atual
           </h2>
           <div className="totais">
             <div>
@@ -254,7 +278,7 @@ export default function FolhaDemonstrativo({
         {/* --------------------------------------------------- cronograma */}
         <section>
           <h2>
-            <span className="num-secao">{fotoUrls.length > 0 ? 4 : 3}</span> Cronograma
+            <span className="num-secao">{n()}</span> Cronograma
           </h2>
 
           {!semCorrecao && (
