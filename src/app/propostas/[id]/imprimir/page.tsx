@@ -68,9 +68,10 @@ export default async function ImprimirPage({
   // apagado depois de a proposta ser criada (lote_id nulo) simplesmente não
   // ganha esses dois campos, sem erro.
   const idsLote = (lotes ?? []).map((l) => l.lote_id).filter((v): v is string => !!v);
-  const { data: detalhesLote } = idsLote.length
+  const { data: detalhesLote, error: erroDetalhesLote } = idsLote.length
     ? await supabase.from("lotes").select("id, area_construida_m2, descricao").in("id", idsLote)
-    : { data: [] };
+    : { data: [], error: null };
+  if (erroDetalhesLote) console.error("área construída/descrição:", erroDetalhesLote.message);
   const porLoteId = new Map((detalhesLote ?? []).map((d) => [d.id, d]));
 
   const lotesOrdenados = [...(lotes ?? [])]

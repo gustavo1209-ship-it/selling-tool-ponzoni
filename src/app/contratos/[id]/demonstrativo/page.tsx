@@ -48,9 +48,10 @@ export default async function DemonstrativoPage({
   // área construída e descrição não são snapshot do contrato (só existem em
   // `lotes`, não em `contrato_lotes`) — busca ao vivo pelos lote_id.
   const idsLote = contrato.lotes.map((l) => l.lote_id).filter((v): v is string => !!v);
-  const { data: detalhesLote } = idsLote.length
+  const { data: detalhesLote, error: erroDetalhesLote } = idsLote.length
     ? await supabase.from("lotes").select("id, area_construida_m2, descricao").in("id", idsLote)
-    : { data: [] };
+    : { data: [], error: null };
+  if (erroDetalhesLote) console.error("área construída/descrição:", erroDetalhesLote.message);
   const porLoteId = new Map((detalhesLote ?? []).map((d) => [d.id, d]));
 
   const lotesOrdenados = [...contrato.lotes]

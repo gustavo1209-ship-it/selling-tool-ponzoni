@@ -48,13 +48,18 @@ export default async function AdminEmpreendimentosPage() {
   }
 
   // imóvel único não passa pelo espelho — o lote (só um) é editado direto
-  // nesta tela, então precisa vir junto.
+  // nesta tela, então precisa vir junto. Lê de `lotes_visiveis`, não de
+  // `lotes` direto: um select("*") na tabela sempre falha por causa da
+  // coluna `comprador`, sem SELECT pra authenticated desde a migration 28.
   const idsImovelUnico = (empreendimentos ?? [])
     .filter((e) => e.imovel_unico)
     .map((e) => e.id);
-  const { data: lotesUnicos } = idsImovelUnico.length
-    ? await supabase.from("lotes").select("*").in("empreendimento_id", idsImovelUnico)
-    : { data: [] };
+  const { data: lotesUnicos, error: erroLotesUnicos } = idsImovelUnico.length
+    ? await supabase.from("lotes_visiveis").select("*").in("empreendimento_id", idsImovelUnico)
+    : { data: [], error: null };
+  // sem isso, uma falha aqui (ex.: permissão) fica muda — a tela mostra os
+  // campos vazios como se nada tivesse sido salvo, em vez de avisar.
+  if (erroLotesUnicos) console.error("lotes_visiveis (imóvel único):", erroLotesUnicos.message);
 
   const idsEmpreendimentos = (empreendimentos ?? []).map((e) => e.id);
   const { data: fotos } = idsEmpreendimentos.length
