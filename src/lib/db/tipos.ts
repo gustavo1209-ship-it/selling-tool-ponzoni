@@ -41,6 +41,8 @@ export interface Empreendimento {
   fotos_proposta_ids: string[];
   /** Até 3 fotos da galeria, lado a lado no demonstrativo de contrato. Vazio = a primeira por ordem. */
   fotos_contrato_ids: string[];
+  /** true (padrão) = lotes.descricao sai na proposta e no contrato. */
+  mostrar_descricao_documento: boolean;
 }
 
 /** Uma foto da galeria de um empreendimento — até 5, escolhidas na tela de cadastro. */
@@ -171,6 +173,10 @@ export interface PropostaLote {
   preco_tabela: number;
   valor_negociado: number;
   ordem: number;
+  /** Não existe na tabela proposta_lotes — só quando a página de impressão junta com `lotes` por lote_id. */
+  area_construida_m2?: number | null;
+  /** Idem — vem de `lotes.descricao` ao vivo, não é snapshot da proposta. */
+  descricao?: string | null;
 }
 
 export interface PropostaBloco {
@@ -293,6 +299,10 @@ export interface ContratoLote {
   area_m2: number;
   valor: number;
   ordem: number;
+  /** Não existe na tabela contrato_lotes — só quando a página de impressão junta com `lotes` por lote_id. */
+  area_construida_m2?: number | null;
+  /** Idem — vem de `lotes.descricao` ao vivo. */
+  descricao?: string | null;
 }
 
 export interface ContratoParcela {

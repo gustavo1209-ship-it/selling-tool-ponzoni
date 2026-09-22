@@ -55,6 +55,7 @@ const VAZIO: DadosEmpreendimento = {
   cor_secundaria: "#E0A221",
   ativo: true,
   imovel_unico: false,
+  mostrar_descricao_documento: true,
 };
 
 const LOTE_UNICO_VAZIO: DadosLoteUnico = {
@@ -232,6 +233,16 @@ export default function AdminEmpreendimentos({
                   }
                 />
               </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={rascunho.mostrar_descricao_documento}
+                  onChange={(e) =>
+                    setRascunho({ ...rascunho, mostrar_descricao_documento: e.target.checked })
+                  }
+                />
+                Mostrar a descrição na proposta e no contrato
+              </label>
             </div>
           )}
 
@@ -517,6 +528,7 @@ function EditorEmpreendimento({
     cor_secundaria: empreendimento.cor_secundaria,
     ativo: empreendimento.ativo,
     imovel_unico: empreendimento.imovel_unico,
+    mostrar_descricao_documento: empreendimento.mostrar_descricao_documento,
   });
   const [imovel, setImovel] = useState<DadosLoteUnico>({
     quadra: loteUnico?.quadra ?? "ÚNICO",
@@ -692,6 +704,20 @@ function EditorEmpreendimento({
               onChange={(e) => setImovel({ ...imovel, descricao: e.target.value || null })}
             />
           </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={dados.mostrar_descricao_documento}
+              onChange={(e) =>
+                setDados({ ...dados, mostrar_descricao_documento: e.target.checked })
+              }
+            />
+            Mostrar a descrição na proposta e no contrato
+          </label>
+          <p className="text-xs text-cinza -mt-1">
+            Esse checkbox salva com &ldquo;Salvar cadastro&rdquo; ali em cima; o texto da
+            descrição salva com o botão abaixo.
+          </p>
           <button
             className="btn btn-primario self-start"
             disabled={pendente}

@@ -67,6 +67,8 @@ export interface DadosEmpreendimento {
   ativo: boolean;
   /** true = casa/apartamento único; false (padrão) = loteamento com espelho. */
   imovel_unico: boolean;
+  /** true (padrão) = lotes.descricao sai na proposta e no contrato. */
+  mostrar_descricao_documento: boolean;
 }
 
 /**
@@ -113,6 +115,13 @@ export async function criarEmpreendimento(
       throw new Error(`Já existe um empreendimento com o endereço "${slug}".`);
     }
 
+    // valida antes de criar o empreendimento — sem isso, um erro só no
+    // lote (ex.: área zerada) deixava o empreendimento criado e órfão,
+    // sem lote nenhum e sem jeito de arrumar pela tela.
+    if (dados.imovel_unico && loteUnico && loteUnico.area_m2 <= 0) {
+      throw new Error("Informe a área do terreno (maior que zero).");
+    }
+
     const { data, error } = await supabase
       .from("empreendimentos")
       .insert({ ...normalizar(dados), nome, slug, organizacao_id: organizacaoId })
@@ -145,7 +154,10 @@ export async function criarEmpreendimento(
 
 /**
  * Edita o lote único de um empreendimento `imovel_unico`. Não existe
- * escolha de qual lote — por definição só tem um.
+ * escolha de qual lote — por definição só tem um. Se por algum motivo o
+ * lote não existir ainda (ex.: falhou na criação, antes da validação de
+ * área acima existir), cria em vez de tentar um update que não acha nada
+ * pra atualizar e "dá certo" sem gravar nada.
  */
 export async function atualizarLoteUnico(
   empreendimentoId: string,
@@ -157,18 +169,28 @@ export async function atualizarLoteUnico(
     const quadra = dados.quadra.trim();
     const numero = dados.numero.trim();
     if (!quadra || !numero) throw new Error("Quadra e lote não podem ficar vazios.");
+    if (dados.area_m2 <= 0) throw new Error("Informe a área do terreno (maior que zero).");
 
-    const { error } = await supabase
+    const linha = {
+      quadra,
+      numero,
+      area_m2: dados.area_m2,
+      area_construida_m2: dados.area_construida_m2,
+      preco_tabela: dados.preco_tabela,
+      descricao: dados.descricao,
+    };
+
+    const { data: existente } = await supabase
       .from("lotes")
-      .update({
-        quadra,
-        numero,
-        area_m2: dados.area_m2,
-        area_construida_m2: dados.area_construida_m2,
-        preco_tabela: dados.preco_tabela,
-        descricao: dados.descricao,
-      })
-      .eq("empreendimento_id", empreendimentoId);
+      .select("id")
+      .eq("empreendimento_id", empreendimentoId)
+      .maybeSingle();
+
+    const { error } = existente
+      ? await supabase.from("lotes").update(linha).eq("id", existente.id)
+      : await supabase
+          .from("lotes")
+          .insert({ ...linha, empreendimento_id: empreendimentoId, status: "livre" });
     if (error) throw new Error(error.message);
 
     revalidatePath("/admin/empreendimentos");
@@ -366,6 +388,7 @@ function normalizar(d: DadosEmpreendimento) {
     cor_secundaria: d.cor_secundaria,
     ativo: d.ativo,
     imovel_unico: d.imovel_unico,
+    mostrar_descricao_documento: d.mostrar_descricao_documento,
   };
 }
 

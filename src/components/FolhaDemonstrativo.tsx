@@ -57,6 +57,7 @@ export default function FolhaDemonstrativo({
   const hoje = new Date().toLocaleDateString("pt-BR");
   const semCorrecao = contrato.indexador === "nenhum";
   const areaTotal = lotes.reduce((s, l) => s + Number(l.area_m2), 0);
+  const temAreaConstruida = lotes.some((l) => l.area_construida_m2 != null);
 
   // `rotulo` e `grupo` são duas chaves do catálogo mas uma coluna só na
   // folha: "Mensais 3/36" cabe numa célula e economiza largura que o A4 não
@@ -131,7 +132,8 @@ export default function FolhaDemonstrativo({
             <thead>
               <tr>
                 <th>Lote</th>
-                <th className="d">Área</th>
+                <th className="d">Área do terreno</th>
+                {temAreaConstruida && <th className="d">Área construída</th>}
                 <th className="d">Valor</th>
               </tr>
             </thead>
@@ -144,12 +146,17 @@ export default function FolhaDemonstrativo({
                     </strong>
                   </td>
                   <td className="d">{area(Number(l.area_m2))}</td>
+                  {temAreaConstruida && (
+                    <td className="d">
+                      {l.area_construida_m2 != null ? area(Number(l.area_construida_m2)) : "—"}
+                    </td>
+                  )}
                   <td className="d">{moeda(Number(l.valor))}</td>
                 </tr>
               ))}
               {lotes.length === 0 && (
                 <tr>
-                  <td colSpan={3}>{contrato.titulo ?? "—"}</td>
+                  <td colSpan={temAreaConstruida ? 4 : 3}>{contrato.titulo ?? "—"}</td>
                 </tr>
               )}
             </tbody>
@@ -160,11 +167,25 @@ export default function FolhaDemonstrativo({
                     {lotes.length} terrenos
                   </td>
                   <td className="d">{area(areaTotal)}</td>
+                  {temAreaConstruida && <td className="d" />}
                   <td className="d">{moeda(Number(contrato.valor_total))}</td>
                 </tr>
               </tfoot>
             )}
           </table>
+
+          {empreendimento.mostrar_descricao_documento &&
+            lotes.some((l) => l.descricao) && (
+              <div style={{ marginTop: "2.5mm" }}>
+                {lotes
+                  .filter((l) => l.descricao)
+                  .map((l) => (
+                    <p key={l.id} className="texto">
+                      <strong>Características:</strong> {l.descricao}
+                    </p>
+                  ))}
+              </div>
+            )}
         </section>
 
         {/* -------------------------------------------------------- foto */}

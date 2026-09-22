@@ -181,6 +181,7 @@ export default function FolhaProposta({
   const varias = opcoes.length > 1;
   const referencia = opcoes.find((o) => o.cenario.recomendado) ?? opcoes[0];
   const somaLotes = lotes.reduce((s, l) => s + Number(l.valor_negociado), 0);
+  const temAreaConstruida = lotes.some((l) => l.area_construida_m2 != null);
 
   // uma opção cujos blocos não somam o valor negociado não pode ir para o
   // cliente sem que o vendedor veja; o aviso fica só na tela, não no papel
@@ -272,7 +273,8 @@ export default function FolhaProposta({
             <thead>
               <tr>
                 <th>Lote</th>
-                <th className="d">Área</th>
+                <th className="d">Área do terreno</th>
+                {temAreaConstruida && <th className="d">Área construída</th>}
                 <th className="d">R$/m²</th>
                 <th className="d">Valor</th>
               </tr>
@@ -286,6 +288,11 @@ export default function FolhaProposta({
                     </strong>
                   </td>
                   <td className="d">{area(Number(l.area_m2))}</td>
+                  {temAreaConstruida && (
+                    <td className="d">
+                      {l.area_construida_m2 != null ? area(Number(l.area_construida_m2)) : "—"}
+                    </td>
+                  )}
                   <td className="d">
                     {precoM2(Number(l.valor_negociado) / Number(l.area_m2))}
                   </td>
@@ -299,6 +306,7 @@ export default function FolhaProposta({
                   {lotes.length} {lotes.length === 1 ? "terreno" : "terrenos"}
                 </td>
                 <td className="d">{area(referencia?.resultado.areaTotal ?? 0)}</td>
+                {temAreaConstruida && <td className="d" />}
                 <td className="d">
                   {precoM2(somaLotes / (referencia?.resultado.areaTotal || 1))}
                 </td>
@@ -306,6 +314,19 @@ export default function FolhaProposta({
               </tr>
             </tfoot>
           </table>
+
+          {empreendimento.mostrar_descricao_documento &&
+            lotes.some((l) => l.descricao) && (
+              <div style={{ marginTop: "2.5mm" }}>
+                {lotes
+                  .filter((l) => l.descricao)
+                  .map((l) => (
+                    <p key={l.id} className="texto">
+                      <strong>Características:</strong> {l.descricao}
+                    </p>
+                  ))}
+              </div>
+            )}
         </section>
 
         {/* ----------------------------------------------------------- fotos */}

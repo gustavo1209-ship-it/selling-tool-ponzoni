@@ -45,6 +45,22 @@ export default async function DemonstrativoPage({
     .map((id) => (fotos ?? []).find((f) => f.id === id)?.url)
     .filter((url): url is string => !!url);
 
+  // área construída e descrição não são snapshot do contrato (só existem em
+  // `lotes`, não em `contrato_lotes`) — busca ao vivo pelos lote_id.
+  const idsLote = contrato.lotes.map((l) => l.lote_id).filter((v): v is string => !!v);
+  const { data: detalhesLote } = idsLote.length
+    ? await supabase.from("lotes").select("id, area_construida_m2, descricao").in("id", idsLote)
+    : { data: [] };
+  const porLoteId = new Map((detalhesLote ?? []).map((d) => [d.id, d]));
+
+  const lotesOrdenados = [...contrato.lotes]
+    .sort((a, b) => a.ordem - b.ordem)
+    .map((l) => ({
+      ...l,
+      area_construida_m2: l.lote_id ? (porLoteId.get(l.lote_id)?.area_construida_m2 ?? null) : null,
+      descricao: l.lote_id ? (porLoteId.get(l.lote_id)?.descricao ?? null) : null,
+    }));
+
   const { serie, taxa } = serieDe(indices, contrato.indexador);
   const calculo = calcularContrato(
     {
@@ -66,7 +82,7 @@ export default async function DemonstrativoPage({
       contrato={contrato}
       empreendimento={contrato.empreendimento}
       cliente={contrato.cliente}
-      lotes={[...contrato.lotes].sort((a, b) => a.ordem - b.ordem)}
+      lotes={lotesOrdenados}
       calculo={calculo}
       fotoUrls={fotoUrls}
     />

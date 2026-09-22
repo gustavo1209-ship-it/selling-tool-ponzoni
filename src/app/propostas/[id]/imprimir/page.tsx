@@ -63,7 +63,23 @@ export default async function ImprimirPage({
     .map((id) => (fotos ?? []).find((f) => f.id === id)?.url)
     .filter((url): url is string => !!url);
 
-  const lotesOrdenados = [...(lotes ?? [])].sort(compararLote);
+  // área construída e descrição não são snapshot da proposta (só existem em
+  // `lotes`, não em `proposta_lotes`) — busca ao vivo pelos lote_id. Um lote
+  // apagado depois de a proposta ser criada (lote_id nulo) simplesmente não
+  // ganha esses dois campos, sem erro.
+  const idsLote = (lotes ?? []).map((l) => l.lote_id).filter((v): v is string => !!v);
+  const { data: detalhesLote } = idsLote.length
+    ? await supabase.from("lotes").select("id, area_construida_m2, descricao").in("id", idsLote)
+    : { data: [] };
+  const porLoteId = new Map((detalhesLote ?? []).map((d) => [d.id, d]));
+
+  const lotesOrdenados = [...(lotes ?? [])]
+    .sort(compararLote)
+    .map((l) => ({
+      ...l,
+      area_construida_m2: l.lote_id ? (porLoteId.get(l.lote_id)?.area_construida_m2 ?? null) : null,
+      descricao: l.lote_id ? (porLoteId.get(l.lote_id)?.descricao ?? null) : null,
+    }));
 
   const premissas = {
     incc_mensal: Number(proposta.incc_mensal),
