@@ -17,6 +17,7 @@ import MontarOpcao from "./MontarOpcao";
 import {
   adicionarFotoEmpreendimento,
   apagarCondicao,
+  apagarEmpreendimento,
   apagarFotoEmpreendimento,
   apagarMapaLocalizacao,
   atualizarCondicao,
@@ -344,6 +345,12 @@ export default function AdminEmpreendimentos({
                     agir={agir}
                   />
                 )}
+                <ZonaDeRisco
+                  empreendimentoId={e.id}
+                  nome={e.nome}
+                  pendente={pendente}
+                  agir={agir}
+                />
               </div>
             )}
           </section>
@@ -500,6 +507,76 @@ function CamposEmpreendimento({
         />
         Ativo (aparece no painel e no espelho)
       </label>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------ zona de risco */
+
+/**
+ * Apagar exige dois cliques de propósito: o primeiro só troca o botão por
+ * um aviso com o nome do empreendimento; nada é enviado ao servidor até o
+ * segundo clique, em "Sim, apagar definitivamente". Empreendimento com
+ * proposta ou contrato vinculado nem chega a apagar — o Postgres barra
+ * (FK `on delete restrict`) e a Server Action traduz isso na tela.
+ */
+function ZonaDeRisco({
+  empreendimentoId,
+  nome,
+  pendente,
+  agir,
+}: {
+  empreendimentoId: string;
+  nome: string;
+  pendente: boolean;
+  agir: (fn: () => Promise<unknown>) => void;
+}) {
+  const [confirmando, setConfirmando] = useState(false);
+
+  return (
+    <div className="border-t border-linha pt-4 flex flex-col gap-2">
+      <h3 className="eyebrow text-vermelho">Zona de risco</h3>
+      {!confirmando ? (
+        <button
+          type="button"
+          className="btn btn-fantasma text-vermelho self-start"
+          disabled={pendente}
+          onClick={() => setConfirmando(true)}
+        >
+          <Trash2 size={15} /> Apagar empreendimento
+        </button>
+      ) : (
+        <div className="bg-vermelho-fraco rounded-md p-3 flex flex-col gap-3">
+          <p className="text-sm text-vermelho">
+            Apagar &ldquo;{nome}&rdquo; remove os lotes, a tabela de preço, as condições de
+            pagamento e as fotos junto — não tem como desfazer. Se já existir proposta ou
+            contrato vinculado, a exclusão é bloqueada; desmarque &ldquo;ativo&rdquo; no
+            cadastro em vez de apagar.
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="btn"
+              style={{ background: "var(--color-vermelho)", color: "#fff" }}
+              disabled={pendente}
+              onClick={() => {
+                setConfirmando(false);
+                agir(() => apagarEmpreendimento(empreendimentoId));
+              }}
+            >
+              <Trash2 size={15} /> Sim, apagar definitivamente
+            </button>
+            <button
+              type="button"
+              className="btn btn-secundario"
+              disabled={pendente}
+              onClick={() => setConfirmando(false)}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

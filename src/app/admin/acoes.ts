@@ -453,6 +453,48 @@ export async function atualizarEmpreendimento(
   });
 }
 
+/**
+ * Apaga o empreendimento inteiro — lotes, tabelas de preço, condições de
+ * pagamento, fotos e vínculos com corretor caem junto (`on delete cascade`).
+ * Proposta e contrato têm FK `on delete restrict` de propósito: existe
+ * histórico de venda ali, então o Postgres barra a exclusão sozinho e a
+ * mensagem abaixo só traduz esse erro — apagar não é a saída nesse caso,
+ * é desativar (`ativo = false`).
+ */
+export async function apagarEmpreendimento(id: string): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase, organizacaoId } = await exigirAdmin();
+
+    // best-effort: a linha (que é o que a RLS protege e o que importa pra
+    // tela) some de qualquer forma, mesmo que sobre lixo no storage.
+    const { data: arquivos } = await supabase.storage
+      .from("empreendimentos")
+      .list(`${organizacaoId}/${id}`);
+    if (arquivos?.length) {
+      await supabase.storage
+        .from("empreendimentos")
+        .remove(arquivos.map((a) => `${organizacaoId}/${id}/${a.name}`));
+    }
+
+    const { error } = await supabase.from("empreendimentos").delete().eq("id", id);
+    if (error) {
+      if (error.code === "23503") {
+        throw new Error(
+          "Esse empreendimento tem proposta ou contrato vinculado — não dá pra apagar. " +
+            "Desmarque \"ativo\" no cadastro pra tirar ele de circulação sem perder o histórico."
+        );
+      }
+      throw new Error(error.message);
+    }
+
+    revalidatePath("/admin/empreendimentos");
+    revalidatePath("/espelho");
+    revalidatePath("/mapa");
+    revalidatePath("/");
+    return {};
+  });
+}
+
 function normalizar(d: DadosEmpreendimento) {
   return {
     subtitulo: limpo(d.subtitulo),
