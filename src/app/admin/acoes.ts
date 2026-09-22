@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { BlocoTemplate, CampanhaModo, Configuracoes } from "@/lib/db/tipos";
 import { comoResultado, type ResultadoAcao } from "@/lib/resultadoAcao";
+import { erroTamanhoArquivo } from "@/lib/uploads";
 
 /**
  * As telas de administração.
@@ -219,6 +220,8 @@ export async function adicionarFotoEmpreendimento(
 
     const arquivo = formData.get("foto") as File | null;
     if (!arquivo || arquivo.size === 0) throw new Error("Escolha um arquivo de imagem.");
+    const erroTamanho = erroTamanhoArquivo(arquivo);
+    if (erroTamanho) throw new Error(erroTamanho);
 
     const { count } = await supabase
       .from("empreendimento_fotos")
@@ -354,6 +357,28 @@ export async function definirFotosContrato(
 }
 
 /**
+ * Foto de capa que aparece no card do empreendimento na página inicial —
+ * uma foto só da galeria, independente das listas de proposta/contrato.
+ * `null` volta ao padrão (a primeira foto por ordem).
+ */
+export async function definirFotoCapa(
+  empreendimentoId: string,
+  fotoId: string | null
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
+    const { error } = await supabase
+      .from("empreendimentos")
+      .update({ foto_capa_id: fotoId })
+      .eq("id", empreendimentoId);
+    if (error) throw new Error(error.message);
+    revalidatePath("/admin/empreendimentos");
+    revalidatePath("/");
+    return {};
+  });
+}
+
+/**
  * Print do Google Maps/Apple Maps com a localização — um slot só, separado
  * da galeria de fotos do imóvel. Mesmo bucket `empreendimentos`, caminho
  * fixo (upsert), então subir de novo substitui em vez de acumular.
@@ -367,6 +392,8 @@ export async function atualizarMapaLocalizacao(
 
     const arquivo = formData.get("mapa") as File | null;
     if (!arquivo || arquivo.size === 0) throw new Error("Escolha um arquivo de imagem.");
+    const erroTamanho = erroTamanhoArquivo(arquivo);
+    if (erroTamanho) throw new Error(erroTamanho);
 
     const ext = arquivo.name.split(".").pop() || "jpg";
     const caminho = `${organizacaoId}/${empreendimentoId}/localizacao.${ext}`;

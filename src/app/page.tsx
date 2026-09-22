@@ -27,7 +27,7 @@ export default async function Inicio() {
   const configuracoes = await obterConfiguracoes();
   const mostrarVgv = (perfil?.ehAdmin ?? false) || configuracoes.corretor_ve_vgv;
 
-  const [{ data: empreendimentos }, { data: lotes }, { data: propostas }] =
+  const [{ data: empreendimentos }, { data: lotes }, { data: propostas }, { data: fotos }] =
     await Promise.all([
       supabase.from("empreendimentos").select("*").eq("ativo", true).order("nome"),
       supabase
@@ -40,6 +40,10 @@ export default async function Inicio() {
         )
         .order("criado_em", { ascending: false })
         .limit(8),
+      supabase
+        .from("empreendimento_fotos")
+        .select("id, url, empreendimento_id")
+        .order("ordem"),
     ]);
 
   const recentes = (propostas ?? []) as unknown as LinhaProposta[];
@@ -64,43 +68,56 @@ export default async function Inicio() {
             const livres = meus.filter((l) => l.status === "livre");
             const vgv = livres.reduce((s, l) => s + Number(l.preco_tabela ?? 0), 0);
             const areaLivre = livres.reduce((s, l) => s + Number(l.area_m2), 0);
+            const fotosDoEmpreendimento = (fotos ?? []).filter(
+              (f) => f.empreendimento_id === e.id
+            );
+            const capa =
+              fotosDoEmpreendimento.find((f) => f.id === e.foto_capa_id) ??
+              fotosDoEmpreendimento[0] ??
+              null;
 
             return (
-              <article key={e.id} className="cartao p-5 flex flex-col gap-4">
-                <div>
-                  <h2 className="serif text-xl">{e.nome}</h2>
-                  <p className="text-sm text-cinza">{e.subtitulo ?? "—"}</p>
-                </div>
-
-                <dl className="grid grid-cols-3 gap-3 text-center">
-                  <div>
-                    <dt className="eyebrow">Livres</dt>
-                    <dd className="text-2xl tabular">{livres.length}</dd>
-                  </div>
-                  <div>
-                    <dt className="eyebrow">Total</dt>
-                    <dd className="text-2xl tabular">{meus.length}</dd>
-                  </div>
-                  <div>
-                    <dt className="eyebrow">Área livre</dt>
-                    <dd className="text-2xl tabular">{num(areaLivre / 1000)}k</dd>
-                  </div>
-                </dl>
-
-                {mostrarVgv && (
-                  <div className="bg-vinho-fraco rounded-md px-3 py-2">
-                    <p className="eyebrow">VGV disponível (tabela)</p>
-                    <p className="serif text-xl text-vinho tabular">{moedaCurta(vgv)}</p>
-                  </div>
+              <article key={e.id} className="cartao overflow-hidden flex flex-col">
+                {capa && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={capa.url} alt="" className="w-full h-36 object-cover" />
                 )}
+                <div className="p-5 flex flex-col gap-4 flex-1">
+                  <div>
+                    <h2 className="serif text-xl">{e.nome}</h2>
+                    <p className="text-sm text-cinza">{e.subtitulo ?? "—"}</p>
+                  </div>
 
-                <div className="flex gap-2 mt-auto">
-                  <Link href="/espelho" className="btn btn-secundario flex-1">
-                    <Map size={15} /> Espelho
-                  </Link>
-                  <Link href="/propostas/nova" className="btn btn-secundario flex-1">
-                    <FileText size={15} /> Simular
-                  </Link>
+                  <dl className="grid grid-cols-3 gap-3 text-center">
+                    <div>
+                      <dt className="eyebrow">Livres</dt>
+                      <dd className="text-2xl tabular">{livres.length}</dd>
+                    </div>
+                    <div>
+                      <dt className="eyebrow">Total</dt>
+                      <dd className="text-2xl tabular">{meus.length}</dd>
+                    </div>
+                    <div>
+                      <dt className="eyebrow">Área livre</dt>
+                      <dd className="text-2xl tabular">{num(areaLivre / 1000)}k</dd>
+                    </div>
+                  </dl>
+
+                  {mostrarVgv && (
+                    <div className="bg-vinho-fraco rounded-md px-3 py-2">
+                      <p className="eyebrow">VGV disponível (tabela)</p>
+                      <p className="serif text-xl text-vinho tabular">{moedaCurta(vgv)}</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 mt-auto">
+                    <Link href="/espelho" className="btn btn-secundario flex-1">
+                      <Map size={15} /> Espelho
+                    </Link>
+                    <Link href="/propostas/nova" className="btn btn-secundario flex-1">
+                      <FileText size={15} /> Simular
+                    </Link>
+                  </div>
                 </div>
               </article>
             );

@@ -47,6 +47,8 @@ export interface Empreendimento {
   mapa_localizacao_url: string | null;
   /** true (padrão) = mapa_localizacao_url sai na proposta e no contrato. */
   mostrar_localizacao_documento: boolean;
+  /** Foto de capa (empreendimento_fotos) no card da página inicial. null = a primeira por ordem. */
+  foto_capa_id: string | null;
 }
 
 /** Uma foto da galeria de um empreendimento — até 5, escolhidas na tela de cadastro. */

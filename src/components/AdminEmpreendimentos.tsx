@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Plus,
   RefreshCw,
+  Star,
   Trash2,
   X,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import {
   atualizarMapaLocalizacao,
   criarCondicao,
   criarEmpreendimento,
+  definirFotoCapa,
   definirFotosContrato,
   definirFotosProposta,
   salvarTabelaPreco,
@@ -43,6 +45,7 @@ import type {
 import { mensagemDeFalha } from "@/lib/erros";
 import { pct } from "@/lib/formato";
 import { verificarResultado } from "@/lib/resultadoAcao";
+import { MAX_TAMANHO_UPLOAD_MB, erroTamanhoArquivo } from "@/lib/uploads";
 
 const VAZIO: DadosEmpreendimento = {
   nome: "",
@@ -486,7 +489,7 @@ function CamposEmpreendimento({
       <p className="sm:col-span-2 text-xs text-cinza -mt-1">
         As fotos do empreendimento (até 5, aérea ou do imóvel) e o mapa de localização (print
         do Google Maps ou Apple Maps) se sobem depois de criar o cadastro: clique no nome dele
-        na lista abaixo pra abrir o card.
+        na lista abaixo pra abrir o card. Cada arquivo até {MAX_TAMANHO_UPLOAD_MB} MB.
       </p>
 
       <label className="flex items-center gap-2 text-sm">
@@ -550,6 +553,8 @@ function EditorEmpreendimento({
   const [enviandoFoto, setEnviandoFoto] = useState(false);
 
   async function enviarFoto(arquivo: File) {
+    const erroTamanho = erroTamanhoArquivo(arquivo);
+    if (erroTamanho) return aoSincronizar(erroTamanho);
     setEnviandoFoto(true);
     try {
       const formData = new FormData();
@@ -565,6 +570,8 @@ function EditorEmpreendimento({
   const [enviandoMapa, setEnviandoMapa] = useState(false);
 
   async function enviarMapaLocalizacao(arquivo: File) {
+    const erroTamanho = erroTamanhoArquivo(arquivo);
+    if (erroTamanho) return aoSincronizar(erroTamanho);
     setEnviandoMapa(true);
     try {
       const formData = new FormData();
@@ -623,6 +630,7 @@ function EditorEmpreendimento({
         fotos={fotos}
         fotosPropostaIds={empreendimento.fotos_proposta_ids}
         fotosContratoIds={empreendimento.fotos_contrato_ids}
+        fotoCapaId={empreendimento.foto_capa_id}
         enviandoFoto={enviandoFoto}
         pendente={pendente}
         agir={agir}
@@ -674,7 +682,7 @@ function EditorEmpreendimento({
         </label>
         <p className="text-xs text-cinza -mt-1">
           Esse checkbox salva com &ldquo;Salvar cadastro&rdquo;; o mapa em si sobe na hora,
-          sem precisar clicar em nada.
+          sem precisar clicar em nada. Arquivo de até {MAX_TAMANHO_UPLOAD_MB} MB.
         </p>
       </div>
 
@@ -838,12 +846,17 @@ const MAX_FOTOS_DOCUMENTO = 3;
  * diferentes, as mesmas, ou qualquer combinação. Sem escolha nenhuma, a
  * folha usa só a primeira por ordem (mesmo comportamento de antes, agora
  * explícito na tela). Mais de uma foto sai lado a lado no documento.
+ *
+ * A foto de capa é a única foto do trio que é sempre uma escolha exclusiva
+ * (nunca lado a lado) — é o que aparece no card do empreendimento na
+ * página inicial, não em proposta nem contrato.
  */
 function GaleriaFotos({
   empreendimentoId,
   fotos,
   fotosPropostaIds,
   fotosContratoIds,
+  fotoCapaId,
   enviandoFoto,
   pendente,
   agir,
@@ -853,6 +866,7 @@ function GaleriaFotos({
   fotos: EmpreendimentoFoto[];
   fotosPropostaIds: string[];
   fotosContratoIds: string[];
+  fotoCapaId: string | null;
   enviandoFoto: boolean;
   pendente: boolean;
   agir: (fn: () => Promise<unknown>) => void;
@@ -861,6 +875,7 @@ function GaleriaFotos({
   const padrao = fotos[0] ? [fotos[0].id] : [];
   const proposta = fotosPropostaIds.length ? fotosPropostaIds : padrao;
   const contrato = fotosContratoIds.length ? fotosContratoIds : padrao;
+  const capa = fotoCapaId ?? fotos[0]?.id ?? null;
 
   function alternar(lista: string[], id: string): string[] | null {
     if (lista.includes(id)) return lista.filter((x) => x !== id);
@@ -872,7 +887,9 @@ function GaleriaFotos({
     <div className="sm:col-span-2 flex flex-col gap-2">
       <label className="rotulo">Fotos ({fotos.length}/5)</label>
       <p className="text-xs text-cinza -mt-1">
-        Marque até {MAX_FOTOS_DOCUMENTO} pra cada documento — mais de uma sai lado a lado.
+        Marque até {MAX_FOTOS_DOCUMENTO} pra cada documento — mais de uma sai lado a lado. A
+        capa é sempre uma foto só, e é o que aparece no card da página inicial. Cada arquivo
+        até {MAX_TAMANHO_UPLOAD_MB} MB.
       </p>
       {fotos.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -906,14 +923,29 @@ function GaleriaFotos({
                   Usar no contrato
                 </label>
               </div>
-              <button
-                type="button"
-                className="btn btn-fantasma text-vermelho self-start"
-                disabled={pendente}
-                onClick={() => agir(() => apagarFotoEmpreendimento(f.id))}
-              >
-                <Trash2 size={13} /> Apagar
-              </button>
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  className={`btn btn-fantasma text-xs self-start ${
+                    capa === f.id ? "text-vinho font-semibold" : ""
+                  }`}
+                  disabled={pendente}
+                  onClick={() =>
+                    agir(() => definirFotoCapa(empreendimentoId, capa === f.id ? null : f.id))
+                  }
+                >
+                  <Star size={13} fill={capa === f.id ? "currentColor" : "none"} />{" "}
+                  {capa === f.id ? "Capa" : "Definir como capa"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-fantasma text-vermelho self-start"
+                  disabled={pendente}
+                  onClick={() => agir(() => apagarFotoEmpreendimento(f.id))}
+                >
+                  <Trash2 size={13} /> Apagar
+                </button>
+              </div>
             </div>
           ))}
         </div>
