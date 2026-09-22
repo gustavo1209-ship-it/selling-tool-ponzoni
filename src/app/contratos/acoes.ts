@@ -432,6 +432,52 @@ export async function definirColunasDoDocumento(
   });
 }
 
+const MAX_FOTOS_DOCUMENTO = 3;
+
+/**
+ * Quais fotos da galeria do empreendimento saem neste contrato —
+ * independente do padrão em Admin > Empreendimentos e independente da
+ * proposta que deu origem a ele. `null` volta a usar o padrão do
+ * empreendimento; array (mesmo vazio) é escolha explícita do corretor.
+ */
+export async function definirFotosDoContrato(
+  id: string,
+  fotoIds: string[] | null
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
+    if (fotoIds && fotoIds.length > MAX_FOTOS_DOCUMENTO) {
+      throw new Error(`No máximo ${MAX_FOTOS_DOCUMENTO} fotos por contrato.`);
+    }
+    const { error } = await supabase
+      .from("contratos")
+      .update({ fotos_ids: fotoIds })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+    revalidatePath(`/contratos/${id}`);
+    revalidatePath(`/contratos/${id}/demonstrativo`);
+    return {};
+  });
+}
+
+/** `null` volta a usar o padrão do empreendimento (mostrar_localizacao_documento). */
+export async function definirMostrarMapaDoContrato(
+  id: string,
+  valor: boolean | null
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("contratos")
+      .update({ mostrar_mapa: valor })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+    revalidatePath(`/contratos/${id}`);
+    revalidatePath(`/contratos/${id}/demonstrativo`);
+    return {};
+  });
+}
+
 export interface DadosComissao {
   percentual: number | null;
   valor_absoluto: number | null;

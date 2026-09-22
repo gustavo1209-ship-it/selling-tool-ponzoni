@@ -46,22 +46,32 @@ export default async function ImprimirPage({
     proposta_cenarios: (PropostaCenario & { proposta_blocos: PropostaBloco[] })[];
   };
 
-  // Sem escolha em Admin > Empreendimentos (fotos_proposta_ids), cai na
-  // primeira foto da galeria por ordem — mesmo comportamento de quando só
-  // existia mapa_imagem_url, agora explícito.
+  // proposta.fotos_ids: null = corretor não mexeu, usa o padrão do
+  // empreendimento (fotos_proposta_ids, ou a 1ª foto da galeria se nem isso
+  // foi escolhido); array (mesmo vazio) é escolha explícita do corretor
+  // pra ESSA proposta, feita em "Fotos e mapa" no simulador.
   const { data: fotos } = await supabase
     .from("empreendimento_fotos")
     .select("id, url")
     .eq("empreendimento_id", empreendimento.id)
     .order("ordem");
-  const escolhidas = empreendimento.fotos_proposta_ids.length
-    ? empreendimento.fotos_proposta_ids
-    : fotos?.[0]
-      ? [fotos[0].id]
-      : [];
+  const escolhidas =
+    proposta.fotos_ids ??
+    (empreendimento.fotos_proposta_ids.length
+      ? empreendimento.fotos_proposta_ids
+      : fotos?.[0]
+        ? [fotos[0].id]
+        : []);
   const fotoUrls = escolhidas
     .map((id) => (fotos ?? []).find((f) => f.id === id)?.url)
     .filter((url): url is string => !!url);
+
+  // idem: null = usa o padrão do empreendimento (mostrar_localizacao_documento).
+  const empreendimentoEfetivo = {
+    ...empreendimento,
+    mostrar_localizacao_documento:
+      proposta.mostrar_mapa ?? empreendimento.mostrar_localizacao_documento,
+  };
 
   // área construída e descrição não são snapshot da proposta (só existem em
   // `lotes`, não em `proposta_lotes`) — busca ao vivo pelos lote_id. Um lote
@@ -116,7 +126,7 @@ export default async function ImprimirPage({
   return (
     <FolhaProposta
       proposta={proposta}
-      empreendimento={empreendimento}
+      empreendimento={empreendimentoEfetivo}
       cliente={cliente}
       lotes={lotesOrdenados}
       opcoes={opcoes}

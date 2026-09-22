@@ -737,6 +737,50 @@ export async function favoritarCenario(payload: {
   });
 }
 
+const MAX_FOTOS_DOCUMENTO = 3;
+
+/**
+ * Quais fotos da galeria do empreendimento saem nesta proposta —
+ * independente do padrão em Admin > Empreendimentos e independente do
+ * contrato que vier a nascer dela. `null` volta a usar o padrão do
+ * empreendimento; array (mesmo vazio) é escolha explícita do corretor.
+ */
+export async function definirFotosDaProposta(
+  id: string,
+  fotoIds: string[] | null
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
+    if (fotoIds && fotoIds.length > MAX_FOTOS_DOCUMENTO) {
+      throw new Error(`No máximo ${MAX_FOTOS_DOCUMENTO} fotos por proposta.`);
+    }
+    const { error } = await supabase
+      .from("propostas")
+      .update({ fotos_ids: fotoIds })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+    revalidatePath(`/propostas/${id}`);
+    return {};
+  });
+}
+
+/** `null` volta a usar o padrão do empreendimento (mostrar_localizacao_documento). */
+export async function definirMostrarMapaDaProposta(
+  id: string,
+  valor: boolean | null
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("propostas")
+      .update({ mostrar_mapa: valor })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+    revalidatePath(`/propostas/${id}`);
+    return {};
+  });
+}
+
 /**
  * Chamada sem `await`/try-catch em `Simulador` (botão de apagar a proposta
  * aberta) — de propósito, o mesmo motivo do comentário em `apagarPropostas`:

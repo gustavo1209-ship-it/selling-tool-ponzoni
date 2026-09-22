@@ -29,21 +29,32 @@ export default async function DemonstrativoPage({
   if (!data) notFound();
   const contrato = data as unknown as ContratoCompleto;
 
-  // Sem escolha em Admin > Empreendimentos (fotos_contrato_ids), cai na
-  // primeira foto da galeria por ordem.
+  // contrato.fotos_ids: null = corretor não mexeu, usa o padrão do
+  // empreendimento (fotos_contrato_ids, ou a 1ª foto da galeria se nem isso
+  // foi escolhido); array (mesmo vazio) é escolha explícita do corretor
+  // pra ESSE contrato, feita em "Fotos e mapa" no detalhe do contrato.
   const { data: fotos } = await supabase
     .from("empreendimento_fotos")
     .select("id, url")
     .eq("empreendimento_id", contrato.empreendimento.id)
     .order("ordem");
-  const escolhidas = contrato.empreendimento.fotos_contrato_ids.length
-    ? contrato.empreendimento.fotos_contrato_ids
-    : fotos?.[0]
-      ? [fotos[0].id]
-      : [];
+  const escolhidas =
+    contrato.fotos_ids ??
+    (contrato.empreendimento.fotos_contrato_ids.length
+      ? contrato.empreendimento.fotos_contrato_ids
+      : fotos?.[0]
+        ? [fotos[0].id]
+        : []);
   const fotoUrls = escolhidas
     .map((id) => (fotos ?? []).find((f) => f.id === id)?.url)
     .filter((url): url is string => !!url);
+
+  // idem: null = usa o padrão do empreendimento (mostrar_localizacao_documento).
+  const empreendimentoEfetivo = {
+    ...contrato.empreendimento,
+    mostrar_localizacao_documento:
+      contrato.mostrar_mapa ?? contrato.empreendimento.mostrar_localizacao_documento,
+  };
 
   // área construída e descrição não são snapshot do contrato (só existem em
   // `lotes`, não em `contrato_lotes`) — busca ao vivo pelos lote_id.
@@ -81,7 +92,7 @@ export default async function DemonstrativoPage({
   return (
     <FolhaDemonstrativo
       contrato={contrato}
-      empreendimento={contrato.empreendimento}
+      empreendimento={empreendimentoEfetivo}
       cliente={contrato.cliente}
       lotes={lotesOrdenados}
       calculo={calculo}

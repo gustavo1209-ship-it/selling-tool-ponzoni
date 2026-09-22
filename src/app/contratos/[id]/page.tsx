@@ -13,6 +13,7 @@ import type {
   ComissaoContrato,
   ComissaoParcela,
   ContratoCompleto,
+  EmpreendimentoFoto,
   IndexadorRef,
 } from "@/lib/db/tipos";
 
@@ -76,6 +77,11 @@ export default async function ContratoPage({
   );
 
   const lotes = [...contrato.lotes].sort((a, b) => a.ordem - b.ordem);
+  const { data: fotos } = await supabase
+    .from("empreendimento_fotos")
+    .select("*")
+    .eq("empreendimento_id", contrato.empreendimento_id)
+    .order("ordem");
   const autores = await mapaDePerfis();
   const comissaoCompleta = comissao as (ComissaoContrato & { parcelas: ComissaoParcela[] }) | null;
   const parcelasComissao = [...(comissaoCompleta?.parcelas ?? [])].sort(
@@ -101,6 +107,7 @@ export default async function ContratoPage({
           calculo={calculo}
           indexadores={(indexadores ?? []) as IndexadorRef[]}
           clientes={(clientes ?? []) as Cliente[]}
+          fotos={(fotos ?? []) as EmpreendimentoFoto[]}
           autor={autores.get(contrato.criado_por ?? "") ?? null}
           ehAdmin={ehAdmin}
           verValor={verValor}

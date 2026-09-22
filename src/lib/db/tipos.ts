@@ -230,6 +230,10 @@ export interface Proposta {
   resultado: Resultado | null;
   /** Teste/treino, não venda real. O contrato gerado dela copia isto. */
   teste: boolean;
+  /** Fotos da galeria escolhidas pelo corretor pra essa proposta. null = usa o padrão do empreendimento. */
+  fotos_ids: string[] | null;
+  /** null = usa o padrão do empreendimento (mostrar_localizacao_documento). */
+  mostrar_mapa: boolean | null;
   criado_por: string | null;
   criado_em: string;
   atualizado_em: string;
@@ -297,6 +301,10 @@ export interface Contrato {
   colunas_documento: string[] | null;
   /** Teste/treino: fora dos totais de /contratos e da lista de /cobranca. */
   teste: boolean;
+  /** Fotos da galeria escolhidas pelo corretor pra esse contrato. null = usa o padrão do empreendimento. */
+  fotos_ids: string[] | null;
+  /** null = usa o padrão do empreendimento (mostrar_localizacao_documento). */
+  mostrar_mapa: boolean | null;
   criado_por: string | null;
   criado_em: string;
   atualizado_em: string;

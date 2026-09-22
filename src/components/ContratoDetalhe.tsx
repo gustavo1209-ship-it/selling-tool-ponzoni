@@ -7,6 +7,7 @@ import {
   Check,
   CheckCheck,
   FileSpreadsheet,
+  Image as ImageIcon,
   Pencil,
   Percent,
   Printer,
@@ -25,6 +26,8 @@ import {
   darBaixaEmLote,
   definirColunasDoDocumento,
   definirComissao,
+  definirFotosDoContrato,
+  definirMostrarMapaDoContrato,
   desfazerBaixa,
   desfazerBaixaComissaoParcela,
   desfazerBaixaEmLote,
@@ -32,6 +35,7 @@ import {
   type ModoBaixa,
 } from "@/app/contratos/acoes";
 import CampoNumero from "./CampoNumero";
+import FotosEMapaDoDocumento from "./FotosEMapaDoDocumento";
 import { SeloContrato, SeloParcela } from "./SeloStatus";
 import type { Indexador } from "@/lib/calc/tipos";
 import { descreverFormaPagamento, valorComissaoEmDinheiro } from "@/lib/comissao";
@@ -45,6 +49,7 @@ import type {
   Contrato,
   ContratoLote,
   Empreendimento,
+  EmpreendimentoFoto,
   IndexadorRef,
 } from "@/lib/db/tipos";
 import { mensagemDeFalha } from "@/lib/erros";
@@ -68,6 +73,7 @@ export default function ContratoDetalhe({
   calculo,
   indexadores,
   clientes,
+  fotos,
   autor,
   ehAdmin,
   verValor,
@@ -85,6 +91,8 @@ export default function ContratoDetalhe({
   indexadores: IndexadorRef[];
   /** Para trocar o comprador do contrato sem refazer o cadastro. */
   clientes: Cliente[];
+  /** Galeria de fotos do empreendimento — pra escolher quais saem NESTE contrato. */
+  fotos: EmpreendimentoFoto[];
   /** Quem cadastrou o contrato — com corretores, deixa de ser óbvio. */
   autor: string | null;
   /** Só admin define ou muda a comissão — a RLS de contrato_comissoes barra o resto. */
@@ -133,6 +141,13 @@ export default function ContratoDetalhe({
       ? contrato.colunas_documento
       : [...TODAS_AS_COLUNAS]
   );
+
+  const [fotosMapa, setFotosMapa] = useState(false);
+  const padraoFotos = empreendimento.fotos_contrato_ids.length
+    ? empreendimento.fotos_contrato_ids
+    : fotos[0]
+      ? [fotos[0].id]
+      : [];
 
   const [ajustes, setAjustes] = useState(false);
   const [cfg, setCfg] = useState({
@@ -417,6 +432,12 @@ export default function ContratoDetalhe({
             onClick={() => setColunas((c) => !c)}
           >
             <Table2 size={15} /> Colunas do documento
+          </button>
+          <button
+            className="btn btn-secundario"
+            onClick={() => setFotosMapa((f) => !f)}
+          >
+            <ImageIcon size={15} /> Fotos e mapa
           </button>
           <a
             className="btn btn-secundario"
@@ -1004,6 +1025,46 @@ export default function ContratoDetalhe({
                 : `${colunasEscolhidas.length} de ${TODAS_AS_COLUNAS.length} marcadas.`}
             </span>
           </div>
+        </section>
+      )}
+
+      {/* --------------------------------------------- fotos e mapa */}
+      {fotosMapa && (
+        <section className="cartao p-5 flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="serif text-lg">Fotos e mapa deste contrato</h2>
+              <p className="text-sm text-cinza mt-1">
+                Vale só pra esse contrato — não muda o padrão do empreendimento nem a
+                proposta que deu origem a ele.
+              </p>
+            </div>
+            <button className="btn btn-fantasma" onClick={() => setFotosMapa(false)}>
+              <X size={15} />
+            </button>
+          </div>
+
+          <FotosEMapaDoDocumento
+            fotos={fotos}
+            fotosIds={contrato.fotos_ids}
+            fotosPadrao={padraoFotos}
+            mostrarMapa={contrato.mostrar_mapa}
+            mapaPadrao={empreendimento.mostrar_localizacao_documento}
+            temMapa={!!empreendimento.mapa_localizacao_url}
+            pendente={pendente}
+            aoDefinirFotos={(ids) =>
+              agir(async () => {
+                const resultado = await definirFotosDoContrato(contrato.id, ids);
+                if (!resultado.ok) throw new Error(resultado.erro);
+              })
+            }
+            aoDefinirMapa={(valor) =>
+              agir(async () => {
+                const resultado = await definirMostrarMapaDoContrato(contrato.id, valor);
+                if (!resultado.ok) throw new Error(resultado.erro);
+              })
+            }
+          />
         </section>
       )}
 

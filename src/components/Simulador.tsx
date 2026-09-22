@@ -12,6 +12,7 @@ import {
   Copy,
   Download,
   FileSignature,
+  Image as ImageIcon,
   Plus,
   Printer,
   Save,
@@ -22,9 +23,12 @@ import {
 import BlocoEditor from "./BlocoEditor";
 import MontarOpcao from "./MontarOpcao";
 import CampoNumero from "./CampoNumero";
+import FotosEMapaDoDocumento from "./FotosEMapaDoDocumento";
 import { SeloProposta } from "./SeloStatus";
 import {
   apagarProposta,
+  definirFotosDaProposta,
+  definirMostrarMapaDaProposta,
   duplicarProposta,
   favoritarCenario,
   salvarProposta,
@@ -46,6 +50,7 @@ import type {
   IndexadorRef,
   CondicaoPagamento,
   Empreendimento,
+  EmpreendimentoFoto,
   Lote,
   Proposta,
   PropostaBloco,
@@ -109,6 +114,7 @@ export default function Simulador({
   condicoes,
   campanhas,
   indexadores,
+  fotos,
   autor,
   podeMontarOpcao,
 }: {
@@ -123,6 +129,8 @@ export default function Simulador({
   /** Campanhas vigentes hoje para o empreendimento desta proposta. */
   campanhas: Campanha[];
   indexadores: IndexadorRef[];
+  /** Galeria de fotos do empreendimento — pra escolher quais saem NESTA proposta. */
+  fotos: EmpreendimentoFoto[];
   /** Quem criou a proposta — com corretores, deixa de ser óbvio. */
   autor: string | null;
   /** Desligado em Configurações, esconde "Montar opção" pro corretor. */
@@ -165,8 +173,38 @@ export default function Simulador({
   const [recado, setRecado] = useState<string | null>(null);
   const router = useRouter();
   const [sujo, setSujo] = useState(false);
+  const [fotosMapaAberto, setFotosMapaAberto] = useState(false);
+  const padraoFotos = empreendimento.fotos_proposta_ids.length
+    ? empreendimento.fotos_proposta_ids
+    : fotos[0]
+      ? [fotos[0].id]
+      : [];
 
   const marcar = () => setSujo(true);
+
+  function definirFotos(ids: string[] | null) {
+    iniciarSalvar(async () => {
+      try {
+        const resultado = await definirFotosDaProposta(proposta.id, ids);
+        if (!resultado.ok) throw new Error(resultado.erro);
+        router.refresh();
+      } catch (e) {
+        setRecado(mensagemDeFalha(e));
+      }
+    });
+  }
+
+  function definirMapa(valor: boolean | null) {
+    iniciarSalvar(async () => {
+      try {
+        const resultado = await definirMostrarMapaDaProposta(proposta.id, valor);
+        if (!resultado.ok) throw new Error(resultado.erro);
+        router.refresh();
+      } catch (e) {
+        setRecado(mensagemDeFalha(e));
+      }
+    });
+  }
 
   const lotesCalc = useMemo(
     () =>
@@ -595,6 +633,13 @@ export default function Simulador({
           )}
           <button
             className="btn btn-fantasma"
+            onClick={() => setFotosMapaAberto((a) => !a)}
+            title="Fotos e mapa desta proposta"
+          >
+            <ImageIcon size={15} />
+          </button>
+          <button
+            className="btn btn-fantasma"
             onClick={() => {
               // sem try/catch de propósito: duplicarProposta() redireciona ao
               // terminar, e um catch aqui engoliria esse redirect (ver o
@@ -631,6 +676,36 @@ export default function Simulador({
         <p className="text-sm rounded-md px-3 py-2 bg-papel-alt text-tinta-suave">
           {recado}
         </p>
+      )}
+
+      {/* ----------------------------------------------------- fotos e mapa */}
+      {fotosMapaAberto && (
+        <section className="cartao p-5 flex flex-col gap-4 sem-impressao">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="serif text-lg">Fotos e mapa desta proposta</h2>
+              <p className="text-sm text-cinza mt-1">
+                Vale só pra essa proposta — não muda o padrão do empreendimento nem o
+                contrato que vier a ser gerado dela.
+              </p>
+            </div>
+            <button className="btn btn-fantasma" onClick={() => setFotosMapaAberto(false)}>
+              <X size={15} />
+            </button>
+          </div>
+
+          <FotosEMapaDoDocumento
+            fotos={fotos}
+            fotosIds={proposta.fotos_ids}
+            fotosPadrao={padraoFotos}
+            mostrarMapa={proposta.mostrar_mapa}
+            mapaPadrao={empreendimento.mostrar_localizacao_documento}
+            temMapa={!!empreendimento.mapa_localizacao_url}
+            pendente={salvando}
+            aoDefinirFotos={definirFotos}
+            aoDefinirMapa={definirMapa}
+          />
+        </section>
       )}
 
       {/* --------------------------------------------------------- terrenos */}

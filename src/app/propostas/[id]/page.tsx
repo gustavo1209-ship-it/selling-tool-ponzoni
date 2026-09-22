@@ -12,6 +12,7 @@ import type {
   Cliente,
   CondicaoPagamento,
   Empreendimento,
+  EmpreendimentoFoto,
   Lote,
   Proposta,
   PropostaBloco,
@@ -62,6 +63,7 @@ export default async function PropostaPage({
     { data: condicoes },
     { data: clientes },
     { data: indexadores },
+    { data: fotos },
     campanhas,
   ] = await Promise.all([
       supabase
@@ -78,6 +80,11 @@ export default async function PropostaPage({
       : Promise.resolve({ data: [] }),
       supabase.from("clientes").select("*").order("nome"),
       supabase.from("indexadores").select("*").order("ordem"),
+      supabase
+        .from("empreendimento_fotos")
+        .select("*")
+        .eq("empreendimento_id", proposta.empreendimento_id)
+        .order("ordem"),
       campanhasVigentes(supabase, proposta.empreendimento_id),
     ]);
 
@@ -104,6 +111,7 @@ export default async function PropostaPage({
           condicoes={(condicoes ?? []) as unknown as CondicaoPagamento[]}
           campanhas={campanhas}
           indexadores={(indexadores ?? []) as IndexadorRef[]}
+          fotos={(fotos ?? []) as EmpreendimentoFoto[]}
           podeMontarOpcao={podeMontarOpcao}
         />
       </main>
