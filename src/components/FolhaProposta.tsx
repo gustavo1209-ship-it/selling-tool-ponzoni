@@ -165,12 +165,15 @@ export default function FolhaProposta({
   cliente,
   lotes,
   opcoes,
+  fotoUrl,
 }: {
   proposta: Proposta;
   empreendimento: Empreendimento;
   cliente: Cliente | null;
   lotes: PropostaLote[];
   opcoes: Opcao[];
+  /** Foto escolhida em Admin > Empreendimentos (empreendimentos.foto_proposta_id), ou a primeira da galeria. */
+  fotoUrl: string | null;
 }) {
   const validade = new Date(`${proposta.data_base}T12:00:00`);
   validade.setDate(validade.getDate() + proposta.validade_dias);
@@ -306,7 +309,7 @@ export default function FolhaProposta({
         </section>
 
         {/* ----------------------------------------------------------- mapa */}
-        {empreendimento.mapa_imagem_url && (
+        {fotoUrl && (
           <section>
             <h2>
               <span className="num-secao">{n()}</span> Localização no parque
@@ -314,7 +317,7 @@ export default function FolhaProposta({
             <MapaDaProposta
               slug={empreendimento.slug}
               lotes={lotes}
-              imagem={empreendimento.mapa_imagem_url}
+              imagem={fotoUrl}
               corPreenchimento={empreendimento.cor_primaria}
               corContorno={empreendimento.cor_secundaria}
             />

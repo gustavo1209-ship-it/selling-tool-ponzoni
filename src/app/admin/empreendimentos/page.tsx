@@ -6,6 +6,7 @@ import { perfilAtual } from "@/lib/supabase/perfil";
 import type {
   CondicaoPagamento,
   Empreendimento,
+  EmpreendimentoFoto,
   IndexadorRef,
   Lote,
   TabelaPreco,
@@ -55,6 +56,15 @@ export default async function AdminEmpreendimentosPage() {
     ? await supabase.from("lotes").select("*").in("empreendimento_id", idsImovelUnico)
     : { data: [] };
 
+  const idsEmpreendimentos = (empreendimentos ?? []).map((e) => e.id);
+  const { data: fotos } = idsEmpreendimentos.length
+    ? await supabase
+        .from("empreendimento_fotos")
+        .select("*")
+        .in("empreendimento_id", idsEmpreendimentos)
+        .order("ordem")
+    : { data: [] };
+
   return (
     <>
       <Cabecalho />
@@ -65,6 +75,7 @@ export default async function AdminEmpreendimentosPage() {
           condicoes={(condicoes ?? []) as unknown as CondicaoPagamento[]}
           indexadores={(indexadores ?? []) as unknown as IndexadorRef[]}
           lotesUnicos={(lotesUnicos ?? []) as Lote[]}
+          fotos={(fotos ?? []) as EmpreendimentoFoto[]}
         />
       </main>
     </>

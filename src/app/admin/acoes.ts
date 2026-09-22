@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { BlocoTemplate, CampanhaModo, Configuracoes } from "@/lib/db/tipos";
@@ -60,7 +61,6 @@ export interface DadosEmpreendimento {
   espelho_csv_url: string | null;
   mapa_url: string | null;
   mapa_publico_url: string | null;
-  mapa_imagem_url: string | null;
   logo_url: string | null;
   cor_primaria: string;
   cor_secundaria: string;
@@ -167,38 +167,124 @@ export async function atualizarLoteUnico(
   });
 }
 
+const MAX_FOTOS = 5;
+
 /**
- * Foto do imóvel, no mesmo campo que a folha da proposta já desenha
- * (`mapa_imagem_url`) — pro loteamento é a foto aérea; pra imóvel único, a
- * foto da fachada/imóvel. Sobe pro bucket `empreendimentos`, mesmo
- * mecanismo do upload de marca (migration 42/48).
+ * Galeria de fotos do empreendimento — até 5, cada uma podendo virar "a
+ * foto da proposta" e/ou "a foto do contrato" (empreendimentos.foto_
+ * proposta_id/foto_contrato_id). Sem escolha nenhuma feita, a folha usa a
+ * primeira por ordem — ver os selects nas páginas de impressão.
  */
-export async function atualizarFotoEmpreendimento(
+export async function adicionarFotoEmpreendimento(
   empreendimentoId: string,
   formData: FormData
-): Promise<ResultadoAcao> {
+): Promise<ResultadoAcao<{ id: string; url: string }>> {
   return comoResultado(async () => {
     const { supabase, organizacaoId } = await exigirAdmin();
 
     const arquivo = formData.get("foto") as File | null;
     if (!arquivo || arquivo.size === 0) throw new Error("Escolha um arquivo de imagem.");
 
+    const { count } = await supabase
+      .from("empreendimento_fotos")
+      .select("id", { count: "exact", head: true })
+      .eq("empreendimento_id", empreendimentoId);
+    if ((count ?? 0) >= MAX_FOTOS) {
+      throw new Error(`Máximo de ${MAX_FOTOS} fotos por empreendimento. Apague uma antes.`);
+    }
+
     const ext = arquivo.name.split(".").pop() || "jpg";
-    const caminho = `${organizacaoId}/${empreendimentoId}/foto.${ext}`;
+    const caminho = `${organizacaoId}/${empreendimentoId}/${randomUUID()}.${ext}`;
     const { error: erroUpload } = await supabase.storage
       .from("empreendimentos")
-      .upload(caminho, arquivo, { upsert: true, contentType: arquivo.type });
+      .upload(caminho, arquivo, { contentType: arquivo.type });
     if (erroUpload) throw new Error(erroUpload.message);
 
     const { data: publica } = supabase.storage.from("empreendimentos").getPublicUrl(caminho);
-    const mapa_imagem_url = `${publica.publicUrl}?v=${Date.now()}`;
 
-    const { error } = await supabase
-      .from("empreendimentos")
-      .update({ mapa_imagem_url })
-      .eq("id", empreendimentoId);
+    const { data, error } = await supabase
+      .from("empreendimento_fotos")
+      .insert({
+        empreendimento_id: empreendimentoId,
+        url: publica.publicUrl,
+        ordem: count ?? 0,
+      })
+      .select("id, url")
+      .single();
     if (error) throw new Error(error.message);
 
+    // a primeira foto do empreendimento já entra como padrão dos dois
+    // documentos — sem isso, quem sobe uma foto só continuaria sem ver
+    // nada na proposta até escolher manualmente.
+    if ((count ?? 0) === 0) {
+      await supabase
+        .from("empreendimentos")
+        .update({ foto_proposta_id: data.id, foto_contrato_id: data.id })
+        .eq("id", empreendimentoId);
+    }
+
+    revalidatePath("/admin/empreendimentos");
+    return { id: data.id as string, url: data.url as string };
+  });
+}
+
+/** Extrai o caminho dentro do bucket a partir da URL pública, pra apagar o arquivo junto da linha. */
+function caminhoNoBucket(url: string): string | null {
+  const marcador = "/object/public/empreendimentos/";
+  const i = url.indexOf(marcador);
+  return i < 0 ? null : url.slice(i + marcador.length);
+}
+
+export async function apagarFotoEmpreendimento(fotoId: string): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
+
+    const { data: foto } = await supabase
+      .from("empreendimento_fotos")
+      .select("url")
+      .eq("id", fotoId)
+      .maybeSingle();
+
+    const { error } = await supabase.from("empreendimento_fotos").delete().eq("id", fotoId);
+    if (error) throw new Error(error.message);
+
+    // best-effort: se o arquivo não sumir do storage não é motivo pra
+    // reportar falha — a linha (que é o que importa pra tela) já foi.
+    const caminho = foto?.url ? caminhoNoBucket(foto.url) : null;
+    if (caminho) await supabase.storage.from("empreendimentos").remove([caminho]);
+
+    revalidatePath("/admin/empreendimentos");
+    return {};
+  });
+}
+
+export async function definirFotoProposta(
+  empreendimentoId: string,
+  fotoId: string | null
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
+    const { error } = await supabase
+      .from("empreendimentos")
+      .update({ foto_proposta_id: fotoId })
+      .eq("id", empreendimentoId);
+    if (error) throw new Error(error.message);
+    revalidatePath("/admin/empreendimentos");
+    return {};
+  });
+}
+
+export async function definirFotoContrato(
+  empreendimentoId: string,
+  fotoId: string | null
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase } = await exigirAdmin();
+    const { error } = await supabase
+      .from("empreendimentos")
+      .update({ foto_contrato_id: fotoId })
+      .eq("id", empreendimentoId);
+    if (error) throw new Error(error.message);
     revalidatePath("/admin/empreendimentos");
     return {};
   });
@@ -236,7 +322,6 @@ function normalizar(d: DadosEmpreendimento) {
     espelho_csv_url: limpo(d.espelho_csv_url),
     mapa_url: limpo(d.mapa_url),
     mapa_publico_url: limpo(d.mapa_publico_url),
-    mapa_imagem_url: limpo(d.mapa_imagem_url),
     logo_url: limpo(d.logo_url),
     cor_primaria: d.cor_primaria,
     cor_secundaria: d.cor_secundaria,

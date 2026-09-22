@@ -6,6 +6,7 @@ import { clarear, escurecer } from "@/lib/cores";
 import { colunasAtivas } from "@/lib/contratos/colunas";
 import { rotuloCompetencia } from "@/lib/contratos/mes";
 import type { ContratoCalculado, ParcelaCalculada } from "@/lib/contratos/tipos";
+import MapaDaProposta from "./MapaDaProposta";
 import type {
   Cliente,
   Contrato,
@@ -43,12 +44,15 @@ export default function FolhaDemonstrativo({
   cliente,
   lotes,
   calculo,
+  fotoUrl,
 }: {
   contrato: Contrato;
   empreendimento: Empreendimento;
   cliente: Cliente | null;
   lotes: ContratoLote[];
   calculo: ContratoCalculado;
+  /** Foto escolhida em Admin > Empreendimentos (empreendimentos.foto_contrato_id), ou a primeira da galeria. */
+  fotoUrl: string | null;
 }) {
   const hoje = new Date().toLocaleDateString("pt-BR");
   const semCorrecao = contrato.indexador === "nenhum";
@@ -163,10 +167,26 @@ export default function FolhaDemonstrativo({
           </table>
         </section>
 
+        {/* -------------------------------------------------------- foto */}
+        {fotoUrl && (
+          <section>
+            <h2>
+              <span className="num-secao">2</span> Localização
+            </h2>
+            <MapaDaProposta
+              slug={empreendimento.slug}
+              lotes={lotes}
+              imagem={fotoUrl}
+              corPreenchimento={empreendimento.cor_primaria}
+              corContorno={empreendimento.cor_secundaria}
+            />
+          </section>
+        )}
+
         {/* ------------------------------------------------------ posição */}
         <section>
           <h2>
-            <span className="num-secao">2</span> Posição atual
+            <span className="num-secao">{fotoUrl ? 3 : 2}</span> Posição atual
           </h2>
           <div className="totais">
             <div>
@@ -212,7 +232,7 @@ export default function FolhaDemonstrativo({
         {/* --------------------------------------------------- cronograma */}
         <section>
           <h2>
-            <span className="num-secao">3</span> Cronograma
+            <span className="num-secao">{fotoUrl ? 4 : 3}</span> Cronograma
           </h2>
 
           {!semCorrecao && (

@@ -30,8 +30,6 @@ export interface Empreendimento {
   mapa_url: string | null;
   /** Página pública do mapa, para mandar ao cliente. */
   mapa_publico_url: string | null;
-  /** Foto aérea servida de `public/`, desenhada na folha da proposta. */
-  mapa_imagem_url: string | null;
   /** Logo do empreendimento, servido de `public/`. */
   logo_url: string | null;
   cor_primaria: string;
@@ -39,6 +37,19 @@ export interface Empreendimento {
   ativo: boolean;
   /** true = casa/apartamento único, cadastro direto sem espelho. false = loteamento. */
   imovel_unico: boolean;
+  /** Qual foto da galeria (empreendimento_fotos) sai na proposta. null = a primeira por ordem. */
+  foto_proposta_id: string | null;
+  /** Qual foto da galeria sai no demonstrativo de contrato. null = a primeira por ordem. */
+  foto_contrato_id: string | null;
+}
+
+/** Uma foto da galeria de um empreendimento — até 5, escolhidas na tela de cadastro. */
+export interface EmpreendimentoFoto {
+  id: string;
+  empreendimento_id: string;
+  url: string;
+  ordem: number;
+  criado_em: string;
 }
 
 export type CampanhaModo = "substituir" | "somar";

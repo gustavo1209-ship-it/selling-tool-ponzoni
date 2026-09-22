@@ -46,6 +46,19 @@ export default async function ImprimirPage({
     proposta_cenarios: (PropostaCenario & { proposta_blocos: PropostaBloco[] })[];
   };
 
+  // Sem escolha em Admin > Empreendimentos (foto_proposta_id), cai na
+  // primeira foto da galeria por ordem — mesmo comportamento de quando só
+  // existia mapa_imagem_url, agora explícito.
+  const { data: fotos } = await supabase
+    .from("empreendimento_fotos")
+    .select("id, url")
+    .eq("empreendimento_id", empreendimento.id)
+    .order("ordem");
+  const fotoUrl =
+    (fotos ?? []).find((f) => f.id === empreendimento.foto_proposta_id)?.url ??
+    fotos?.[0]?.url ??
+    null;
+
   const lotesOrdenados = [...(lotes ?? [])].sort(compararLote);
 
   const premissas = {
@@ -86,6 +99,7 @@ export default async function ImprimirPage({
       cliente={cliente}
       lotes={lotesOrdenados}
       opcoes={opcoes}
+      fotoUrl={fotoUrl}
     />
   );
 }

@@ -14,13 +14,16 @@ import {
 import CampoNumero from "./CampoNumero";
 import MontarOpcao from "./MontarOpcao";
 import {
+  adicionarFotoEmpreendimento,
   apagarCondicao,
+  apagarFotoEmpreendimento,
   atualizarCondicao,
   atualizarEmpreendimento,
-  atualizarFotoEmpreendimento,
   atualizarLoteUnico,
   criarCondicao,
   criarEmpreendimento,
+  definirFotoContrato,
+  definirFotoProposta,
   salvarTabelaPreco,
   type DadosEmpreendimento,
   type DadosLoteUnico,
@@ -30,6 +33,7 @@ import type {
   BlocoTemplate,
   CondicaoPagamento,
   Empreendimento,
+  EmpreendimentoFoto,
   IndexadorRef,
   Lote,
   TabelaPreco,
@@ -46,7 +50,6 @@ const VAZIO: DadosEmpreendimento = {
   espelho_csv_url: null,
   mapa_url: null,
   mapa_publico_url: null,
-  mapa_imagem_url: null,
   logo_url: null,
   cor_primaria: "#7C2A28",
   cor_secundaria: "#E0A221",
@@ -78,12 +81,14 @@ export default function AdminEmpreendimentos({
   condicoes,
   indexadores,
   lotesUnicos,
+  fotos,
 }: {
   empreendimentos: Empreendimento[];
   tabelas: TabelaPreco[];
   condicoes: CondicaoPagamento[];
   indexadores: IndexadorRef[];
   lotesUnicos: Lote[];
+  fotos: EmpreendimentoFoto[];
 }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
@@ -275,6 +280,9 @@ export default function AdminEmpreendimentos({
                 <EditorEmpreendimento
                   empreendimento={e}
                   loteUnico={lotesUnicos.find((l) => l.empreendimento_id === e.id) ?? null}
+                  fotos={fotos
+                    .filter((f) => f.empreendimento_id === e.id)
+                    .sort((a, b) => a.ordem - b.ordem)}
                   pendente={pendente}
                   agir={agir}
                   aoSincronizar={setRecado}
@@ -437,8 +445,8 @@ function CamposEmpreendimento({
         />
       </div>
       <p className="sm:col-span-2 text-xs text-cinza -mt-1">
-        A foto do empreendimento (aérea ou do imóvel) se sobe depois de criar o cadastro:
-        clique no nome dele na lista abaixo pra abrir o card e o upload aparece lá.
+        As fotos do empreendimento (até 5, aérea ou do imóvel) se sobem depois de criar o
+        cadastro: clique no nome dele na lista abaixo pra abrir o card e a galeria aparece lá.
       </p>
 
       <label className="flex items-center gap-2 text-sm">
@@ -458,16 +466,19 @@ function CamposEmpreendimento({
 function EditorEmpreendimento({
   empreendimento,
   loteUnico,
+  fotos,
   pendente,
   agir,
   aoSincronizar,
 }: {
   empreendimento: Empreendimento;
   loteUnico: Lote | null;
+  fotos: EmpreendimentoFoto[];
   pendente: boolean;
   agir: (fn: () => Promise<unknown>) => void;
   aoSincronizar: (texto: string) => void;
 }) {
+  const router = useRouter();
   const [dados, setDados] = useState<DadosEmpreendimento>({
     nome: empreendimento.nome,
     subtitulo: empreendimento.subtitulo,
@@ -476,7 +487,6 @@ function EditorEmpreendimento({
     espelho_csv_url: empreendimento.espelho_csv_url,
     mapa_url: empreendimento.mapa_url,
     mapa_publico_url: empreendimento.mapa_publico_url,
-    mapa_imagem_url: empreendimento.mapa_imagem_url,
     logo_url: empreendimento.logo_url,
     cor_primaria: empreendimento.cor_primaria,
     cor_secundaria: empreendimento.cor_secundaria,
@@ -497,9 +507,14 @@ function EditorEmpreendimento({
 
   async function enviarFoto(arquivo: File) {
     setEnviandoFoto(true);
-    const formData = new FormData();
-    formData.append("foto", arquivo);
-    agir(() => atualizarFotoEmpreendimento(empreendimento.id, formData));
+    try {
+      const formData = new FormData();
+      formData.append("foto", arquivo);
+      verificarResultado(await adicionarFotoEmpreendimento(empreendimento.id, formData));
+      router.refresh();
+    } catch (e) {
+      aoSincronizar(mensagemDeFalha(e));
+    }
     setEnviandoFoto(false);
   }
 
@@ -544,31 +559,16 @@ function EditorEmpreendimento({
       <h3 className="eyebrow">Cadastro</h3>
       <CamposEmpreendimento dados={dados} aoMudar={setDados} />
 
-      <div className="sm:col-span-2">
-        <label className="rotulo">
-          {dados.imovel_unico ? "Foto do imóvel" : "Foto aérea da proposta"}
-        </label>
-        <div className="flex items-center gap-3">
-          {empreendimento.mapa_imagem_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={empreendimento.mapa_imagem_url}
-              alt=""
-              className="w-16 h-16 rounded object-cover"
-            />
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            className="campo"
-            disabled={enviandoFoto || pendente}
-            onChange={(e) => {
-              const arquivo = e.target.files?.[0];
-              if (arquivo) enviarFoto(arquivo);
-            }}
-          />
-        </div>
-      </div>
+      <GaleriaFotos
+        empreendimentoId={empreendimento.id}
+        fotos={fotos}
+        fotoPropostaId={empreendimento.foto_proposta_id}
+        fotoContratoId={empreendimento.foto_contrato_id}
+        enviandoFoto={enviandoFoto}
+        pendente={pendente}
+        agir={agir}
+        aoEnviar={enviarFoto}
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <button
@@ -678,6 +678,97 @@ function EditorEmpreendimento({
             {colando ? "Lendo…" : "Criar/atualizar lotes com este texto"}
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+/* --------------------------------------------------- galeria de fotos */
+
+/**
+ * Até 5 fotos por empreendimento. Cada uma pode virar "a foto da proposta"
+ * e/ou "a foto do contrato" — os dois documentos podem usar fotos
+ * diferentes, ou a mesma. Sem escolha nenhuma, a folha usa a primeira por
+ * ordem (mesmo comportamento de antes, só que agora explícito na tela).
+ */
+function GaleriaFotos({
+  empreendimentoId,
+  fotos,
+  fotoPropostaId,
+  fotoContratoId,
+  enviandoFoto,
+  pendente,
+  agir,
+  aoEnviar,
+}: {
+  empreendimentoId: string;
+  fotos: EmpreendimentoFoto[];
+  fotoPropostaId: string | null;
+  fotoContratoId: string | null;
+  enviandoFoto: boolean;
+  pendente: boolean;
+  agir: (fn: () => Promise<unknown>) => void;
+  aoEnviar: (arquivo: File) => void;
+}) {
+  const padrao = fotos[0]?.id ?? null;
+  const propostaAtual = fotoPropostaId ?? padrao;
+  const contratoAtual = fotoContratoId ?? padrao;
+
+  return (
+    <div className="sm:col-span-2 flex flex-col gap-2">
+      <label className="rotulo">Fotos ({fotos.length}/5)</label>
+      {fotos.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {fotos.map((f) => (
+            <div key={f.id} className="rounded-md border border-linha p-2 flex flex-col gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={f.url} alt="" className="w-full h-28 rounded object-cover" />
+              <div className="flex flex-col gap-1 text-xs">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={`foto-proposta-${empreendimentoId}`}
+                    checked={propostaAtual === f.id}
+                    onChange={() => agir(() => definirFotoProposta(empreendimentoId, f.id))}
+                    disabled={pendente}
+                  />
+                  Usar na proposta
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={`foto-contrato-${empreendimentoId}`}
+                    checked={contratoAtual === f.id}
+                    onChange={() => agir(() => definirFotoContrato(empreendimentoId, f.id))}
+                    disabled={pendente}
+                  />
+                  Usar no contrato
+                </label>
+              </div>
+              <button
+                type="button"
+                className="btn btn-fantasma text-vermelho self-start"
+                disabled={pendente}
+                onClick={() => agir(() => apagarFotoEmpreendimento(f.id))}
+              >
+                <Trash2 size={13} /> Apagar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {fotos.length < 5 && (
+        <input
+          type="file"
+          accept="image/*"
+          className="campo"
+          disabled={enviandoFoto || pendente}
+          onChange={(e) => {
+            const arquivo = e.target.files?.[0];
+            if (arquivo) aoEnviar(arquivo);
+            e.target.value = "";
+          }}
+        />
       )}
     </div>
   );
