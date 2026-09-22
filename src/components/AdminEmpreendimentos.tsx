@@ -58,6 +58,8 @@ const VAZIO: DadosEmpreendimento = {
 };
 
 const LOTE_UNICO_VAZIO: DadosLoteUnico = {
+  quadra: "ÚNICO",
+  numero: "1",
   area_m2: 0,
   area_construida_m2: null,
   preco_tabela: null,
@@ -170,6 +172,29 @@ export default function AdminEmpreendimentos({
           {rascunho.imovel_unico && (
             <div className="border-t border-linha pt-4 flex flex-col gap-3">
               <h3 className="eyebrow">O imóvel</h3>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="rotulo">Quadra</label>
+                  <input
+                    className="campo"
+                    value={loteUnico.quadra}
+                    onChange={(e) => setLoteUnico({ ...loteUnico, quadra: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="rotulo">Lote</label>
+                  <input
+                    className="campo"
+                    value={loteUnico.numero}
+                    onChange={(e) => setLoteUnico({ ...loteUnico, numero: e.target.value })}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-cinza -mt-2">
+                É o rótulo que sai na proposta e no contrato (&ldquo;Quadra{" "}
+                {loteUnico.quadra || "…"} · Lote {loteUnico.numero || "…"}&rdquo;) — troque por
+                algo que faça sentido pra uma casa só, como o nome da rua, ou deixe como está.
+              </p>
               <div className="grid gap-3 md:grid-cols-3">
                 <div>
                   <label className="rotulo">Área do terreno (m²)</label>
@@ -494,6 +519,8 @@ function EditorEmpreendimento({
     imovel_unico: empreendimento.imovel_unico,
   });
   const [imovel, setImovel] = useState<DadosLoteUnico>({
+    quadra: loteUnico?.quadra ?? "ÚNICO",
+    numero: loteUnico?.numero ?? "1",
     area_m2: loteUnico?.area_m2 ?? 0,
     area_construida_m2: loteUnico?.area_construida_m2 ?? null,
     preco_tabela: loteUnico?.preco_tabela ?? null,
@@ -607,6 +634,29 @@ function EditorEmpreendimento({
       {dados.imovel_unico && (
         <div className="border-t border-linha pt-4 flex flex-col gap-3">
           <h3 className="eyebrow">O imóvel</h3>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="rotulo">Quadra</label>
+              <input
+                className="campo"
+                value={imovel.quadra}
+                onChange={(e) => setImovel({ ...imovel, quadra: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="rotulo">Lote</label>
+              <input
+                className="campo"
+                value={imovel.numero}
+                onChange={(e) => setImovel({ ...imovel, numero: e.target.value })}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-cinza -mt-2">
+            É o rótulo que sai na proposta e no contrato (&ldquo;Quadra {imovel.quadra || "…"} ·
+            Lote {imovel.numero || "…"}&rdquo;) — troque por algo que faça sentido pra uma casa
+            só, como o nome da rua.
+          </p>
           <div className="grid gap-3 md:grid-cols-3">
             <div>
               <label className="rotulo">Área do terreno (m²)</label>

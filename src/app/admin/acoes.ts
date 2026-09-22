@@ -70,11 +70,15 @@ export interface DadosEmpreendimento {
 }
 
 /**
- * Área, área construída, preço e descrição de um empreendimento
- * `imovel_unico` — os únicos campos que fariam sentido preencher pela
- * planilha do Sheets num loteamento, aqui vêm direto na tela.
+ * Quadra/lote, área, área construída, preço e descrição de um
+ * empreendimento `imovel_unico` — os únicos campos que fariam sentido
+ * preencher pela planilha do Sheets num loteamento, aqui vêm direto na
+ * tela. Quadra/lote nascem "ÚNICO"/"1" mas são editáveis — é o rótulo que
+ * sai na proposta e no contrato, e "ÚNICO-1" não serve pra toda casa.
  */
 export interface DadosLoteUnico {
+  quadra: string;
+  numero: string;
   area_m2: number;
   area_construida_m2: number | null;
   preco_tabela: number | null;
@@ -122,8 +126,8 @@ export async function criarEmpreendimento(
     if (dados.imovel_unico && loteUnico) {
       const { error: erroLote } = await supabase.from("lotes").insert({
         empreendimento_id: data.id,
-        quadra: "ÚNICO",
-        numero: "1",
+        quadra: loteUnico.quadra.trim() || "ÚNICO",
+        numero: loteUnico.numero.trim() || "1",
         area_m2: loteUnico.area_m2,
         area_construida_m2: loteUnico.area_construida_m2,
         preco_tabela: loteUnico.preco_tabela,
@@ -150,9 +154,15 @@ export async function atualizarLoteUnico(
   return comoResultado(async () => {
     const { supabase } = await exigirAdmin();
 
+    const quadra = dados.quadra.trim();
+    const numero = dados.numero.trim();
+    if (!quadra || !numero) throw new Error("Quadra e lote não podem ficar vazios.");
+
     const { error } = await supabase
       .from("lotes")
       .update({
+        quadra,
+        numero,
         area_m2: dados.area_m2,
         area_construida_m2: dados.area_construida_m2,
         preco_tabela: dados.preco_tabela,
