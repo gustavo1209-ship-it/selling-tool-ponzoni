@@ -72,6 +72,12 @@ export interface DadosEmpreendimento {
   mostrar_descricao_documento: boolean;
   /** true (padrão) = mapa_localizacao_url sai na proposta e no contrato. */
   mostrar_localizacao_documento: boolean;
+  /** Opcional — sai no cabeçalho da proposta e do contrato, junto do nome. */
+  endereco: string | null;
+  /** Opcional — sai no rodapé da proposta e do contrato. */
+  site_url: string | null;
+  /** Opcional — usuário ou link, sai no rodapé da proposta e do contrato. */
+  instagram: string | null;
 }
 
 /**
@@ -510,6 +516,9 @@ function normalizar(d: DadosEmpreendimento) {
     imovel_unico: d.imovel_unico,
     mostrar_descricao_documento: d.mostrar_descricao_documento,
     mostrar_localizacao_documento: d.mostrar_localizacao_documento,
+    endereco: limpo(d.endereco),
+    site_url: limpo(d.site_url),
+    instagram: limpo(d.instagram),
   };
 }
 

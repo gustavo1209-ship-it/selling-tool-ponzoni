@@ -63,6 +63,9 @@ const VAZIO: DadosEmpreendimento = {
   imovel_unico: false,
   mostrar_descricao_documento: true,
   mostrar_localizacao_documento: true,
+  endereco: null,
+  site_url: null,
+  instagram: null,
 };
 
 const LOTE_UNICO_VAZIO: DadosLoteUnico = {
@@ -412,6 +415,18 @@ function CamposEmpreendimento({
           onChange={(ev) => mudar({ uf: ev.target.value })}
         />
       </div>
+      <div className="sm:col-span-2 lg:col-span-4">
+        <label className="rotulo">Endereço exato (opcional)</label>
+        <input
+          className="campo"
+          value={dados.endereco ?? ""}
+          onChange={(ev) => mudar({ endereco: ev.target.value })}
+          placeholder="Rodovia SP-000, km 00 · Bairro · Cidade/UF"
+        />
+        <p className="text-xs text-cinza mt-1">
+          Preenchido, sai no cabeçalho da proposta e do contrato, junto do nome.
+        </p>
+      </div>
       <div>
         <label className="rotulo">Cor primária</label>
         <div className="flex gap-2">
@@ -484,6 +499,27 @@ function CamposEmpreendimento({
           onChange={(ev) => mudar({ mapa_publico_url: ev.target.value })}
         />
       </div>
+      <div className="sm:col-span-2">
+        <label className="rotulo">Site (opcional)</label>
+        <input
+          className="campo"
+          value={dados.site_url ?? ""}
+          onChange={(ev) => mudar({ site_url: ev.target.value })}
+          placeholder="www.seusite.com.br"
+        />
+      </div>
+      <div className="sm:col-span-2">
+        <label className="rotulo">Instagram (opcional)</label>
+        <input
+          className="campo"
+          value={dados.instagram ?? ""}
+          onChange={(ev) => mudar({ instagram: ev.target.value })}
+          placeholder="@seuempreendimento"
+        />
+      </div>
+      <p className="sm:col-span-2 lg:col-span-4 text-xs text-cinza -mt-1">
+        Site e Instagram saem no rodapé da proposta e do contrato, junto da assinatura.
+      </p>
       <div className="sm:col-span-2">
         <label className="rotulo">Logo (arquivo em public/)</label>
         <input
@@ -614,6 +650,9 @@ function EditorEmpreendimento({
     imovel_unico: empreendimento.imovel_unico,
     mostrar_descricao_documento: empreendimento.mostrar_descricao_documento,
     mostrar_localizacao_documento: empreendimento.mostrar_localizacao_documento,
+    endereco: empreendimento.endereco,
+    site_url: empreendimento.site_url,
+    instagram: empreendimento.instagram,
   });
   const [imovel, setImovel] = useState<DadosLoteUnico>({
     quadra: loteUnico?.quadra ?? "ÚNICO",

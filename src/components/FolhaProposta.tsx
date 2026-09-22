@@ -248,6 +248,9 @@ export default function FolhaProposta({
               {empreendimento.nome}
               {empreendimento.cidade ? ` · ${empreendimento.cidade}/${empreendimento.uf}` : ""}
             </p>
+            {empreendimento.endereco && (
+              <p className="endereco-p">{empreendimento.endereco}</p>
+            )}
             <h1>Proposta comercial</h1>
             <p className="sub">
               {cliente?.nome ?? proposta.titulo ?? "—"}
@@ -585,6 +588,13 @@ export default function FolhaProposta({
             {empreendimento.nome} · {proposta.codigo} · emitida em{" "}
             {dataBR(proposta.data_base)}
           </p>
+          {(empreendimento.site_url || empreendimento.instagram) && (
+            <p className="contato-rodape">
+              {[empreendimento.site_url, empreendimento.instagram]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
         </footer>
       </article>
     </>
@@ -651,6 +661,7 @@ body{ background:#e9e6e2; }
   font-size:7.5pt; font-weight:bold; letter-spacing:.16em;
   text-transform:uppercase; color:var(--vinho); margin:0;
 }
+.endereco-p{ font-size:8.5pt; color:var(--cinza); margin:.8mm 0 0; }
 .cabecalho h1{ font-size:23pt; line-height:1.05; margin:1.5mm 0 0; letter-spacing:-.01em; }
 .cabecalho .sub{ font-size:11pt; color:var(--cinza); margin:1.5mm 0 0; }
 .protocolo{ text-align:right; font-size:8.5pt; color:var(--cinza); line-height:1.7; white-space:nowrap; }
@@ -749,6 +760,7 @@ h3{ font-size:9.5pt; margin:0 0 2mm; color:var(--vinho); }
   display:flex; align-items:center; gap:2mm;
 }
 .rodape .selo-rodape{ width:5mm; height:5mm; object-fit:cover; border-radius:.6mm; }
+.contato-rodape{ color:var(--cinza); }
 
 @media print{
   body{ background:#fff; }

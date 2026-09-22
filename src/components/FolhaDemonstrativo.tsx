@@ -111,6 +111,9 @@ export default function FolhaDemonstrativo({
                 ? ` · ${empreendimento.cidade}/${empreendimento.uf}`
                 : ""}
             </p>
+            {empreendimento.endereco && (
+              <p className="endereco-p">{empreendimento.endereco}</p>
+            )}
             <h1>Demonstrativo de pagamentos</h1>
             <p className="sub">
               {cliente?.nome ?? contrato.titulo ?? "—"}
@@ -360,6 +363,13 @@ export default function FolhaDemonstrativo({
             )}
             {empreendimento.nome}
           </p>
+          {(empreendimento.site_url || empreendimento.instagram) && (
+            <p className="contato-rodape">
+              {[empreendimento.site_url, empreendimento.instagram]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
           <p>
             Documento informativo, emitido em {hoje} a pedido do titular. Não
             substitui o contrato de compra e venda, não quita débitos e não vale
@@ -543,6 +553,7 @@ body{ background:#e9e6e2; }
   font-size:7.5pt; font-weight:bold; letter-spacing:.16em;
   text-transform:uppercase; color:var(--vinho); margin:0;
 }
+.endereco-p{ font-size:8.5pt; color:var(--cinza); margin:.8mm 0 0; }
 .cabecalho h1{ font-size:21pt; line-height:1.05; margin:1.5mm 0 0; letter-spacing:-.01em; }
 .cabecalho .sub{ font-size:11pt; color:var(--cinza); margin:1.5mm 0 0; }
 .protocolo{ text-align:right; font-size:8.5pt; color:var(--cinza); line-height:1.7; white-space:nowrap; }
@@ -599,6 +610,7 @@ h2 .num-secao{ color:var(--ouro); }
   display:flex; align-items:center; gap:2mm;
 }
 .rodape .selo-rodape{ width:5mm; height:5mm; object-fit:cover; border-radius:.6mm; }
+.contato-rodape{ color:var(--cinza); }
 
 @media print{
   body{ background:#fff; }

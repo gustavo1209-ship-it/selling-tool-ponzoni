@@ -49,6 +49,12 @@ export interface Empreendimento {
   mostrar_localizacao_documento: boolean;
   /** Foto de capa (empreendimento_fotos) no card da página inicial. null = a primeira por ordem. */
   foto_capa_id: string | null;
+  /** Opcional — sai no cabeçalho da proposta e do contrato, junto do nome. */
+  endereco: string | null;
+  /** Opcional — sai no rodapé da proposta e do contrato. */
+  site_url: string | null;
+  /** Opcional — usuário ou link, sai no rodapé da proposta e do contrato. */
+  instagram: string | null;
 }
 
 /** Uma foto da galeria de um empreendimento — até 5, escolhidas na tela de cadastro. */
