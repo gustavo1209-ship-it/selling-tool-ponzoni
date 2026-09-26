@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Pencil, ShieldCheck, User, X } from "lucide-react";
 import {
   definirAcessoEmpreendimentos,
+  definirAcessoEmpreendimentosEmMassa,
   definirPapel,
   renomearCorretor,
 } from "@/app/admin/acoes";
@@ -71,25 +72,168 @@ export default function AdminCorretores({
         </p>
       )}
 
-      {perfis.map((p) => (
-        <LinhaPerfil
-          key={p.id}
-          perfil={p}
-          souEu={p.id === eu}
-          empreendimentos={empreendimentos}
-          marcados={vinculos
-            .filter((v) => v.perfil_id === p.id)
-            .map((v) => v.empreendimento_id)}
-          pendente={pendente}
-          agir={agir}
-        />
-      ))}
+      <AcessoEmMassa
+        corretores={perfis.filter((p) => p.papel !== "admin")}
+        empreendimentos={empreendimentos}
+        pendente={pendente}
+        agir={agir}
+      />
+
+      {perfis.map((p) => {
+        const marcados = vinculos
+          .filter((v) => v.perfil_id === p.id)
+          .map((v) => v.empreendimento_id);
+        return (
+          <LinhaPerfil
+            // a chave muda quando a trava vem de fora (ex.: aplicar em
+            // massa), remontando a linha e evitando estado preso — sem
+            // isso a lista mostrada continuaria a de antes até um F5.
+            key={`${p.id}:${p.empreendimentos_restritos}:${marcados.join(",")}`}
+            perfil={p}
+            souEu={p.id === eu}
+            empreendimentos={empreendimentos}
+            marcados={marcados}
+            pendente={pendente}
+            agir={agir}
+          />
+        );
+      })}
 
       <p className="text-xs text-cinza">
         Contas novas são criadas no painel do Supabase, em Authentication →
         Users → Add user. Elas nascem como corretor.
       </p>
     </div>
+  );
+}
+
+/**
+ * Aplica a mesma trava a vários corretores de uma vez — sem isso, "só o
+ * Florescer para o time todo" exigia repetir a mesma marcação corretor a
+ * corretor. Admin nunca aparece aqui: enxerga tudo por definição, e a ação
+ * do servidor recusa a chamada se algum id passado for de admin.
+ */
+function AcessoEmMassa({
+  corretores,
+  empreendimentos,
+  pendente,
+  agir,
+}: {
+  corretores: Perfil[];
+  empreendimentos: Empreendimento[];
+  pendente: boolean;
+  agir: (fn: () => Promise<unknown>) => void;
+}) {
+  const [selecionados, setSelecionados] = useState<string[]>([]);
+  const [restrito, setRestrito] = useState(true);
+  const [escolhidos, setEscolhidos] = useState<string[]>([]);
+
+  const alternarCorretor = (id: string) =>
+    setSelecionados((atual) =>
+      atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]
+    );
+  const alternarEmpreendimento = (id: string) =>
+    setEscolhidos((atual) =>
+      atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id]
+    );
+
+  if (corretores.length === 0) return null;
+
+  const todosMarcados = selecionados.length === corretores.length;
+
+  return (
+    <section className="cartao p-5 flex flex-col gap-4 border-vinho">
+      <div>
+        <h2 className="serif text-lg">Aplicar em massa</h2>
+        <p className="text-sm text-cinza">
+          Escolhe os corretores e os empreendimentos de uma vez, em vez de
+          repetir corretor a corretor.
+        </p>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="rotulo">Corretores</label>
+          <button
+            type="button"
+            className="text-xs text-vinho underline"
+            onClick={() =>
+              setSelecionados(todosMarcados ? [] : corretores.map((c) => c.id))
+            }
+          >
+            {todosMarcados ? "Desmarcar todos" : "Marcar todos"}
+          </button>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {corretores.map((c) => (
+            <label
+              key={c.id}
+              className="flex items-center gap-2.5 rounded-md border border-linha px-3 py-2 text-sm cursor-pointer hover:bg-papel-alt"
+            >
+              <input
+                type="checkbox"
+                checked={selecionados.includes(c.id)}
+                onChange={() => alternarCorretor(c.id)}
+              />
+              <span>{c.nome}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={restrito}
+          onChange={(e) => setRestrito(e.target.checked)}
+        />
+        Restringir a empreendimentos específicos
+      </label>
+
+      {restrito && (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {empreendimentos.map((e) => (
+            <label
+              key={e.id}
+              className="flex items-center gap-2.5 rounded-md border border-linha px-3 py-2 text-sm cursor-pointer hover:bg-papel-alt"
+            >
+              <input
+                type="checkbox"
+                checked={escolhidos.includes(e.id)}
+                onChange={() => alternarEmpreendimento(e.id)}
+              />
+              <span>
+                {e.nome}
+                {!e.ativo && <span className="text-cinza"> · inativo</span>}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          className="btn btn-primario"
+          disabled={pendente || selecionados.length === 0}
+          onClick={() =>
+            agir(() =>
+              definirAcessoEmpreendimentosEmMassa(selecionados, restrito, escolhidos)
+            )
+          }
+        >
+          <Check size={15} /> Aplicar aos selecionados
+        </button>
+        <span className="text-xs text-cinza">
+          {selecionados.length === 0
+            ? "Selecione ao menos um corretor."
+            : restrito
+              ? escolhidos.length === 0
+                ? `${selecionados.length} corretor(es) não verão empreendimento nenhum.`
+                : `${selecionados.length} corretor(es) verão ${escolhidos.length} de ${empreendimentos.length}.`
+              : `${selecionados.length} corretor(es) verão todos os empreendimentos.`}
+        </span>
+      </div>
+    </section>
   );
 }
 

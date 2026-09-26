@@ -437,10 +437,20 @@ correção o comportamento antigo continua — a sobra ali não é arredondament
 ## Montar opção personalizada
 
 `MontarOpcao.tsx` gera os blocos a partir do formato que o mercado usa:
-entrada % + mensais + reforços periódicos. Ele aparece nos **dois** lugares
+entrada % + parcelas + reforços periódicos. Ele aparece nos **dois** lugares
 onde a condição é escolhida — na criação da proposta e no simulador — porque
 montar bloco a bloco é preciso mas lento, e o vendedor monta condição nova no
 meio da conversa com o cliente.
+
+**As parcelas também têm frequência**, não só os reforços: um select ao lado
+da quantidade escolhe mensal (padrão), bimestral, trimestral, quadrimestral
+ou semestral, e vira `periodicidade_meses` do bloco de parcelas — o mesmo
+campo genérico que já existia para reforço (ver "Reforços periódicos"). O
+rótulo da opção só cita o adjetivo quando não é mensal ("12x trimestrais
+corrigidas pelo IGP-M"), para não mudar o texto do caso comum. Editar um
+bloco já criado com qualquer periodicidade (inclusive bimestral e
+quadrimestral) sempre foi possível pelo `BlocoEditor`; o que faltava era o
+atalho na hora de montar a condição do zero.
 
 Na tela de criação a opção montada não existe como condição salva, então
 viaja no `<form>` como JSON num `input[name=opcao_custom]` — um formulário só
@@ -1001,6 +1011,18 @@ o banco recusaria. Menu, botões do espelho e a página `/indices` olham
 controle de acesso. Ao escrever tela nova, a pergunta certa continua sendo
 "a policy deixa?".
 
+**Armadilha: subquery na própria tabela recursiona a RLS.** A migration 43
+escreveu o `with check` de "perfis: edita o próprio" com três subselects
+direto em `perfis` (`select p.papel from perfis p where p.id = auth.uid()`).
+Isso estoura `infinite recursion detected in policy for relation "perfis"`
+em qualquer update — mesmo a subquery sendo trivial, o Postgres detecta que
+a RLS de `perfis` já está em avaliação para a linha e recusa entrar de novo.
+A correção (migration 59) foi a mesma receita de sempre: uma função
+`security definer` (`meu_perfil_atual()`, molde de `is_admin()` e
+`minha_organizacao()`) para ler o próprio perfil sem passar pela RLS de
+novo. **Nunca fazer `select ... from perfis where id = auth.uid()` dentro de
+uma policy de `perfis`** — sempre por função.
+
 ### Quais empreendimentos cada corretor vê
 
 **O padrão continua sendo ver todos** — a restrição é opt-in, pessoa a
@@ -1022,6 +1044,12 @@ Efeito colateral conhecido: uma proposta ou contrato antigo de um
 empreendimento que o corretor deixou de ver continua na carteira dele, mas o
 join com `empreendimentos` volta nulo. Restringir quem já tem histórico é
 decisão da casa, não acidente.
+
+Em `/admin/corretores`, "Aplicar em massa" grava a mesma trava e a mesma
+lista de empreendimentos para vários corretores de uma vez
+(`definirAcessoEmpreendimentosEmMassa`), em vez de repetir "Salvar acesso"
+pessoa a pessoa. Admin nunca entra: a ação recusa qualquer id de admin na
+lista, porque admin enxerga tudo por definição e a trava não se aplicaria.
 
 ### O que continua compartilhado
 

@@ -17,7 +17,8 @@ import {
 const INDEXADORES: Indexador[] = [
   "nenhum", "incc", "igpm", "ipca", "inpc", "igpdi", "cub", "tr", "cdi", "selic",
 ];
-const PERIODICIDADES = [3, 6, 12];
+const PERIODICIDADES_PARCELAS = [1, 2, 3, 4, 6];
+const PERIODICIDADES_REFORCO = [2, 3, 4, 6, 12];
 const AMORTIZACOES: Amortizacao[] = ["nenhuma", "sac", "price"];
 
 /**
@@ -42,6 +43,7 @@ export default function MontarOpcao({
   const [nome, setNome] = useState("");
   const [entradaPct, setEntradaPct] = useState(0.3);
   const [parcelas, setParcelas] = useState(36);
+  const [periodicidadeParcelas, setPeriodicidadeParcelas] = useState(1);
   const [indexador, setIndexador] = useState<Indexador>("incc");
   const [amortizacao, setAmortizacao] = useState<Amortizacao>("nenhuma");
   const [jurosMensal, setJurosMensal] = useState(0);
@@ -65,14 +67,14 @@ export default function MontarOpcao({
       mensal: parcelas > 0 ? baseMensais / parcelas : 0,
       reforco: comReforco && reforcos > 0 ? baseReforcos / reforcos : 0,
       prazo: Math.max(
-        parcelas,
+        1 + (parcelas - 1) * periodicidadeParcelas,
         comReforco ? reforcos * periodicidade : 0
       ),
       excede: entradaPct + totalReforco > 1.0001,
     };
   }, [
-    valorReferencia, entradaPct, parcelas, comReforco, reforcos,
-    periodicidade, reforcoPct,
+    valorReferencia, entradaPct, parcelas, periodicidadeParcelas, comReforco,
+    reforcos, periodicidade, reforcoPct,
   ]);
 
   function criar() {
@@ -96,17 +98,21 @@ export default function MontarOpcao({
       });
     }
 
-    // as mensais absorvem o resíduo: é o que faz o reforço baratear a parcela
+    // as parcelas absorvem o resíduo: é o que faz o reforço baratear a parcela
+    const sufixoFreqParcelas =
+      periodicidadeParcelas === 1
+        ? ""
+        : ` ${adjetivoPeriodicidade(periodicidadeParcelas)}`;
     blocos.push({
       rotulo:
         indexador === "nenhum"
-          ? `${parcelas}x sem juros`
-          : `${parcelas}x corrigidas pelo ${ROTULO_INDEXADOR[indexador]}`,
+          ? `${parcelas}x${sufixoFreqParcelas} sem juros`
+          : `${parcelas}x${sufixoFreqParcelas} corrigidas pelo ${ROTULO_INDEXADOR[indexador]}`,
       tipo: "parcelas",
       absorve_residuo: true,
       qtd_parcelas: parcelas,
       mes_inicio: 1,
-      periodicidade_meses: 1,
+      periodicidade_meses: periodicidadeParcelas,
       indexador,
       taxa_indexador_mensal: taxa,
       juros_mensal: amortizacao === "nenhuma" ? 0 : jurosMensal,
@@ -132,7 +138,7 @@ export default function MontarOpcao({
       nome.trim() ||
       [
         `${pct(entradaPct, 0)} entrada`,
-        `${parcelas}x`,
+        `${parcelas}x${sufixoFreqParcelas}`,
         comReforco
           ? `${reforcos} reforços ${adjetivoPeriodicidade(periodicidade)}`
           : null,
@@ -171,7 +177,7 @@ export default function MontarOpcao({
           />
         </div>
         <div>
-          <label className="rotulo">Parcelas mensais</label>
+          <label className="rotulo">Parcelas</label>
           <input
             type="number"
             className="campo text-right"
@@ -180,6 +186,20 @@ export default function MontarOpcao({
             value={parcelas}
             onChange={(e) => setParcelas(Math.max(1, Number(e.target.value) || 1))}
           />
+        </div>
+        <div>
+          <label className="rotulo">Frequência das parcelas</label>
+          <select
+            className="campo"
+            value={periodicidadeParcelas}
+            onChange={(e) => setPeriodicidadeParcelas(Number(e.target.value) || 1)}
+          >
+            {PERIODICIDADES_PARCELAS.map((m) => (
+              <option key={m} value={m}>
+                {rotuloPeriodicidade(m)}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -266,7 +286,7 @@ export default function MontarOpcao({
               value={periodicidade}
               onChange={(e) => setPeriodicidade(Number(e.target.value))}
             >
-              {PERIODICIDADES.map((m) => (
+              {PERIODICIDADES_REFORCO.map((m) => (
                 <option key={m} value={m}>
                   {rotuloPeriodicidade(m)}
                 </option>
@@ -290,7 +310,7 @@ export default function MontarOpcao({
           <p className="tabular font-semibold">{moeda(previa.entrada)}</p>
         </div>
         <div>
-          <p className="eyebrow">Mensal (1ª)</p>
+          <p className="eyebrow">Parcela (1ª)</p>
           <p className="tabular font-semibold">{moeda(previa.mensal)}</p>
           <p className="text-[11px] text-cinza">{pct(previa.mensaisPct, 0)} do valor</p>
         </div>

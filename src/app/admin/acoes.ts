@@ -679,6 +679,38 @@ export async function apagarCondicao(id: string): Promise<ResultadoAcao> {
  * fica gravada de qualquer forma, para que desligar e religar a trava não
  * apague a configuração de quem administra.
  */
+/** Grava a trava e a lista de um único perfil — usado pela tela individual e pela em massa. */
+async function aplicarAcessoEmpreendimentos(
+  supabase: Awaited<ReturnType<typeof exigirAdmin>>["supabase"],
+  organizacaoId: string,
+  perfilId: string,
+  restrito: boolean,
+  empreendimentoIds: string[]
+) {
+  const { error: erroPerfil } = await supabase
+    .from("perfis")
+    .update({ empreendimentos_restritos: restrito })
+    .eq("id", perfilId);
+  if (erroPerfil) throw new Error(erroPerfil.message);
+
+  const { error: erroLimpeza } = await supabase
+    .from("corretor_empreendimentos")
+    .delete()
+    .eq("perfil_id", perfilId);
+  if (erroLimpeza) throw new Error(erroLimpeza.message);
+
+  if (empreendimentoIds.length > 0) {
+    const { error } = await supabase.from("corretor_empreendimentos").insert(
+      empreendimentoIds.map((empreendimento_id) => ({
+        perfil_id: perfilId,
+        empreendimento_id,
+        organizacao_id: organizacaoId,
+      }))
+    );
+    if (error) throw new Error(error.message);
+  }
+}
+
 export async function definirAcessoEmpreendimentos(
   perfilId: string,
   restrito: boolean,
@@ -686,28 +718,52 @@ export async function definirAcessoEmpreendimentos(
 ): Promise<ResultadoAcao> {
   return comoResultado(async () => {
     const { supabase, organizacaoId } = await exigirAdmin();
+    await aplicarAcessoEmpreendimentos(
+      supabase,
+      organizacaoId,
+      perfilId,
+      restrito,
+      empreendimentoIds
+    );
+    revalidatePath("/admin/corretores");
+    return {};
+  });
+}
 
-    const { error: erroPerfil } = await supabase
+/**
+ * A mesma trava aplicada de uma vez a vários corretores — para não exigir um
+ * "Salvar acesso" por pessoa quando o time inteiro entra na mesma regra (ex.:
+ * "só o Florescer" para quem não é admin). Admin nunca entra na lista: quem
+ * chama esta ação já filtra por papel = 'corretor', e aqui a restrição não
+ * faria sentido nenhum — admin enxerga tudo por definição.
+ */
+export async function definirAcessoEmpreendimentosEmMassa(
+  perfilIds: string[],
+  restrito: boolean,
+  empreendimentoIds: string[]
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    if (perfilIds.length === 0) throw new Error("Selecione ao menos um corretor.");
+
+    const { supabase, organizacaoId } = await exigirAdmin();
+
+    const { data: alvos, error: erroAlvos } = await supabase
       .from("perfis")
-      .update({ empreendimentos_restritos: restrito })
-      .eq("id", perfilId);
-    if (erroPerfil) throw new Error(erroPerfil.message);
+      .select("id, papel")
+      .in("id", perfilIds);
+    if (erroAlvos) throw new Error(erroAlvos.message);
+    if ((alvos ?? []).some((p) => p.papel === "admin")) {
+      throw new Error("Admin não entra na restrição — enxerga tudo por definição.");
+    }
 
-    const { error: erroLimpeza } = await supabase
-      .from("corretor_empreendimentos")
-      .delete()
-      .eq("perfil_id", perfilId);
-    if (erroLimpeza) throw new Error(erroLimpeza.message);
-
-    if (empreendimentoIds.length > 0) {
-      const { error } = await supabase.from("corretor_empreendimentos").insert(
-        empreendimentoIds.map((empreendimento_id) => ({
-          perfil_id: perfilId,
-          empreendimento_id,
-          organizacao_id: organizacaoId,
-        }))
+    for (const perfilId of perfilIds) {
+      await aplicarAcessoEmpreendimentos(
+        supabase,
+        organizacaoId,
+        perfilId,
+        restrito,
+        empreendimentoIds
       );
-      if (error) throw new Error(error.message);
     }
 
     revalidatePath("/admin/corretores");
