@@ -197,10 +197,22 @@ export function calcular(entrada: EntradaCalculo): Resultado {
   });
 
   const alocado = arredonda(calculados.reduce((s, c) => s + c.base, 0));
-  const entradaValor = arredonda(
-    fluxo.filter((f) => f.mes === 0).reduce((s, f) => s + f.valor, 0)
+
+  // "Entrada" é o bloco marcado como tal, não "o que vence no mês 0" — uma
+  // entrada parcelada (ex.: "Entrada 3x sem juros") tem parcelas nos meses
+  // 0, 1 e 2, e as três são entrada. Somar só o mês 0 subestimava o total
+  // toda vez que a entrada não cabia inteira no dia da assinatura.
+  const blocosEntradaIds = new Set(
+    calculados.filter((c) => c.bloco.tipo === "entrada").map((c) => c.bloco.id)
   );
-  const parcelasFuturas = fluxo.filter((f) => f.mes > 0);
+  const entradaValor = arredonda(
+    todas.filter((p) => blocosEntradaIds.has(p.blocoId)).reduce((s, p) => s + p.valor, 0)
+  );
+  // mesmo raciocínio: um mês inteiro de entrada parcelada não é uma
+  // "parcela" para fins de parcela inicial/média/final/maior parcela.
+  const parcelasFuturas = fluxo.filter((f) =>
+    f.itens.some((it) => !blocosEntradaIds.has(it.blocoId))
+  );
 
   const avisos = calculados.flatMap((c) => c.avisos);
   const residuo = arredonda(valorNegociado - alocado);

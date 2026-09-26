@@ -110,9 +110,20 @@ function descreverBloco(
     };
   }
 
+  // "e a última" aparecia só quando havia correção por índice — mas mesmo
+  // sem correção a última parcela pode diferir da primeira (o centavo do
+  // arredondamento vai para ela, ver calcularBloco em src/lib/calc/index.ts),
+  // e é justamente o caso mais comum de entrada parcelada ("Entrada 3x sem
+  // juros"). Sem isso, a proposta nunca dizia quando nem quanto era a
+  // última parcela — ela só aparecia, sem identificação, lá no cronograma.
+  const ultimaVenc = rotuloMes(bloco.mes_inicio + (n - 1) * passo, dataBase);
   return {
     titulo: bloco.rotulo,
-    detalhe: `${n} parcelas mensais${correcao}, a partir de ${venc}. A primeira de ${moeda(primeiraParcela)}${correcao ? ` e a última de ${moeda(ultimaParcela)}` : ""}.`,
+    detalhe: `${n} parcelas mensais${correcao}, a partir de ${venc}. A primeira de ${moeda(primeiraParcela)}${
+      ultimaParcela !== primeiraParcela
+        ? ` e a última de ${moeda(ultimaParcela)}, em ${ultimaVenc}`
+        : ""
+    }.`,
     valor: moeda(totalNominal),
   };
 }

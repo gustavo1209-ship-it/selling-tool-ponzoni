@@ -142,6 +142,38 @@ conferir("bloco de parcela travada = 2 × 30.000", rTravado.blocos[1].base, 6000
 conferir("bloco residual = 621.741,72 − 260.000", rTravado.blocos[2].base, 361741.72, 0.05);
 conferir("resíduo zerado", rTravado.residuo, 0, 0.01);
 
+console.log("\n— Entrada parcelada: 3x sem juros + 4x semestrais (Vale dos Vinhedos) —");
+const rEntradaParcelada = calcular({
+  lotes: [
+    { quadra: "1", numero: "1", area_m2: 912, preco_tabela: 840000, valor_negociado: 780000 },
+  ],
+  blocos: [
+    bloco({
+      id: "e", rotulo: "Entrada 3x sem juros", tipo: "entrada",
+      base_valor: 380000, qtd_parcelas: 3, mes_inicio: 0,
+    }),
+    bloco({
+      id: "p", rotulo: "4x semestrais", absorve_residuo: true,
+      qtd_parcelas: 4, mes_inicio: 4, periodicidade_meses: 6,
+      indexador: "incc", ordem: 1,
+    }),
+  ],
+  premissas,
+  desconto_pct: 0,
+  desconto_valor: 0,
+});
+// a entrada é o bloco, não "o que vence no mês 0" — as 3 parcelas da
+// entrada (meses 0, 1 e 2) somam os 380.000 inteiros, não só a 1ª de 126.666,67
+conferir("entrada parcelada soma as 3 parcelas, não só a 1ª", rEntradaParcelada.entrada, 380000);
+conferir(
+  "última parcela da entrada continua no fluxo (mês 2)",
+  rEntradaParcelada.fluxo.find((f) => f.mes === 2)?.valor ?? 0,
+  126666.66
+);
+// a 1ª "parcela" de verdade é a 1ª semestral (mês 4) — as 3 tranches da
+// entrada nos meses 0/1/2 não contam como "parcela inicial"
+conferir("parcela inicial pula a entrada e cai na 1ª semestral", rEntradaParcelada.parcelaInicial, 101507.51, 0.01);
+
 console.log("\n— Reforços semestrais: 20% entrada + 8 semestrais + o resto em 48x —");
 const rReforco = calcular({
   lotes: [

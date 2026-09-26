@@ -336,6 +336,29 @@ nada impede dois blocos começarem no mês 1. É exatamente assim que a planilha
 `20% + 25% 12x + 55% 36x` funciona — nos primeiros 12 meses o cliente paga as
 duas parcelas somadas. Não "sequenciar" os blocos automaticamente.
 
+### "Entrada" é o bloco, não "o que vence no mês 0"
+
+`resultado.entrada`/`entradaPct` somam as parcelas dos blocos com
+`tipo = "entrada"` (`src/lib/calc/index.ts`) — não mais "o que cai no mês
+0", que era o cálculo até a entrada de uma proposta poder ser parcelada
+("Entrada 3x sem juros" tem parcelas nos meses 0, 1 e 2). Com o cálculo
+antigo, uma entrada em 3x aparecia na proposta valendo só a 1ª parcela —
+um terço do combinado. Pelo mesmo motivo, `parcelaInicial`/`parcelaMedia`/
+`parcelaFinal`/`maiorParcela` (usadas nas métricas da proposta) ignoram
+meses que são só entrada: a 2ª e a 3ª parcela de uma entrada parcelada não
+são "a parcela inicial" do financiamento.
+
+O texto de cada bloco na proposta (`descreverBloco` em
+`FolhaProposta.tsx`) tinha o mesmo problema pela outra ponta: só mencionava
+"e a última de X" quando havia correção por índice. Sem correção — o caso
+mais comum de entrada parcelada, "sem juros" — a última parcela nunca
+aparecia descrita em lugar nenhum: não no texto do bloco (que só dizia "a
+partir de [data]") nem, de forma identificável, no cronograma de
+vencimentos (que lista Mês/Venc./Valor sem dizer de qual bloco é). A
+condição certa é comparar `ultimaParcela !== primeiraParcela`, não
+`correcao` — a última parcela pode diferir da primeira só pelo centavo do
+arredondamento (ver "Arredondamento" abaixo) e ainda assim merece ser dita.
+
 ### Reforços periódicos
 
 `periodicidade_meses` no bloco é o intervalo entre vencimentos: 1 mensal, 3
