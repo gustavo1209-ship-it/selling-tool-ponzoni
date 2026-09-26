@@ -19,7 +19,7 @@ export default async function AdminCorretoresPage() {
         .from("perfis")
         .select("id, nome, email, papel, empreendimentos_restritos")
         .order("nome"),
-      supabase.from("empreendimentos").select("*").order("nome"),
+      supabase.from("empreendimentos").select("*").order("ordem"),
       supabase
         .from("corretor_empreendimentos")
         .select("perfil_id, empreendimento_id"),

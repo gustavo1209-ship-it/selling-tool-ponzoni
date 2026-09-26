@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowDown,
+  ArrowUp,
   Check,
   ChevronDown,
   ChevronUp,
@@ -29,6 +31,7 @@ import {
   definirFotoCapa,
   definirFotosContrato,
   definirFotosProposta,
+  moverEmpreendimento,
   salvarTabelaPreco,
   type DadosEmpreendimento,
   type DadosLoteUnico,
@@ -286,7 +289,7 @@ export default function AdminEmpreendimentos({
         </section>
       )}
 
-      {empreendimentos.map((e) => {
+      {empreendimentos.map((e, i) => {
         const tabela = tabelas.find((t) => t.empreendimento_id === e.id) ?? null;
         const minhasCondicoes = tabela
           ? condicoes.filter((c) => c.tabela_preco_id === tabela.id)
@@ -295,31 +298,49 @@ export default function AdminEmpreendimentos({
 
         return (
           <section key={e.id} className="cartao">
-            <button
-              className="w-full flex items-center gap-3 p-4 text-left"
-              onClick={() => setAberto(expandido ? null : e.id)}
-            >
-              {e.logo_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={e.logo_url}
-                  alt=""
-                  className="w-9 h-9 rounded object-cover"
-                />
-              )}
-              <span className="flex-1">
-                <span className="serif text-lg block">{e.nome}</span>
-                <span className="text-xs text-cinza">
-                  /{e.slug}
-                  {e.cidade ? ` · ${e.cidade}/${e.uf}` : ""} ·{" "}
-                  {tabela
-                    ? `${minhasCondicoes.length} condição(ões)`
-                    : "sem tabela de preço"}
-                  {!e.ativo && " · inativo"}
+            <div className="flex items-center gap-1 p-4">
+              <button
+                className="flex-1 flex items-center gap-3 text-left min-w-0"
+                onClick={() => setAberto(expandido ? null : e.id)}
+              >
+                {e.logo_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={e.logo_url}
+                    alt=""
+                    className="w-9 h-9 rounded object-cover"
+                  />
+                )}
+                <span className="flex-1">
+                  <span className="serif text-lg block">{e.nome}</span>
+                  <span className="text-xs text-cinza">
+                    /{e.slug}
+                    {e.cidade ? ` · ${e.cidade}/${e.uf}` : ""} ·{" "}
+                    {tabela
+                      ? `${minhasCondicoes.length} condição(ões)`
+                      : "sem tabela de preço"}
+                    {!e.ativo && " · inativo"}
+                  </span>
                 </span>
-              </span>
-              {expandido ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-            </button>
+                {expandido ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </button>
+              <button
+                className="btn btn-fantasma px-2"
+                disabled={i === 0 || pendente}
+                onClick={() => agir(() => moverEmpreendimento(e.id, -1))}
+                title="Subir"
+              >
+                <ArrowUp size={15} />
+              </button>
+              <button
+                className="btn btn-fantasma px-2"
+                disabled={i === empreendimentos.length - 1 || pendente}
+                onClick={() => agir(() => moverEmpreendimento(e.id, 1))}
+                title="Descer"
+              >
+                <ArrowDown size={15} />
+              </button>
+            </div>
 
             {expandido && (
               <div className="border-t border-linha p-5 flex flex-col gap-6">

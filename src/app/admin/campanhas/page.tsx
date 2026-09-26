@@ -14,7 +14,7 @@ export default async function AdminCampanhasPage() {
   const supabase = await createClient();
   const [{ data: campanhas }, { data: empreendimentos }] = await Promise.all([
     supabase.from("campanhas").select("*").order("inicio", { ascending: false }),
-    supabase.from("empreendimentos").select("*").order("nome"),
+    supabase.from("empreendimentos").select("*").order("ordem"),
   ]);
 
   return (

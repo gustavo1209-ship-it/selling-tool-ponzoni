@@ -14,7 +14,7 @@ export default async function NovoContratoPage() {
 
   const [{ data: empreendimentos }, { data: lotes }, { data: clientes }, { data: indexadores }] =
     await Promise.all([
-      supabase.from("empreendimentos").select("*").eq("ativo", true).order("nome"),
+      supabase.from("empreendimentos").select("*").eq("ativo", true).order("ordem"),
       // todos os status: um contrato antigo é justamente de um lote que já
       // está marcado como vendido no espelho
       supabase.from("lotes_visiveis").select("*"),

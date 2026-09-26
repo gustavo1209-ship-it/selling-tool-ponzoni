@@ -29,7 +29,7 @@ export default async function Inicio() {
 
   const [{ data: empreendimentos }, { data: lotes }, { data: propostas }, { data: fotos }] =
     await Promise.all([
-      supabase.from("empreendimentos").select("*").eq("ativo", true).order("nome"),
+      supabase.from("empreendimentos").select("*").eq("ativo", true).order("ordem"),
       supabase
         .from("lotes_visiveis")
         .select("status, preco_tabela, area_m2, empreendimento_id"),

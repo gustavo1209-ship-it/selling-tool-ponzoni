@@ -21,7 +21,7 @@ export default async function AdminEmpreendimentosPage() {
   const supabase = await createClient();
   const [{ data: empreendimentos }, { data: tabelas }, { data: indexadores }] =
     await Promise.all([
-      supabase.from("empreendimentos").select("*").order("nome"),
+      supabase.from("empreendimentos").select("*").order("ordem"),
       supabase
         .from("tabelas_preco")
         .select("*")

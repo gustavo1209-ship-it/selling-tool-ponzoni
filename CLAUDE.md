@@ -847,6 +847,15 @@ português no lugar de "new row violates row-level security policy" — e evitar
 que um update que a policy simplesmente não alcança (zero linhas, sem erro)
 seja relatado como sucesso.
 
+**A ordem dos empreendimentos é dado, não é mais alfabética** (migration
+60). `empreendimentos.ordem` decide a posição em toda lista da aplicação —
+home, seletor de nova proposta/cliente/contrato, funil, espelho de campanhas
+— e o admin rearruma pelas setas em `/admin/empreendimentos`
+(`moverEmpreendimento`), mesma receita de `funil_etapas.ordem`: troca o
+valor com o vizinho, os dois espaçados de 10. Um empreendimento novo nasce
+no fim da lista. Ao adicionar uma tela nova que liste empreendimentos,
+`.order("ordem")`, não `.order("nome")`.
+
 ## Configurações (`/admin/configuracoes`)
 
 Opções da casa, numa linha única (`configuracoes`, id fixo = 1 — não é

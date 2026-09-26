@@ -131,9 +131,19 @@ export async function criarEmpreendimento(
       throw new Error("Informe a área do terreno (maior que zero).");
     }
 
+    // nasce no fim da lista — o admin rearruma pelas setas depois, se quiser.
+    const { data: ultimo } = await supabase
+      .from("empreendimentos")
+      .select("ordem")
+      .eq("organizacao_id", organizacaoId)
+      .order("ordem", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const ordem = (ultimo?.ordem ?? 0) + 10;
+
     const { data, error } = await supabase
       .from("empreendimentos")
-      .insert({ ...normalizar(dados), nome, slug, organizacao_id: organizacaoId })
+      .insert({ ...normalizar(dados), nome, slug, organizacao_id: organizacaoId, ordem })
       .select("id, slug")
       .single();
     if (error) throw new Error(error.message);
@@ -450,6 +460,50 @@ export async function atualizarEmpreendimento(
       .update({ ...normalizar(dados), nome })
       .eq("id", id);
     if (error) throw new Error(error.message);
+
+    revalidatePath("/admin/empreendimentos");
+    revalidatePath("/espelho");
+    revalidatePath("/mapa");
+    revalidatePath("/");
+    return {};
+  });
+}
+
+/**
+ * Troca a ordem de exibição com o vizinho — mesma receita das colunas do
+ * funil (`atualizarEtapa`/`ordem`), só que calculada no servidor: a tela só
+ * manda "sobe" ou "desce", quem acha o vizinho e grava os dois é a action.
+ */
+export async function moverEmpreendimento(
+  id: string,
+  direcao: -1 | 1
+): Promise<ResultadoAcao> {
+  return comoResultado(async () => {
+    const { supabase, organizacaoId } = await exigirAdmin();
+
+    const { data: lista, error: erroLista } = await supabase
+      .from("empreendimentos")
+      .select("id, ordem")
+      .eq("organizacao_id", organizacaoId)
+      .order("ordem");
+    if (erroLista) throw new Error(erroLista.message);
+
+    const posicao = (lista ?? []).findIndex((e) => e.id === id);
+    const vizinha = (lista ?? [])[posicao + direcao];
+    if (posicao === -1 || !vizinha) return {};
+
+    const atual = lista![posicao];
+    const { error: e1 } = await supabase
+      .from("empreendimentos")
+      .update({ ordem: vizinha.ordem })
+      .eq("id", atual.id);
+    if (e1) throw new Error(e1.message);
+
+    const { error: e2 } = await supabase
+      .from("empreendimentos")
+      .update({ ordem: atual.ordem })
+      .eq("id", vizinha.id);
+    if (e2) throw new Error(e2.message);
 
     revalidatePath("/admin/empreendimentos");
     revalidatePath("/espelho");

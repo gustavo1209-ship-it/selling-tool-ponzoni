@@ -34,7 +34,7 @@ export default async function FunilPage() {
       )
       .order("ordem"),
     supabase.from("clientes").select("*").order("nome"),
-    supabase.from("empreendimentos").select("*").eq("ativo", true).order("nome"),
+    supabase.from("empreendimentos").select("*").eq("ativo", true).order("ordem"),
     supabase.from("lotes_visiveis").select("*").in("status", ["livre", "reservado"]),
     supabase
       .from("propostas")

@@ -24,7 +24,7 @@ export default async function ClientesPage() {
       .select("*, propostas(id, codigo), contratos(id, codigo)")
       .order("nome"),
     supabase.from("funil_etapas").select("*").eq("ativa", true).order("ordem"),
-    supabase.from("empreendimentos").select("*").eq("ativo", true).order("nome"),
+    supabase.from("empreendimentos").select("*").eq("ativo", true).order("ordem"),
     supabase.from("lotes_visiveis").select("*"),
     mapaDePerfis(),
   ]);

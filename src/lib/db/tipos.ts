@@ -55,6 +55,8 @@ export interface Empreendimento {
   site_url: string | null;
   /** Opcional — usuário ou link, sai no rodapé da proposta e do contrato. */
   instagram: string | null;
+  /** Ordem de exibição nas listas — o admin rearruma pelas setas em /admin/empreendimentos. */
+  ordem: number;
 }
 
 /** Uma foto da galeria de um empreendimento — até 5, escolhidas na tela de cadastro. */

@@ -22,7 +22,7 @@ export default async function NovaPropostaPage() {
 
   const [{ data: empreendimentos }, { data: lotes }, { data: tabelas }, { data: clientes }] =
     await Promise.all([
-      supabase.from("empreendimentos").select("*").eq("ativo", true).order("nome"),
+      supabase.from("empreendimentos").select("*").eq("ativo", true).order("ordem"),
       supabase
         .from("lotes_visiveis")
         .select("*")
